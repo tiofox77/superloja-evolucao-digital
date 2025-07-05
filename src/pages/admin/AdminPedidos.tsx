@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ShoppingCart, Clock, CheckCircle, XCircle, Eye, Users, Package, TrendingUp } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle, XCircle, Eye, Users, Package, TrendingUp, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import OrderDetails from '@/components/OrderDetails';
@@ -97,6 +97,31 @@ const AdminPedidos = () => {
       setOrderItems(data || []);
     } catch (error) {
       console.error('Erro ao carregar itens do pedido:', error);
+    }
+  };
+
+  const deleteOrder = async (orderId) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Pedido excluído!",
+        description: "Pedido removido com sucesso."
+      });
+
+      loadOrders();
+      loadStats();
+    } catch (error) {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
@@ -291,6 +316,14 @@ const AdminPedidos = () => {
                           )}
                         </DialogContent>
                       </Dialog>
+                      
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteOrder(order.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>

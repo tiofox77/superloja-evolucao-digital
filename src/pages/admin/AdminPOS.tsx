@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Minus, ShoppingCart, Trash2, Calculator } from 'lucide-react';
+import { Search, Plus, Minus, ShoppingCart, Trash2, Calculator, CreditCard } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,6 +17,7 @@ const AdminPOS = () => {
     phone: '',
     email: ''
   });
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -105,7 +107,7 @@ const AdminPOS = () => {
           customer_phone: customerInfo.phone || null,
           customer_email: customerInfo.email || null,
           total_amount: getTotalAmount(),
-          payment_method: 'cash',
+          payment_method: paymentMethod,
           payment_status: 'paid',
           order_status: 'completed',
           order_source: 'pos'
@@ -258,6 +260,30 @@ const AdminPOS = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Payment Method */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Método de Pagamento</label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">
+                      <div className="flex items-center gap-2">
+                        <span>💵</span>
+                        Dinheiro
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="transfer">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4" />
+                        Transferência
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Customer Info */}
               <div className="space-y-2">
                 <Input
