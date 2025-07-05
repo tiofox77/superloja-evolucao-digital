@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { User, MapPin, ShoppingBag, Settings, LogOut, Eye, Package } from 'lucide-react';
+import { User, MapPin, ShoppingBag, Settings, LogOut, Eye, Package, Phone } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,7 @@ const Cliente = () => {
   const [profileData, setProfileData] = useState({
     full_name: '',
     email: '',
+    phone: '',
     country: '',
     province: '',
     city: '',
@@ -79,6 +80,7 @@ const Cliente = () => {
         setProfileData({
           full_name: profileData.full_name || '',
           email: profileData.email || '',
+          phone: profileData.phone || '',
           country: profileData.country || '',
           province: profileData.province || '',
           city: profileData.city || '',
@@ -248,6 +250,29 @@ const Cliente = () => {
                           className="bg-muted"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="phone">Telefone</Label>
+                      <div className="flex mt-1">
+                        <div className="flex items-center px-3 border border-r-0 border-input bg-muted rounded-l-md">
+                          <span className="text-sm text-muted-foreground">+244</span>
+                        </div>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={profileData.phone}
+                          onChange={(e) => {
+                            const cleaned = e.target.value.replace(/\D/g, '').replace(/^244/, '');
+                            setProfileData({...profileData, phone: cleaned});
+                          }}
+                          placeholder="912345678"
+                          className="rounded-l-none"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Digite apenas os números sem o código do país
+                      </p>
                     </div>
 
                     <div className="space-y-4">

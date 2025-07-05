@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, Search, UserCog, Shield, Plus, Edit, MapPin } from 'lucide-react';
+import { Users, Search, UserCog, Shield, Plus, Edit, MapPin, Phone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import UserForm from '@/components/UserForm';
 import { useToast } from '@/hooks/use-toast';
@@ -168,6 +168,12 @@ const AdminUsuarios = () => {
                       {getRoleBadge(user.role)}
                     </div>
                     <p className="text-sm text-muted-foreground mb-1">{user.email}</p>
+                    {user.phone && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                        <Phone className="w-3 h-3" />
+                        <span>+244{user.phone}</span>
+                      </div>
+                    )}
                     {(user.country || user.city) && (
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <MapPin className="w-3 h-3" />

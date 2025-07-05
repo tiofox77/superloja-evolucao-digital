@@ -21,6 +21,7 @@ import AdminUpload from "@/pages/admin/AdminUpload";
 import AdminPOS from "@/pages/admin/AdminPOS";
 import AdminConfiguracoes from "@/pages/admin/AdminConfiguracoes";
 import AdminPromocoes from "@/pages/admin/AdminPromocoes";
+import AdminPerfil from "@/pages/admin/AdminPerfil";
 import AdminLogs from "@/pages/admin/AdminLogs";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
@@ -50,6 +51,7 @@ function App() {
                 <Route path="categorias" element={<AdminCategorias />} />
                 <Route path="pedidos" element={<AdminPedidos />} />
                 <Route path="usuarios" element={<AdminUsuarios />} />
+                <Route path="perfil" element={<AdminPerfil />} />
                 <Route path="upload" element={<AdminUpload />} />
                 <Route path="pos" element={<AdminPOS />} />
                 <Route path="configuracoes" element={<AdminConfiguracoes />} />

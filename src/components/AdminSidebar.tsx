@@ -10,7 +10,8 @@ import {
   Tag,
   Upload,
   FileText,
-  Activity
+  Activity,
+  User
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -64,6 +65,11 @@ const menuItems = [
 ];
 
 const toolsItems = [
+  {
+    title: 'Meu Perfil',
+    url: '/admin/perfil',
+    icon: User,
+  },
   {
     title: 'Upload de Imagens',
     url: '/admin/upload',
