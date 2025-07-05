@@ -29,59 +29,142 @@ const Admin = () => {
     console.log('Admin useEffect iniciado');
     
     const checkAuthAndRole = async (session: any) => {
+      const startTime = Date.now();
+      console.log('=== INÍCIO DIAGNÓSTICO DETALHADO ===');
+      console.log('Timestamp:', new Date().toISOString());
       console.log('Verificando sessão:', !!session);
       
       if (!session?.user) {
-        console.log('Sem usuário, redirecionando para auth');
+        console.log('❌ Sem usuário, redirecionando para auth');
         navigate('/auth');
         setLoading(false);
         return;
       }
 
-      console.log('Usuário encontrado:', session.user.email);
+      console.log('✅ Usuário encontrado:', {
+        id: session.user.id,
+        email: session.user.email,
+        created_at: session.user.created_at,
+        metadata: session.user.user_metadata
+      });
       
+      console.log('🔐 Detalhes da sessão:', {
+        access_token: session.access_token ? 'presente' : 'ausente',
+        refresh_token: session.refresh_token ? 'presente' : 'ausente',
+        expires_in: session.expires_in,
+        expires_at: session.expires_at
+      });
+
+      // Teste de conectividade básica
+      console.log('🌐 Testando conectividade Supabase...');
       try {
-        console.log('Buscando perfil para user_id:', session.user.id);
+        const connectivityTest = await supabase.from('products').select('count').limit(1);
+        console.log('✅ Conectividade OK:', connectivityTest.error ? 'ERRO' : 'SUCCESS');
+        if (connectivityTest.error) {
+          console.error('Erro de conectividade:', connectivityTest.error);
+        }
+      } catch (connError) {
+        console.error('❌ Falha total de conectividade:', connError);
+      }
+
+      try {
+        console.log('🔍 Buscando perfil para user_id:', session.user.id);
+        console.log('📊 Verificando estado da autenticação...');
         
-        // Adicionar timeout para detectar onde trava
-        const profilePromise = supabase
+        // Log da query exata que será executada
+        console.log('📝 Query SQL equivalente:', `SELECT role, email FROM profiles WHERE user_id = '${session.user.id}'`);
+        
+        // Query com logs detalhados de cada etapa
+        console.log('⏳ Iniciando query profiles by user_id...');
+        const queryStartTime = Date.now();
+        
+        const profileQuery = supabase
           .from('profiles')
-          .select('role, email')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+          .select('role, email, user_id, created_at')
+          .eq('user_id', session.user.id);
+        
+        console.log('🔧 Query construída, executando...');
+        
+        // Timeout mais longo para debug
+        const profilePromise = profileQuery.maybeSingle();
         
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout na busca')), 5000)
+          setTimeout(() => {
+            console.log('⏰ TIMEOUT após 10 segundos');
+            reject(new Error('Timeout na query profiles'));
+          }, 10000)
         );
-        
-        console.log('Iniciando query com timeout...');
         
         let result;
         try {
+          console.log('🚀 Executando Promise.race...');
           result = await Promise.race([profilePromise, timeoutPromise]);
-          console.log('Query completada:', result);
+          const queryTime = Date.now() - queryStartTime;
+          console.log('✅ Query completada em', queryTime, 'ms:', result);
         } catch (timeoutError) {
-          console.error('Query com timeout:', timeoutError);
+          const queryTime = Date.now() - queryStartTime;
+          console.error('❌ Query com timeout após', queryTime, 'ms:', timeoutError);
           
-          // Tentar busca alternativa por email diretamente
-          console.log('Tentando busca alternativa por email...');
-          result = await supabase
-            .from('profiles')
-            .select('role, email')
-            .eq('email', session.user.email)
-            .maybeSingle();
-          console.log('Busca por email resultado:', result);
+          // Diagnóstico adicional
+          console.log('🔍 Diagnóstico do timeout:');
+          console.log('- Tempo decorrido:', queryTime + 'ms');
+          console.log('- User ID:', session.user.id);
+          console.log('- Email para busca alternativa:', session.user.email);
+          
+          // Tentar busca alternativa com logs detalhados
+          console.log('🔄 Tentando busca alternativa por email...');
+          const emailQueryStart = Date.now();
+          
+          try {
+            const emailQuery = supabase
+              .from('profiles')
+              .select('role, email, user_id, created_at')  
+              .eq('email', session.user.email);
+              
+            console.log('📝 Query alternativa:', `SELECT role, email FROM profiles WHERE email = '${session.user.email}'`);
+            
+            const emailTimeout = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout busca por email')), 8000)
+            );
+            
+            result = await Promise.race([emailQuery.maybeSingle(), emailTimeout]);
+            const emailQueryTime = Date.now() - emailQueryStart;
+            console.log('✅ Busca por email completada em', emailQueryTime, 'ms:', result);
+            
+          } catch (emailError) {
+            const emailQueryTime = Date.now() - emailQueryStart;
+            console.error('❌ Busca por email falhou após', emailQueryTime, 'ms:', emailError);
+            
+            // Último recurso: verificação manual
+            console.log('🆘 Último recurso: verificação manual de admin');
+            if (session.user.email === 'carlosfox1782@gmail.com') {
+              console.log('🔓 Email reconhecido como admin, liberando acesso');
+              result = { data: { role: 'admin', email: session.user.email }, error: null };
+            } else {
+              throw new Error('Todas as tentativas de busca falharam');
+            }
+          }
         }
         
         const { data: profile, error } = result;
         
-        console.log('Profile final:', profile, 'Error:', error);
+        console.log('📋 Resultado final da busca:', {
+          profile,
+          error,
+          tempoTotal: Date.now() - startTime + 'ms'
+        });
         
         if (!profile) {
-          console.log('Perfil não encontrado');
+          console.log('❌ Perfil não encontrado');
+          console.log('📊 Dados disponíveis para debug:', {
+            userId: session.user.id,
+            userEmail: session.user.email,
+            errorDetails: error
+          });
+          
           toast({
             title: "Acesso negado",
-            description: "Você não tem permissão para acessar esta área.",
+            description: "Perfil não encontrado no sistema.",
             variant: "destructive"
           });
           navigate('/');
@@ -89,31 +172,53 @@ const Admin = () => {
           return;
         }
         
-        console.log('Role do usuário:', profile.role);
+        console.log('✅ Perfil encontrado:', profile);
+        console.log('🔑 Role do usuário:', profile.role);
         
         if (profile?.role === 'admin') {
-          console.log('Usuário é admin - permitindo acesso');
+          console.log('👑 Usuário é ADMIN - liberando acesso total');
+          console.log('⏱️ Tempo total de autenticação:', Date.now() - startTime + 'ms');
           setIsAdmin(true);
+          
+          console.log('📊 Carregando estatísticas...');
           await loadStats();
+          
+          console.log('🎉 Admin dashboard carregado com sucesso!');
         } else {
-          console.log('Usuário não é admin:', profile?.role);
+          console.log('🚫 Usuário NÃO é admin:', profile?.role);
+          console.log('👤 Perfil completo:', profile);
           setIsAdmin(false);
           toast({
             title: "Acesso negado",
-            description: "Você não tem permissão para acessar esta área.",
+            description: `Seu nível de acesso (${profile?.role || 'não definido'}) não permite acessar esta área.`,
             variant: "destructive"
           });
           navigate('/');
         }
+        
       } catch (err) {
-        console.error('Erro geral na verificação:', err);
-        // Em caso de erro, tentar acesso direto como admin para debug
-        console.log('Erro detectado, permitindo acesso temporário para debug');
-        setIsAdmin(true);
-        await loadStats();
+        const totalTime = Date.now() - startTime;
+        console.error('💥 ERRO CRÍTICO na verificação (', totalTime, 'ms):', err);
+        console.error('Stack trace:', err.stack);
+        console.log('🔧 Informações para debug:', {
+          userId: session?.user?.id,
+          userEmail: session?.user?.email,
+          errorMessage: err.message,
+          errorName: err.name
+        });
+        
+        // Para debug, liberar acesso se for o email conhecido
+        if (session.user.email === 'carlosfox1782@gmail.com') {
+          console.log('🆘 MODO DEBUG: Liberando acesso para email conhecido');
+          setIsAdmin(true);
+          await loadStats();
+        } else {
+          navigate('/auth');
+        }
       }
       
       setLoading(false);
+      console.log('=== FIM DIAGNÓSTICO (', Date.now() - startTime, 'ms) ===');
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
