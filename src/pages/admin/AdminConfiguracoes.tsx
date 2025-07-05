@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Settings, Store, Bell, Shield, Database } from 'lucide-react';
+import { Settings, Store, Bell, Shield, Database, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const AdminConfiguracoes = () => {
@@ -19,23 +19,27 @@ const AdminConfiguracoes = () => {
     auto_backup: true,
     maintenance_mode: false
   });
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const handleSave = async () => {
+    setLoading(true);
     try {
       // Simular salvamento (implementar com Supabase posteriormente)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       toast({
-        title: "Configurações salvas!",
-        description: "Todas as configurações foram atualizadas."
+        title: "✅ Configurações salvas!",
+        description: "Todas as configurações foram atualizadas com sucesso."
       });
     } catch (error) {
       toast({
-        title: "Erro ao salvar",
+        title: "❌ Erro ao salvar",
         description: "Não foi possível salvar as configurações.",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -43,9 +47,9 @@ const AdminConfiguracoes = () => {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          Configurações
+          ⚙️ Configurações
         </h1>
-        <p className="text-muted-foreground">Gerencie as configurações da sua loja</p>
+        <p className="text-muted-foreground">Gerencie as configurações da sua loja e sistema</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -201,9 +205,18 @@ const AdminConfiguracoes = () => {
 
       {/* Salvar Configurações */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} size="lg">
-          <Settings className="w-4 h-4 mr-2" />
-          Salvar Configurações
+        <Button onClick={handleSave} size="lg" disabled={loading}>
+          {loading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Salvando...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              💾 Salvar Configurações
+            </>
+          )}
         </Button>
       </div>
     </div>

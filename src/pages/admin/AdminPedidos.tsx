@@ -303,10 +303,13 @@ const AdminPedidos = () => {
                             Ver Detalhes
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                          <DialogHeader>
-                            <DialogTitle>Pedido #{selectedOrder?.id.slice(0, 8)}</DialogTitle>
-                          </DialogHeader>
+        <DialogContent className="max-w-2xl" aria-describedby="order-details-description">
+          <DialogHeader>
+            <DialogTitle>Pedido #{selectedOrder?.id.slice(0, 8)}</DialogTitle>
+            <p id="order-details-description" className="text-sm text-muted-foreground">
+              Detalhes completos do pedido e informações do cliente
+            </p>
+          </DialogHeader>
                           {selectedOrder && (
                             <OrderDetails 
                               order={selectedOrder} 
