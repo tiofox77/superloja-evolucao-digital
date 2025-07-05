@@ -2,8 +2,18 @@ import { Facebook, Instagram, Twitter, Youtube, Mail, Phone, MapPin, CreditCard,
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import logoImage from "@/assets/superloja-logo.png";
+import { useSettings } from "@/contexts/SettingsContext";
 
 export const Footer = () => {
+  const { settings, loading } = useSettings();
+
+  const openSocialMedia = (url: string) => {
+    if (url) {
+      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+      window.open(fullUrl, '_blank');
+    }
+  };
+
   return (
     <footer className="bg-card border-t border-border">
       {/* Features section */}
@@ -69,38 +79,65 @@ export const Footer = () => {
             </div>
             
             <p className="text-muted-foreground leading-relaxed">
-              A SuperLoja é sua loja online de confiança para produtos tecnológicos modernos. 
-              Oferecemos os melhores preços e atendimento excepcional.
+              {settings.store_description}
             </p>
 
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <MapPin className="h-4 w-4 text-primary" />
-                <span>Luanda, Angola</span>
+                <span>{settings.address}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Phone className="h-4 w-4 text-primary" />
-                <span>+244 942 705 533</span>
+                <span>{settings.contact_phone}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Mail className="h-4 w-4 text-primary" />
-                <span>contato@superloja.vip</span>
+                <span>{settings.contact_email}</span>
               </div>
             </div>
 
             <div className="flex gap-3">
-              <Button variant="outline" size="icon" className="rounded-full">
-                <Facebook className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="rounded-full">
-                <Instagram className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="rounded-full">
-                <Twitter className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="rounded-full">
-                <Youtube className="h-4 w-4" />
-              </Button>
+              {settings.facebook && (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="rounded-full"
+                  onClick={() => openSocialMedia(settings.facebook)}
+                >
+                  <Facebook className="h-4 w-4" />
+                </Button>
+              )}
+              {settings.instagram && (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="rounded-full"
+                  onClick={() => openSocialMedia(settings.instagram)}
+                >
+                  <Instagram className="h-4 w-4" />
+                </Button>
+              )}
+              {settings.whatsapp && (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="rounded-full"
+                  onClick={() => openSocialMedia(`https://wa.me/${settings.whatsapp.replace(/[^\d]/g, '')}`)}
+                >
+                  <Phone className="h-4 w-4" />
+                </Button>
+              )}
+              {settings.website && (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="rounded-full"
+                  onClick={() => openSocialMedia(settings.website)}
+                >
+                  <Youtube className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 

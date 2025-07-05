@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import Index from "@/pages/Index";
 import Catalogo from "@/pages/Catalogo";
 import Produto from "@/pages/Produto";
@@ -25,7 +26,8 @@ import { AdminLayout } from "@/components/AdminLayout";
 
 function App() {
   return (
-    <CartProvider>
+    <SettingsProvider>
+      <CartProvider>
       <Router>
         <div className="min-h-screen bg-background">
           <Suspense fallback={<div>Loading...</div>}>
@@ -60,6 +62,7 @@ function App() {
         <Toaster />
       </Router>
     </CartProvider>
+    </SettingsProvider>
   );
 }
 
