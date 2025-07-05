@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Upload, Image as ImageIcon, Loader2, Star, Images } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Loader2, Star, Images, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ImageAIEditor from '@/components/ImageAIEditor';
@@ -23,6 +23,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
   const [loading, setLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [seoSuggestions, setSeoSuggestions] = useState(null);
+  const [generatingSEO, setGeneratingSEO] = useState(false);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -35,7 +37,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
     in_stock: product?.in_stock ?? true,
     featured: product?.featured ?? false,
     image_url: product?.image_url || '',
-    images: product?.images || []
+    images: product?.images || [],
+    seo_title: product?.seo_title || '',
+    seo_description: product?.seo_description || '',
+    seo_keywords: product?.seo_keywords || ''
   });
 
   useEffect(() => {
@@ -138,7 +143,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         price: parseFloat(formData.price),
         original_price: formData.original_price ? parseFloat(formData.original_price) : null,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
-        slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        seo_title: formData.seo_title || null,
+        seo_description: formData.seo_description || null,
+        seo_keywords: formData.seo_keywords || null
       };
 
       let result;
@@ -209,6 +217,59 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
       currency: 'AOA',
       minimumFractionDigits: 0
     }).format(price);
+  };
+
+  const generateSEOSuggestions = async () => {
+    if (!formData.name || !formData.description) {
+      toast({
+        title: "Informações incompletas",
+        description: "Preencha o nome e descrição do produto para gerar sugestões de SEO.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setGeneratingSEO(true);
+    try {
+      const categoryName = categories.find(cat => cat.id === formData.category_id)?.name || 'Produto';
+      
+      const { data, error } = await supabase.functions.invoke('generate-product-seo', {
+        body: {
+          productName: formData.name,
+          productDescription: formData.description,
+          categoryName,
+          price: formData.price ? parseFloat(formData.price) : 0,
+          generateOnly: true // Flag para só gerar, não salvar
+        }
+      });
+
+      if (error) throw error;
+
+      setSeoSuggestions(data);
+      toast({
+        title: "Sugestões geradas!",
+        description: "Use as sugestões abaixo para otimizar o SEO do produto."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao gerar sugestões",
+        description: error.message || "Verifique se a API OpenAI está configurada.",
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingSEO(false);
+    }
+  };
+
+  const applySEOSuggestion = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    toast({
+      title: "Sugestão aplicada!",
+      description: `Campo ${field.replace('seo_', '').toUpperCase()} atualizado.`
+    });
   };
 
   return (
@@ -286,6 +347,143 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                         </p>
                       </div>
                     </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Sugestões SEO com IA */}
+            <Card className="hover-scale border-l-4 border-l-purple-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-purple-600">
+                  <Sparkles className="w-5 h-5" />
+                  Sugestões SEO com IA
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Gere título, descrição e palavras-chave otimizadas usando inteligência artificial
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-center">
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    onClick={generateSEOSuggestions}
+                    disabled={generatingSEO || !formData.name || !formData.description}
+                    className="bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200"
+                  >
+                    {generatingSEO ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Gerando sugestões...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Gerar Sugestões SEO
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {!formData.name || !formData.description ? (
+                  <div className="text-center p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      Preencha o nome e descrição do produto para gerar sugestões de SEO
+                    </p>
+                  </div>
+                ) : null}
+
+                {seoSuggestions && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
+                      <h4 className="font-semibold text-purple-800 mb-3">✨ Título SEO Sugerido</h4>
+                      <div className="bg-white p-3 rounded border border-purple-100 mb-2">
+                        <p className="text-sm">{seoSuggestions.seo_title}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button"
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => applySEOSuggestion('seo_title', seoSuggestions.seo_title)}
+                        >
+                          Aplicar
+                        </Button>
+                        <div className="text-xs text-muted-foreground flex items-center">
+                          {seoSuggestions.seo_title?.length || 0}/60 caracteres
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
+                      <h4 className="font-semibold text-purple-800 mb-3">📝 Descrição SEO Sugerida</h4>
+                      <div className="bg-white p-3 rounded border border-purple-100 mb-2">
+                        <p className="text-sm">{seoSuggestions.seo_description}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          type="button"
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => applySEOSuggestion('seo_description', seoSuggestions.seo_description)}
+                        >
+                          Aplicar
+                        </Button>
+                        <div className="text-xs text-muted-foreground flex items-center">
+                          {seoSuggestions.seo_description?.length || 0}/160 caracteres
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
+                      <h4 className="font-semibold text-purple-800 mb-3">🔑 Palavras-chave Sugeridas</h4>
+                      <div className="bg-white p-3 rounded border border-purple-100 mb-2">
+                        <p className="text-sm">{seoSuggestions.seo_keywords}</p>
+                      </div>
+                      <Button 
+                        type="button"
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => applySEOSuggestion('seo_keywords', seoSuggestions.seo_keywords)}
+                      >
+                        Aplicar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Campos SEO Atuais */}
+                {(formData.seo_title || formData.seo_description || formData.seo_keywords) && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="font-semibold text-sm">SEO Atual do Produto</h4>
+                    
+                    {formData.seo_title && (
+                      <div>
+                        <Label>Título SEO</Label>
+                        <div className="bg-muted/50 p-2 rounded text-sm mt-1">
+                          {formData.seo_title}
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.seo_description && (
+                      <div>
+                        <Label>Descrição SEO</Label>
+                        <div className="bg-muted/50 p-2 rounded text-sm mt-1">
+                          {formData.seo_description}
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.seo_keywords && (
+                      <div>
+                        <Label>Palavras-chave</Label>
+                        <div className="bg-muted/50 p-2 rounded text-sm mt-1">
+                          {formData.seo_keywords}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

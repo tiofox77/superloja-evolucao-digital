@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    const { productId, productName, productDescription, categoryName, price } = await req.json();
+    const { productId, productName, productDescription, categoryName, price, generateOnly } = await req.json();
     
     if (!openAIApiKey) {
       return new Response(JSON.stringify({
@@ -28,8 +28,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Gerar SEO com IA
     const prompt = `
@@ -109,6 +107,26 @@ Formato de resposta em JSON:
         og_description: `${productDescription?.substring(0, 150) || `Compre ${productName} na SuperLoja Angola`}`
       };
     }
+
+    // Se for apenas para gerar sugestões, retornar sem salvar
+    if (generateOnly) {
+      return new Response(JSON.stringify(seoData), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Verificar se productId foi fornecido para salvar
+    if (!productId) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Product ID is required when not generating only'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Atualizar produto com dados SEO
     const { error: updateError } = await supabase
