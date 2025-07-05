@@ -133,7 +133,7 @@ const Checkout = () => {
         payment_method: formData.paymentMethod,
         payment_status: formData.paymentMethod === 'cash' ? 'pending' : 'paid',
         order_status: 'pending',
-        order_source: 'online',
+        order_source: 'web',
         notes: `${formData.notes}\n\nEndereço: ${formData.address}\nCidade: ${formData.city}, ${formData.province}\nPaís: ${formData.country}\nRua: ${formData.street}${proofUrl ? `\nComprovante: ${proofUrl}` : ''}`
       };
 
