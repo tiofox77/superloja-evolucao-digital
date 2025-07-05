@@ -11,7 +11,13 @@ import Contato from "@/pages/Contato";
 import Checkout from "@/pages/Checkout";
 import Auth from "@/pages/Auth";
 import Admin from "@/pages/Admin";
+import AdminProdutos from "@/pages/admin/AdminProdutos";
+import AdminCategorias from "@/pages/admin/AdminCategorias";
+import AdminPedidos from "@/pages/admin/AdminPedidos";
+import AdminUsuarios from "@/pages/admin/AdminUsuarios";
+import AdminUpload from "@/pages/admin/AdminUpload";
 import NotFound from "@/pages/NotFound";
+import { AdminLayout } from "@/components/AdminLayout";
 
 function App() {
   return (
@@ -26,8 +32,18 @@ function App() {
               <Route path="/categorias" element={<Categorias />} />
               <Route path="/sobre" element={<Sobre />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/admin" element={<Admin />} />
               <Route path="/checkout" element={<Checkout />} />
+              
+              {/* Admin Routes */}
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<Admin />} />
+                <Route path="produtos" element={<AdminProdutos />} />
+                <Route path="categorias" element={<AdminCategorias />} />
+                <Route path="pedidos" element={<AdminPedidos />} />
+                <Route path="usuarios" element={<AdminUsuarios />} />
+                <Route path="upload" element={<AdminUpload />} />
+              </Route>
+              
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
