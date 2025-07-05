@@ -4,7 +4,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.3';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,10 +18,32 @@ serve(async (req) => {
   try {
     const { productId, productName, productDescription, categoryName, price, generateOnly } = await req.json();
     
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Buscar chave OpenAI das configurações
+    const { data: settings, error: settingsError } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'seo_settings')
+      .maybeSingle();
+    
+    if (settingsError) {
+      console.error('Erro ao buscar configurações:', settingsError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Erro ao acessar configurações'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    const openAIApiKey = settings?.value?.openai_api_key;
+    
     if (!openAIApiKey) {
       return new Response(JSON.stringify({
         success: false,
-        error: 'OpenAI API key not configured'
+        error: 'Chave OpenAI não configurada. Configure em Configurações → SEO & API'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
