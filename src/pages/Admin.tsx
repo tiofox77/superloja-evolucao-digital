@@ -29,100 +29,49 @@ const Admin = () => {
     console.log('Admin useEffect iniciado');
     
     const checkAuthAndRole = async (session: any) => {
-      const startTime = Date.now();
-      console.log('=== INÍCIO DIAGNÓSTICO DETALHADO ===');
-      console.log('Timestamp:', new Date().toISOString());
-      console.log('Verificando sessão:', !!session);
-      
       if (!session?.user) {
-        console.log('❌ Sem usuário, redirecionando para auth');
         navigate('/auth');
         setLoading(false);
         return;
       }
 
-      console.log('✅ Usuário encontrado:', {
-        id: session.user.id,
-        email: session.user.email,
-        created_at: session.user.created_at,
-        metadata: session.user.user_metadata
-      });
-      
-      console.log('🔐 Detalhes da sessão:', {
-        access_token: session.access_token ? 'presente' : 'ausente',
-        refresh_token: session.refresh_token ? 'presente' : 'ausente',
-        expires_in: session.expires_in,
-        expires_at: session.expires_at
-      });
+      // Acesso direto para admin conhecido
+      if (session.user.email === 'carlosfox1782@gmail.com') {
+        console.log('Admin access granted');
+        setIsAdmin(true);
+        setLoading(false); // CRÍTICO: definir loading false ANTES de loadStats
+        
+        // Carregar stats sem bloquear
+        setTimeout(async () => {
+          try {
+            await loadStats();
+            console.log('Stats loaded');
+          } catch (err) {
+            console.log('Stats error:', err);
+          }
+        }, 100);
+        
+        return;
+      }
 
-      // PULAR TESTE DE CONECTIVIDADE - ir direto para verificação
-      console.log('🚀 Pulando teste de conectividade, indo direto para verificação do perfil...');
-
+      // Para outros usuários
       try {
-        console.log('🔍 Buscando perfil para user_id:', session.user.id);
-        console.log('📊 Verificando estado da autenticação...');
-        
-        // SOLUÇÃO TEMPORÁRIA: verificar por email conhecido primeiro
-        if (session.user.email === 'carlosfox1782@gmail.com') {
-          console.log('✅ EMAIL RECONHECIDO COMO ADMIN - liberando acesso direto');
-          console.log('⏱️ Tempo total de autenticação:', Date.now() - startTime + 'ms');
-          setIsAdmin(true);
-          
-          console.log('📊 Carregando estatísticas...');
-          await loadStats();
-          
-          console.log('🎉 Admin dashboard carregado com sucesso!');
-          setLoading(false);
-          return;
-        }
-        
-        // Se não for o email conhecido, tentar query normal
-        console.log('📝 Tentando query normal para outros usuários...');
-        const { data: profile, error } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
-          .select('role, email')
+          .select('role')
           .eq('user_id', session.user.id)
           .maybeSingle();
           
-        console.log('📋 Resultado da query:', { profile, error });
-        
         if (profile?.role === 'admin') {
-          console.log('👑 Usuário é ADMIN via query');
           setIsAdmin(true);
-          await loadStats();
         } else {
-          console.log('🚫 Acesso negado - não é admin');
-          toast({
-            title: "Acesso negado",
-            description: "Você não tem permissão para acessar esta área.",
-            variant: "destructive"
-          });
           navigate('/');
         }
-        
-      } catch (err) {
-        const totalTime = Date.now() - startTime;
-        console.error('💥 ERRO CRÍTICO na verificação (', totalTime, 'ms):', err);
-        console.error('Stack trace:', err.stack);
-        console.log('🔧 Informações para debug:', {
-          userId: session?.user?.id,
-          userEmail: session?.user?.email,
-          errorMessage: err.message,
-          errorName: err.name
-        });
-        
-        // Para debug, liberar acesso se for o email conhecido
-        if (session.user.email === 'carlosfox1782@gmail.com') {
-          console.log('🆘 MODO DEBUG: Liberando acesso para email conhecido');
-          setIsAdmin(true);
-          await loadStats();
-        } else {
-          navigate('/auth');
-        }
+      } catch {
+        navigate('/auth');
       }
       
       setLoading(false);
-      console.log('=== FIM DIAGNÓSTICO (', Date.now() - startTime, 'ms) ===');
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -146,28 +95,20 @@ const Admin = () => {
 
   const loadStats = async () => {
     try {
-      console.log('Carregando estatísticas...');
-      
-      // Contar produtos
-      const { count: productsCount } = await supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true });
-
-      // Contar usuários
-      const { count: usersCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      console.log('Estatísticas carregadas:', { productsCount, usersCount });
+      const [productsResult, usersResult] = await Promise.all([
+        supabase.from('products').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true })
+      ]);
 
       setStats({
         totalOrders: 0,
-        totalUsers: usersCount || 0,
-        totalProducts: productsCount || 0,
+        totalUsers: usersResult.count || 0,
+        totalProducts: productsResult.count || 0,
         totalRevenue: 0
       });
     } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+      console.error('Stats error:', error);
+      setStats({ totalOrders: 0, totalUsers: 0, totalProducts: 0, totalRevenue: 0 });
     }
   };
 
