@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Heart, ShoppingCart, Eye, Star } from "lucide-react";
+import React, { useState } from 'react';
+import { Heart, ShoppingCart, Star } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Link } from 'react-router-dom';
+import { useCart } from '@/contexts/CartContext';
 
 interface ProductCardProps {
   id: string;
@@ -9,172 +11,169 @@ interface ProductCardProps {
   price: number;
   originalPrice?: number;
   image: string;
+  slug: string;
   rating?: number;
   reviews?: number;
-  inStock?: boolean;
+  discount?: string;
   isNew?: boolean;
-  discount?: number;
-  onAddToCart?: (id: string) => void;
-  onToggleFavorite?: (id: string) => void;
-  onQuickView?: (id: string) => void;
+  featured?: boolean;
 }
 
-export const ProductCard = ({
+export const ProductCard: React.FC<ProductCardProps> = ({
   id,
   name,
   price,
   originalPrice,
   image,
-  rating = 0,
+  slug,
+  rating = 5,
   reviews = 0,
-  inStock = true,
-  isNew = false,
   discount,
-  onAddToCart,
-  onToggleFavorite,
-  onQuickView
-}: ProductCardProps) => {
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  isNew = false,
+  featured = false,
+}) => {
+  const { addToCart, isLoading } = useCart();
 
-  const handleAddToCart = async () => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-    onAddToCart?.(id);
-    setIsLoading(false);
-  };
-
-  const handleToggleFavorite = () => {
-    setIsFavorite(!isFavorite);
-    onToggleFavorite?.(id);
-  };
-
-  const formatPrice = (value: number) => {
-    return new Intl.NumberFormat('pt-AO', {
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'AOA',
-      minimumFractionDigits: 0,
-    }).format(value);
+      currency: 'BRL'
+    }).format(price);
+  };
+
+  const discountPercentage = originalPrice 
+    ? Math.round(((originalPrice - price) / originalPrice) * 100)
+    : 0;
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addToCart(id);
   };
 
   return (
     <div className="product-card group">
       {/* Image container */}
-      <div className="relative overflow-hidden rounded-t-xl bg-card">
-        <img 
-          src={image} 
-          alt={name}
-          className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+      <div className="relative overflow-hidden rounded-t-xl">
+        <Link to={`/produto/${slug}`}>
+          <img
+            src={image || '/placeholder.svg'}
+            alt={name}
+            className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        </Link>
         
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-1">
           {isNew && (
-            <Badge variant="default" className="bg-success text-success-foreground">
+            <Badge variant="secondary" className="bg-success text-success-foreground">
               Novo
+            </Badge>
+          )}
+          {featured && (
+            <Badge variant="default" className="bg-primary text-primary-foreground">
+              Destaque
             </Badge>
           )}
           {discount && (
             <Badge variant="destructive" className="animate-pulse">
-              -{discount}%
+              {discount}
+            </Badge>
+          )}
+          {discountPercentage > 0 && (
+            <Badge variant="destructive" className="animate-pulse">
+              -{discountPercentage}%
             </Badge>
           )}
         </div>
 
-        {/* Action buttons */}
+        {/* Actions */}
         <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <Button
-            variant="secondary"
             size="icon"
-            className="rounded-full bg-background/80 backdrop-blur-sm shadow-lg hover:bg-background"
-            onClick={handleToggleFavorite}
-          >
-            <Heart className={`h-4 w-4 ${isFavorite ? 'fill-destructive text-destructive' : ''}`} />
-          </Button>
-          
-          <Button
             variant="secondary"
-            size="icon"
-            className="rounded-full bg-background/80 backdrop-blur-sm shadow-lg hover:bg-background"
-            onClick={() => onQuickView?.(id)}
+            className="w-8 h-8 rounded-full shadow-lg hover:scale-110 transition-transform"
           >
-            <Eye className="h-4 w-4" />
+            <Heart className="w-4 h-4" />
           </Button>
         </div>
 
-        {/* Quick add to cart on hover */}
-        <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-          <Button
-            variant="cart"
-            className="w-full shadow-glow"
+        {/* Quick add to cart */}
+        <div className="absolute bottom-3 left-3 right-3 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+          <Button 
+            className="w-full bg-primary/90 hover:bg-primary text-primary-foreground shadow-lg"
+            size="sm"
             onClick={handleAddToCart}
-            disabled={!inStock || isLoading}
+            disabled={isLoading}
           >
-            <ShoppingCart className="h-4 w-4 mr-2" />
+            <ShoppingCart className="w-4 h-4 mr-2" />
             {isLoading ? 'Adicionando...' : 'Adicionar ao Carrinho'}
           </Button>
         </div>
       </div>
 
-      {/* Product info */}
+      {/* Content */}
       <div className="p-4 space-y-3">
         {/* Rating */}
-        {rating > 0 && (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center">
-              {[...Array(5)].map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-4 w-4 ${
-                    i < rating 
-                      ? 'fill-yellow-400 text-yellow-400' 
-                      : 'text-muted-foreground/30'
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-sm text-muted-foreground">({reviews})</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          {[...Array(5)].map((_, i) => (
+            <Star
+              key={i}
+              className={`w-4 h-4 ${
+                i < rating
+                  ? 'text-warning fill-warning'
+                  : 'text-muted-foreground'
+              }`}
+            />
+          ))}
+          <span className="text-sm text-muted-foreground ml-1">
+            ({reviews})
+          </span>
+        </div>
 
         {/* Product name */}
-        <h3 className="font-semibold text-foreground leading-tight line-clamp-2 group-hover:text-primary transition-colors">
-          {name}
-        </h3>
+        <Link to={`/produto/${slug}`}>
+          <h3 className="font-semibold text-foreground line-clamp-2 min-h-[3rem] leading-6 hover:text-primary transition-colors">
+            {name}
+          </h3>
+        </Link>
 
         {/* Price */}
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-primary">
-            {formatPrice(price)}
-          </span>
-          {originalPrice && originalPrice > price && (
-            <span className="text-sm text-muted-foreground line-through">
-              {formatPrice(originalPrice)}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold text-primary">
+              {formatPrice(price)}
             </span>
+            {originalPrice && originalPrice > price && (
+              <span className="text-sm text-muted-foreground line-through">
+                {formatPrice(originalPrice)}
+              </span>
+            )}
+          </div>
+          
+          {originalPrice && originalPrice > price && (
+            <p className="text-xs text-success font-medium">
+              Economia de {formatPrice(originalPrice - price)}
+            </p>
           )}
         </div>
 
-        {/* Stock status */}
-        <div className="flex justify-between items-center">
-          <span className={`text-sm font-medium ${
-            inStock 
-              ? 'text-success' 
-              : 'text-destructive'
-          }`}>
-            {inStock ? '✅ Em estoque' : '❌ Indisponível'}
-          </span>
-          
-          {inStock && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-primary hover:text-primary-foreground hover:bg-primary"
-              onClick={handleAddToCart}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Adicionando...' : 'Comprar'}
-            </Button>
-          )}
+        {/* Actions */}
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" className="flex-1" size="sm" asChild>
+            <Link to={`/produto/${slug}`}>
+              Ver Detalhes
+            </Link>
+          </Button>
+          <Button 
+            className="flex-1" 
+            size="sm"
+            onClick={handleAddToCart}
+            disabled={isLoading}
+          >
+            <ShoppingCart className="w-4 h-4 mr-1" />
+            {isLoading ? 'Adicionando...' : 'Comprar'}
+          </Button>
         </div>
       </div>
     </div>
