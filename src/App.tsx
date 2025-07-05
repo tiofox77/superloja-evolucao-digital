@@ -7,7 +7,6 @@ import Catalogo from "@/pages/Catalogo";
 import Produto from "@/pages/Produto";
 import Categorias from "@/pages/Categorias";
 import Sobre from "@/pages/Sobre";
-import Contato from "@/pages/Contato";
 import Checkout from "@/pages/Checkout";
 import Auth from "@/pages/Auth";
 import Admin from "@/pages/Admin";
@@ -17,6 +16,7 @@ import AdminPedidos from "@/pages/admin/AdminPedidos";
 import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 import AdminUpload from "@/pages/admin/AdminUpload";
 import AdminPOS from "@/pages/admin/AdminPOS";
+import Cliente from "@/pages/Cliente";
 import AdminConfiguracoes from "@/pages/admin/AdminConfiguracoes";
 import AdminPromocoes from "@/pages/admin/AdminPromocoes";
 import NotFound from "@/pages/NotFound";
@@ -36,6 +36,7 @@ function App() {
               <Route path="/sobre" element={<Sobre />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/checkout" element={<Checkout />} />
+              <Route path="/cliente" element={<Cliente />} />
               
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLayout />}>

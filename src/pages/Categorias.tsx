@@ -12,7 +12,7 @@ interface Category {
   slug: string;
   description?: string;
   image_url?: string;
-  product_count?: number;
+  productCount?: number;
 }
 
 const Categorias = () => {
@@ -22,25 +22,35 @@ const Categorias = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        // Buscar categorias com contagem de produtos
+        // Buscar categorias com contagem de produtos ativos
         const { data, error } = await supabase
           .from('categories')
           .select(`
             *,
-            products (
+            products!inner (
               id
             )
           `);
 
         if (error) throw error;
 
-        // Formatar dados com contagem de produtos
-        const categoriesWithCount = data?.map(category => ({
-          ...category,
-          product_count: category.products?.length || 0
-        })) || [];
+        // Contar apenas produtos ativos para cada categoria
+        const categoriesWithCount = await Promise.all(
+          (data || []).map(async (category) => {
+            const { count } = await supabase
+              .from('products')
+              .select('*', { count: 'exact', head: true })
+              .eq('category_id', category.id)
+              .eq('active', true);
 
-        setCategories(categoriesWithCount);
+            return {
+              ...category,
+              productCount: count || 0
+            };
+          })
+        );
+
+        setCategories(categoriesWithCount.filter(cat => cat.productCount > 0));
       } catch (error) {
         console.error('Erro ao carregar categorias:', error);
       } finally {
@@ -105,7 +115,7 @@ const Categorias = () => {
                         {category.name}
                       </CardTitle>
                       <Badge variant="secondary">
-                        {category.product_count} produto{category.product_count !== 1 ? 's' : ''}
+                        {category.productCount} produto{category.productCount !== 1 ? 's' : ''}
                       </Badge>
                     </div>
                   </CardHeader>

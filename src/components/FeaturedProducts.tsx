@@ -24,8 +24,16 @@ export const FeaturedProducts: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+            *,
+            categories (
+              name
+            )
+          `)
           .eq('featured', true)
+          .eq('active', true)  // Only show active products
+          .eq('in_stock', true)
+          .order('created_at', { ascending: false })
           .limit(8);
 
         if (error) throw error;

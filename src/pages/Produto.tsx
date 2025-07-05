@@ -50,6 +50,7 @@ const Produto = () => {
             )
           `)
           .eq('slug', slug)
+          .eq('active', true)  // Only show active products
           .single();
 
         if (error) throw error;

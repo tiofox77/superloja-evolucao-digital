@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCart } from '@/contexts/CartContext';
-import { ArrowLeft, CreditCard, Building, Banknote, User, Upload } from 'lucide-react';
+import { ArrowLeft, CreditCard, Building, Banknote, User, Upload, MapPin, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +26,10 @@ const Checkout = () => {
     email: '',
     phone: '',
     address: '',
+    country: '',
+    province: '',
+    city: '',
+    street: '',
     paymentMethod: 'transfer',
     notes: ''
   });
@@ -164,13 +168,69 @@ const Checkout = () => {
                       required
                     />
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5" />
+                    Endereço de Entrega
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="country">País</Label>
+                      <Input
+                        id="country"
+                        value={formData.country}
+                        onChange={(e) => setFormData({...formData, country: e.target.value})}
+                        placeholder="Ex: Angola"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="province">Província *</Label>
+                      <Input
+                        id="province"
+                        value={formData.province}
+                        onChange={(e) => setFormData({...formData, province: e.target.value})}
+                        placeholder="Ex: Luanda"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="city">Cidade *</Label>
+                      <Input
+                        id="city"
+                        value={formData.city}
+                        onChange={(e) => setFormData({...formData, city: e.target.value})}
+                        placeholder="Ex: Luanda"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="street">Rua/Bairro *</Label>
+                      <Input
+                        id="street"
+                        value={formData.street}
+                        onChange={(e) => setFormData({...formData, street: e.target.value})}
+                        placeholder="Ex: Rua da Independência"
+                        required
+                      />
+                    </div>
+                  </div>
                   <div>
-                    <Label htmlFor="address">Endereço de Entrega *</Label>
+                    <Label htmlFor="address">Endereço Completo/Referência *</Label>
                     <Textarea
                       id="address"
                       value={formData.address}
                       onChange={(e) => setFormData({...formData, address: e.target.value})}
+                      placeholder="Detalhes do endereço, referências, número da casa..."
                       required
+                      rows={3}
                     />
                   </div>
                 </CardContent>

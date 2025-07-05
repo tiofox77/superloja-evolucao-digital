@@ -102,7 +102,7 @@ export const Header: React.FC = () => {
                   className="hover:bg-muted transition-colors"
                   asChild
                 >
-                  <Link to="/auth">
+                  <Link to="/cliente">
                     <User className="w-5 h-5" />
                   </Link>
                 </Button>
@@ -152,6 +152,9 @@ export const Header: React.FC = () => {
                 </Link>
                 <Link to="/contato" className="text-foreground hover:text-primary transition-colors font-medium py-2">
                   Contato
+                </Link>
+                <Link to="/cliente" className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                  Área do Cliente
                 </Link>
               </nav>
             </div>

@@ -57,7 +57,8 @@ const Catalogo = () => {
             categories (
               name
             )
-          `);
+          `)
+          .eq('active', true);  // Only show active products
 
         // Filtrar por categoria se selecionada
         if (selectedCategory !== 'all') {
