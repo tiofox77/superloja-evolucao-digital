@@ -166,6 +166,7 @@ export type Database = {
       }
       products: {
         Row: {
+          active: boolean | null
           category_id: string | null
           created_at: string
           description: string | null
@@ -182,6 +183,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active?: boolean | null
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -198,6 +200,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active?: boolean | null
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -226,31 +229,43 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          city: string | null
+          country: string | null
           created_at: string
           email: string | null
           full_name: string | null
           id: string
+          province: string | null
           role: string | null
+          street: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           id?: string
+          province?: string | null
           role?: string | null
+          street?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
           id?: string
+          province?: string | null
           role?: string | null
+          street?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -292,6 +307,33 @@ export type Database = {
           name?: string
           start_date?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: Json
         }
         Relationships: []
       }
