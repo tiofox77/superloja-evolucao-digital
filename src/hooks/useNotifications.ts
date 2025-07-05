@@ -90,6 +90,20 @@ export const useNotifications = () => {
     newStatus?: string;
   }) => {
     try {
+      // Garantir que o número tenha o prefixo +244
+      let formattedPhone = props.to;
+      if (!formattedPhone.startsWith('+')) {
+        // Remove qualquer prefixo existente e adiciona +244
+        formattedPhone = formattedPhone.replace(/^244/, '').replace(/^\+/, '');
+        formattedPhone = `+244${formattedPhone}`;
+      } else if (!formattedPhone.startsWith('+244')) {
+        // Se tem + mas não é +244, corrigir
+        formattedPhone = formattedPhone.replace(/^\+/, '');
+        formattedPhone = formattedPhone.replace(/^244/, '');
+        formattedPhone = `+244${formattedPhone}`;
+      }
+
+      console.log('Sending SMS to formatted number:', formattedPhone);
       // Get template configuration
       const { data: templateSettings } = await supabase
         .from('settings')
@@ -111,7 +125,10 @@ export const useNotifications = () => {
       }
 
       const { error } = await supabase.functions.invoke('send-notification-sms', {
-        body: props
+        body: {
+          ...props,
+          to: formattedPhone
+        }
       });
 
       if (error) throw error;
@@ -132,9 +149,20 @@ export const useNotifications = () => {
   };
 
   const sendTestSms = async (phone: string) => {
+    // Garantir que o número tenha o prefixo +244
+    let formattedPhone = phone;
+    if (!formattedPhone.startsWith('+')) {
+      formattedPhone = formattedPhone.replace(/^244/, '').replace(/^\+/, '');
+      formattedPhone = `+244${formattedPhone}`;
+    } else if (!formattedPhone.startsWith('+244')) {
+      formattedPhone = formattedPhone.replace(/^\+/, '');
+      formattedPhone = formattedPhone.replace(/^244/, '');
+      formattedPhone = `+244${formattedPhone}`;
+    }
+
     return await sendSmsNotification({
       type: 'welcome',
-      to: phone,
+      to: formattedPhone,
       userName: 'Teste'
     });
   };
@@ -144,11 +172,12 @@ export const useNotifications = () => {
     userName: string;
     orderNumber: string;
     orderTotal: number;
+    userPhone?: string;
   }) => {
     // Get user ID from email
     const { data: profile } = await supabase
       .from('profiles')
-      .select('user_id')
+      .select('user_id, phone')
       .eq('email', orderData.userEmail)
       .single();
 
@@ -170,13 +199,29 @@ export const useNotifications = () => {
       orderNumber: orderData.orderNumber,
       orderTotal: orderData.orderTotal
     });
+
+    // Send SMS notification if phone available
+    const phoneToUse = orderData.userPhone || profile?.phone;
+    if (phoneToUse) {
+      try {
+        await sendSmsNotification({
+          type: 'order_created',
+          to: phoneToUse,
+          userName: orderData.userName,
+          orderNumber: orderData.orderNumber,
+          orderTotal: orderData.orderTotal
+        });
+      } catch (smsError) {
+        console.error('Erro ao enviar SMS do pedido:', smsError);
+      }
+    }
   };
 
-  const createWelcomeNotification = async (userEmail: string, userName: string) => {
+  const createWelcomeNotification = async (userEmail: string, userName: string, userPhone?: string) => {
     // Get user ID from email
     const { data: profile } = await supabase
       .from('profiles')
-      .select('user_id')
+      .select('user_id, phone')
       .eq('email', userEmail)
       .single();
 
@@ -196,6 +241,20 @@ export const useNotifications = () => {
       to: userEmail,
       userName
     });
+
+    // Send SMS notification if phone available
+    const phoneToUse = userPhone || profile?.phone;
+    if (phoneToUse) {
+      try {
+        await sendSmsNotification({
+          type: 'welcome',
+          to: phoneToUse,
+          userName
+        });
+      } catch (smsError) {
+        console.error('Erro ao enviar SMS de boas-vindas:', smsError);
+      }
+    }
   };
 
   return {

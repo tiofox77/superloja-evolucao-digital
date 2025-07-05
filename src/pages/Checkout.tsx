@@ -188,7 +188,8 @@ const Checkout = () => {
           userEmail: formData.email,
           userName: formData.name,
           orderNumber: order.order_number.toString(),
-          orderTotal: totalAmount
+          orderTotal: totalAmount,
+          userPhone: formData.phone ? `+244${formData.phone}` : undefined
         });
       } catch (notificationError) {
         console.error('Erro ao enviar notificações:', notificationError);
