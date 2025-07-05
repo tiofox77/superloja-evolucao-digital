@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { X, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { X, Upload, Image as ImageIcon, Loader2, Star, Images } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import ImageAIEditor from '@/components/ImageAIEditor';
 
 interface ProductFormProps {
   product?: any;
@@ -326,69 +328,140 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
           <div className="space-y-6">
             <Card className="hover-scale">
               <CardHeader>
-                <CardTitle>Imagens do Produto</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Images className="w-5 h-5" />
+                  Imagens do Produto
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Upload Area */}
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                  <ImageIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Arraste imagens aqui ou clique para selecionar
-                  </p>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file);
-                    }}
-                    className="hidden"
-                    id="image-upload"
-                    disabled={imageUploading}
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    asChild 
-                    disabled={imageUploading}
-                  >
-                    <label htmlFor="image-upload" className="cursor-pointer">
-                      {imageUploading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Enviando...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Selecionar
-                        </>
-                      )}
-                    </label>
-                  </Button>
-                </div>
+                <Tabs defaultValue="upload" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="upload">Upload Manual</TabsTrigger>
+                    <TabsTrigger value="ai">IA Assistant</TabsTrigger>
+                  </TabsList>
 
-                {/* Imagens Carregadas */}
-                {formData.images.length > 0 && (
+                  <TabsContent value="upload" className="space-y-4">
+                    {/* Upload Area */}
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                      <ImageIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Arraste imagens aqui ou clique para selecionar
+                      </p>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          files.forEach(file => handleImageUpload(file));
+                        }}
+                        className="hidden"
+                        id="image-upload"
+                        disabled={imageUploading}
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        asChild 
+                        disabled={imageUploading}
+                      >
+                        <label htmlFor="image-upload" className="cursor-pointer">
+                          {imageUploading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Selecionar Imagens
+                            </>
+                          )}
+                        </label>
+                      </Button>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="ai" className="space-y-4">
+                    <div className="text-center py-6">
+                      <ImageAIEditor 
+                        productName={formData.name}
+                        onImageSelect={(imageUrl) => {
+                          if (!formData.image_url) {
+                            setFormData(prev => ({
+                              ...prev,
+                              image_url: imageUrl,
+                              images: [...prev.images, imageUrl]
+                            }));
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              images: [...prev.images, imageUrl]
+                            }));
+                          }
+                        }}
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                {/* Imagem de Destaque */}
+                {formData.image_url && (
                   <div className="space-y-2">
-                    <Label>Imagens ({formData.images.length})</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {formData.images.map((imageUrl, index) => (
+                    <div className="flex items-center gap-2">
+                      <Star className="w-4 h-4 text-yellow-500" />
+                      <Label className="font-medium">Imagem de Destaque</Label>
+                    </div>
+                    <div className="relative group">
+                      <div className="aspect-square bg-muted rounded-lg overflow-hidden border-2 border-yellow-200">
+                        <img
+                          src={formData.image_url}
+                          alt="Imagem de destaque"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <Badge className="absolute top-2 left-2 bg-yellow-500">
+                        Destaque
+                      </Badge>
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            const newImages = formData.images.filter(img => img !== formData.image_url);
+                            setFormData(prev => ({
+                              ...prev,
+                              image_url: newImages[0] || '',
+                              images: newImages
+                            }));
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Galeria de Imagens */}
+                {formData.images.length > 1 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Images className="w-4 h-4" />
+                      <Label>Galeria ({formData.images.length - 1} imagens)</Label>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {formData.images.filter(img => img !== formData.image_url).map((imageUrl, index) => (
                         <div key={index} className="relative group">
                           <div className="aspect-square bg-muted rounded-lg overflow-hidden">
                             <img
                               src={imageUrl}
-                              alt={`Produto ${index + 1}`}
+                              alt={`Galeria ${index + 1}`}
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          
-                          {formData.image_url === imageUrl && (
-                            <Badge className="absolute top-1 left-1 text-xs">
-                              Principal
-                            </Badge>
-                          )}
 
                           <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
@@ -401,17 +474,16 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                             </Button>
                           </div>
 
-                          {formData.image_url !== imageUrl && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                              onClick={() => setMainImage(imageUrl)}
-                            >
-                              Definir Principal
-                            </Button>
-                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                            onClick={() => setMainImage(imageUrl)}
+                          >
+                            <Star className="w-3 h-3 mr-1" />
+                            Destaque
+                          </Button>
                         </div>
                       ))}
                     </div>

@@ -95,10 +95,56 @@ const AdminPOS = () => {
     }
 
     try {
-      // Simular venda por enquanto até termos as tabelas orders
+      setLoading(true);
+      
+      // Criar o pedido
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_name: customerInfo.name || null,
+          customer_phone: customerInfo.phone || null,
+          customer_email: customerInfo.email || null,
+          total_amount: getTotalAmount(),
+          payment_method: 'cash',
+          payment_status: 'paid',
+          order_status: 'completed',
+          order_source: 'pos'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Criar os itens do pedido
+      const orderItems = cart.map(item => ({
+        order_id: orderData.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Atualizar estoque dos produtos
+      for (const item of cart) {
+        const newStock = (item.stock_quantity || 0) - item.quantity;
+        await supabase
+          .from('products')
+          .update({ 
+            stock_quantity: Math.max(0, newStock),
+            in_stock: newStock > 0
+          })
+          .eq('id', item.id);
+      }
+
       toast({
-        title: "Venda simulada!",
-        description: `Total: ${formatPrice(getTotalAmount())} - ${getTotalItems()} itens`,
+        title: "Venda realizada!",
+        description: `Pedido #${orderData.id.slice(0, 8)} - Total: ${formatPrice(getTotalAmount())}`,
       });
 
       clearCart();
@@ -108,6 +154,8 @@ const AdminPOS = () => {
         description: error.message,
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
