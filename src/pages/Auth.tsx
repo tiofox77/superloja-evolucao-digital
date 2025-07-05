@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { User, Session } from '@supabase/supabase-js';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -17,6 +18,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { createWelcomeNotification } = useNotifications();
 
   const [loginData, setLoginData] = useState({
     identifier: '', // email, phone ou username
@@ -131,6 +133,14 @@ const Auth = () => {
       });
 
       if (error) throw error;
+
+      // Enviar notificação de boas-vindas
+      try {
+        await createWelcomeNotification(signupData.email, signupData.fullName);
+      } catch (notificationError) {
+        console.error('Erro ao enviar notificação de boas-vindas:', notificationError);
+        // Não falhar se não conseguir enviar notificação
+      }
 
       toast({
         title: "Cadastro realizado!",

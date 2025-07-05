@@ -7,6 +7,7 @@ import { ShoppingCart, Clock, CheckCircle, XCircle, Eye, Users, Package, Trendin
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import OrderDetails from '@/components/OrderDetails';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const AdminPedidos = () => {
   const [orders, setOrders] = useState([]);
@@ -20,6 +21,7 @@ const AdminPedidos = () => {
     revenue: 0
   });
   const { toast } = useToast();
+  const { sendEmailNotification, sendSmsNotification } = useNotifications();
 
   useEffect(() => {
     loadOrders();
@@ -127,12 +129,52 @@ const AdminPedidos = () => {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
+      // Buscar dados do pedido antes de atualizar
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('customer_email, customer_name, order_number')
+        .eq('id', orderId)
+        .single();
+
       const { error } = await supabase
         .from('orders')
         .update({ order_status: newStatus })
         .eq('id', orderId);
 
       if (error) throw error;
+
+      // Enviar notificações de mudança de status
+      if (orderData?.customer_email) {
+        try {
+          await sendEmailNotification({
+            type: 'status_changed',
+            to: orderData.customer_email,
+            userName: orderData.customer_name || 'Cliente',
+            orderNumber: orderData.order_number?.toString(),
+            newStatus: newStatus
+          });
+
+          // Se tiver telefone, enviar SMS também
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('phone')
+            .eq('email', orderData.customer_email)
+            .single();
+
+          if (profile?.phone) {
+            await sendSmsNotification({
+              type: 'status_changed',
+              to: profile.phone,
+              userName: orderData.customer_name || 'Cliente',
+              orderNumber: orderData.order_number?.toString(),
+              newStatus: newStatus
+            });
+          }
+        } catch (notificationError) {
+          console.error('Erro ao enviar notificações:', notificationError);
+          // Não falhar se não conseguir enviar notificações
+        }
+      }
 
       toast({
         title: "Status atualizado!",

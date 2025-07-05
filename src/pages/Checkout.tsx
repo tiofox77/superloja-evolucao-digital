@@ -13,11 +13,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const Checkout = () => {
   const { items, totalAmount, clearCart } = useCart();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { createOrderNotification } = useNotifications();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
@@ -178,6 +180,19 @@ const Checkout = () => {
           console.error('Erro ao atualizar perfil:', profileError);
           // Não falhar se não conseguir salvar o perfil
         }
+      }
+
+      // Enviar notificações
+      try {
+        await createOrderNotification({
+          userEmail: formData.email,
+          userName: formData.name,
+          orderNumber: order.order_number.toString(),
+          orderTotal: totalAmount
+        });
+      } catch (notificationError) {
+        console.error('Erro ao enviar notificações:', notificationError);
+        // Não falhar se não conseguir enviar notificações
       }
 
       // Toast de sucesso
