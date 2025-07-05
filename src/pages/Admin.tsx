@@ -46,27 +46,27 @@ const Admin = () => {
         // Primeiro tentar buscar por user_id
         let { data: profile, error } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, email')
           .eq('user_id', session.user.id)
-          .single();
+          .maybeSingle();
         
         console.log('Busca por user_id - Profile:', profile, 'Error:', error);
         
         // Se não encontrar por user_id, tentar por email
-        if (error && session.user.email) {
+        if (!profile && session.user.email) {
           console.log('Tentando buscar por email:', session.user.email);
           const result = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, email')
             .eq('email', session.user.email)
-            .single();
+            .maybeSingle();
           
           profile = result.data;
           error = result.error;
           console.log('Busca por email - Profile:', profile, 'Error:', error);
         }
         
-        if (error || !profile) {
+        if (!profile) {
           console.log('Perfil não encontrado, criando novo perfil de usuário');
           
           const { error: insertError } = await supabase
