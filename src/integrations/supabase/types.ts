@@ -74,6 +74,84 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_settings: {
+        Row: {
+          created_at: string | null
+          email_notifications: boolean | null
+          id: string
+          order_created_email: boolean | null
+          order_created_sms: boolean | null
+          phone_number: string | null
+          sms_notifications: boolean | null
+          status_changed_email: boolean | null
+          status_changed_sms: boolean | null
+          updated_at: string | null
+          user_id: string | null
+          welcome_email: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          order_created_email?: boolean | null
+          order_created_sms?: boolean | null
+          phone_number?: string | null
+          sms_notifications?: boolean | null
+          status_changed_email?: boolean | null
+          status_changed_sms?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          welcome_email?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          order_created_email?: boolean | null
+          order_created_sms?: boolean | null
+          phone_number?: string | null
+          sms_notifications?: boolean | null
+          status_changed_email?: boolean | null
+          status_changed_sms?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          welcome_email?: boolean | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          read: boolean | null
+          title: string
+          type: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          read?: boolean | null
+          title: string
+          type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          read?: boolean | null
+          title?: string
+          type?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string

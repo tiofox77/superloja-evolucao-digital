@@ -1,15 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, ShoppingCart, Menu, X, User, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
-import { useCart } from '@/contexts/CartContext';
+import NotificationBell from '@/components/NotificationBell';
 import { CartSidebar } from './CartSidebar';
+import { useCart } from '@/contexts/CartContext';
+import { supabase } from '@/integrations/supabase/client';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const { itemCount, setIsOpen } = useCart();
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <>
@@ -82,6 +102,8 @@ export const Header: React.FC = () => {
                   <Heart className="w-5 h-5" />
                 </Button>
                 
+                {user && <NotificationBell />}
+                
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -102,7 +124,7 @@ export const Header: React.FC = () => {
                   className="hover:bg-muted transition-colors"
                   asChild
                 >
-                  <Link to="/cliente">
+                  <Link to={user ? "/cliente" : "/auth"}>
                     <User className="w-5 h-5" />
                   </Link>
                 </Button>
@@ -153,8 +175,8 @@ export const Header: React.FC = () => {
                 <Link to="/contato" className="text-foreground hover:text-primary transition-colors font-medium py-2">
                   Contato
                 </Link>
-                <Link to="/cliente" className="text-foreground hover:text-primary transition-colors font-medium py-2">
-                  Área do Cliente
+                <Link to={user ? "/cliente" : "/auth"} className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                  {user ? 'Área do Cliente' : 'Entrar'}
                 </Link>
               </nav>
             </div>
