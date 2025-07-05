@@ -119,9 +119,12 @@ const AdminLogs = () => {
       return;
     }
 
+    // Add +244 prefix if not present
+    const phoneWithPrefix = testPhone.startsWith('+244') ? testPhone : `+244${testPhone}`;
+
     setTestingSms(true);
     try {
-      const result = await sendTestSms(testPhone);
+      const result = await sendTestSms(phoneWithPrefix);
       if (result.success) {
         toast({
           title: "✅ Sucesso",
@@ -205,7 +208,16 @@ const AdminLogs = () => {
             <Input
               placeholder={type === 'email' ? 'Digite um email...' : 'Digite um número de telefone...'}
               value={type === 'email' ? testEmail : testPhone}
-              onChange={(e) => type === 'email' ? setTestEmail(e.target.value) : setTestPhone(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (type === 'email') {
+                  setTestEmail(value);
+                } else {
+                  // For phone, remove any non-numeric and ensure +244 prefix
+                  const cleaned = value.replace(/\D/g, '').replace(/^244/, '');
+                  setTestPhone(cleaned);
+                }
+              }}
               className="flex-1"
             />
             <Button 
@@ -220,6 +232,11 @@ const AdminLogs = () => {
               }
             </Button>
           </div>
+          {type === 'sms' && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Digite apenas os números sem +244 (será adicionado automaticamente)
+            </p>
+          )}
         </CardContent>
       </Card>
 

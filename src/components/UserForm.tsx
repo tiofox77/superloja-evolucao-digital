@@ -19,6 +19,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     full_name: user?.full_name || '',
     email: user?.email || '',
+    phone: user?.phone || '',
     role: user?.role || 'user',
     country: user?.country || '',
     province: user?.province || '',
@@ -39,6 +40,7 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel }) => {
           .from('profiles')
           .update({
             full_name: formData.full_name,
+            phone: formData.phone,
             role: formData.role,
             country: formData.country,
             province: formData.province,
@@ -109,6 +111,30 @@ const UserForm: React.FC<UserFormProps> = ({ user, onSave, onCancel }) => {
                 disabled={!!user} // Don't allow email changes for existing users
                 className="mt-1"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="phone">Telefone</Label>
+              <div className="flex mt-1">
+                <div className="flex items-center px-3 border border-r-0 border-input bg-muted rounded-l-md">
+                  <span className="text-sm text-muted-foreground">+244</span>
+                </div>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => {
+                    // Remove any non-numeric characters and ensure it doesn't start with +244
+                    const cleaned = e.target.value.replace(/\D/g, '').replace(/^244/, '');
+                    setFormData({ ...formData, phone: cleaned });
+                  }}
+                  placeholder="912345678"
+                  className="rounded-l-none"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Digite apenas os números sem o código do país
+              </p>
             </div>
 
             <div>

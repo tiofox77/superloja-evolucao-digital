@@ -117,7 +117,7 @@ const handler = async (req: Request): Promise<Response> => {
                   'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: new URLSearchParams({
-                  From: smsConfig.twilio_phone_number,
+                  From: 'SuperLoja',
                   To: to,
                   Body: message,
                 }),

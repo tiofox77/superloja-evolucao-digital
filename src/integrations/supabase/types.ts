@@ -370,6 +370,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          phone: string | null
           province: string | null
           role: string | null
           street: string | null
@@ -384,6 +385,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          phone?: string | null
           province?: string | null
           role?: string | null
           street?: string | null
@@ -398,6 +400,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          phone?: string | null
           province?: string | null
           role?: string | null
           street?: string | null
