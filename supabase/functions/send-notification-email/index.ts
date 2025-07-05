@@ -32,23 +32,56 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Create notification message
+    // Get notification templates
+    const { data: templateSettings } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'notification_templates')
+      .single();
+
+    // Create notification message using template
     let title = '';
     let message = '';
 
-    switch (type) {
-      case 'welcome':
-        title = 'Bem-vindo à SuperLoja!';
-        message = `Olá ${userName}! Sua conta foi criada com sucesso. Aproveite nossas ofertas especiais!`;
-        break;
-      case 'order_created':
-        title = 'Pedido Confirmado';
-        message = `Seu pedido #${orderNumber} foi criado com sucesso! Total: ${orderTotal ? new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(orderTotal) : 'N/A'}`;
-        break;
-      case 'status_changed':
-        title = 'Status do Pedido Atualizado';
-        message = `Seu pedido #${orderNumber} teve o status alterado para: ${newStatus}`;
-        break;
+    if (templateSettings?.value?.email_templates?.[type]) {
+      const template = templateSettings.value.email_templates[type];
+      title = template.subject || '';
+      message = template.body || '';
+    } else {
+      // Fallback to default messages
+      switch (type) {
+        case 'welcome':
+          title = 'Bem-vindo à SuperLoja!';
+          message = `Olá ${userName}! Sua conta foi criada com sucesso. Aproveite nossas ofertas especiais!`;
+          break;
+        case 'order_created':
+          title = 'Pedido Confirmado';
+          message = `Seu pedido #${orderNumber} foi criado com sucesso! Total: ${orderTotal ? new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(orderTotal) : 'N/A'}`;
+          break;
+        case 'status_changed':
+          title = 'Status do Pedido Atualizado';
+          message = `Seu pedido #${orderNumber} teve o status alterado para: ${newStatus}`;
+          break;
+      }
+    }
+
+    // Replace template variables
+    if (userName) {
+      title = title.replace(/{userName}/g, userName);
+      message = message.replace(/{userName}/g, userName);
+    }
+    if (orderNumber) {
+      title = title.replace(/{orderNumber}/g, orderNumber);
+      message = message.replace(/{orderNumber}/g, orderNumber);
+    }
+    if (orderTotal) {
+      const formattedTotal = new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(orderTotal);
+      title = title.replace(/{orderTotal}/g, formattedTotal);
+      message = message.replace(/{orderTotal}/g, formattedTotal);
+    }
+    if (newStatus) {
+      title = title.replace(/{newStatus}/g, newStatus);
+      message = message.replace(/{newStatus}/g, newStatus);
     }
 
     // Create notification log entry

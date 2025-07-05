@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, Store, Bell, Shield, Database, Save, Upload, Globe, Clock, Users, Mail, MessageSquare } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Settings, Store, Bell, Shield, Database, Save, Upload, Globe, Clock, Users, Mail, MessageSquare, FileText, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
@@ -48,7 +49,40 @@ const AdminConfiguracoes = () => {
     twilio_account_sid: '',
     twilio_auth_token: '',
     twilio_phone_number: '',
-    sms_notifications_enabled: false
+    sms_notifications_enabled: false,
+    
+    // Notification Templates
+    email_templates: {
+      welcome: {
+        enabled: true,
+        subject: 'Bem-vindo à SuperLoja!',
+        body: 'Olá {userName}! Sua conta foi criada com sucesso. Aproveite nossas ofertas especiais!'
+      },
+      order_created: {
+        enabled: true,
+        subject: 'Pedido Confirmado #{orderNumber}',
+        body: 'Seu pedido #{orderNumber} foi criado com sucesso! Total: {orderTotal}. Acompanhe o status em nossa plataforma.'
+      },
+      status_changed: {
+        enabled: true,
+        subject: 'Status do Pedido Atualizado',
+        body: 'Seu pedido #{orderNumber} teve o status alterado para: {newStatus}. Fique atento às atualizações!'
+      }
+    },
+    sms_templates: {
+      welcome: {
+        enabled: true,
+        body: 'Bem-vindo à SuperLoja, {userName}! Sua conta foi criada com sucesso. Aproveite!'
+      },
+      order_created: {
+        enabled: true,
+        body: 'SuperLoja: Pedido #{orderNumber} confirmado! Total: {orderTotal}'
+      },
+      status_changed: {
+        enabled: true,
+        body: 'SuperLoja: Pedido #{orderNumber} - Status: {newStatus}'
+      }
+    }
   });
   const [loading, setLoading] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
@@ -102,6 +136,9 @@ const AdminConfiguracoes = () => {
           settingsMap.twilio_auth_token = value.twilio_auth_token || '';
           settingsMap.twilio_phone_number = value.twilio_phone_number || '';
           settingsMap.sms_notifications_enabled = value.sms_notifications_enabled ?? false;
+        } else if (setting.key === 'notification_templates') {
+          settingsMap.email_templates = value.email_templates || settingsMap.email_templates;
+          settingsMap.sms_templates = value.sms_templates || settingsMap.sms_templates;
         }
       });
       
@@ -205,6 +242,13 @@ const AdminConfiguracoes = () => {
             twilio_phone_number: settings.twilio_phone_number,
             sms_notifications_enabled: settings.sms_notifications_enabled
           }
+        },
+        {
+          key: 'notification_templates',
+          value: {
+            email_templates: settings.email_templates,
+            sms_templates: settings.sms_templates
+          }
         }
       ];
 
@@ -251,8 +295,9 @@ const AdminConfiguracoes = () => {
       </div>
 
       <Tabs defaultValue="store" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="store">Loja</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
           <TabsTrigger value="advanced">Avançado</TabsTrigger>
@@ -437,6 +482,381 @@ const AdminConfiguracoes = () => {
           </CardContent>
         </Card>
 
+          </div>
+        </TabsContent>
+
+        <TabsContent value="templates">
+          <div className="space-y-6">
+            {/* Header */}
+            <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-0">
+              <CardContent className="p-6">
+                <div className="text-center space-y-2">
+                  <div className="flex justify-center">
+                    <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-full">
+                      <FileText className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold">Templates de Notificação</h3>
+                  <p className="text-muted-foreground">
+                    Configure mensagens personalizadas para cada evento do sistema
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Email Templates */}
+              <Card className="hover-scale">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="w-5 h-5" />
+                    Templates de Email
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Welcome Email */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Conta Criada</Badge>
+                        <Switch
+                          checked={settings.email_templates.welcome.enabled}
+                          onCheckedChange={(checked) => setSettings({
+                            ...settings,
+                            email_templates: {
+                              ...settings.email_templates,
+                              welcome: { ...settings.email_templates.welcome, enabled: checked }
+                            }
+                          })}
+                        />
+                      </div>
+                      <Zap className="w-4 h-4 text-green-500" />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="welcome_email_subject">Assunto</Label>
+                      <Input
+                        id="welcome_email_subject"
+                        value={settings.email_templates.welcome.subject}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          email_templates: {
+                            ...settings.email_templates,
+                            welcome: { ...settings.email_templates.welcome, subject: e.target.value }
+                          }
+                        })}
+                        placeholder="Assunto do email"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="welcome_email_body">Mensagem</Label>
+                      <Textarea
+                        id="welcome_email_body"
+                        value={settings.email_templates.welcome.body}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          email_templates: {
+                            ...settings.email_templates,
+                            welcome: { ...settings.email_templates.welcome, body: e.target.value }
+                          }
+                        })}
+                        placeholder="Corpo do email"
+                        className="mt-1"
+                        rows={3}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use {'{userName}'} para inserir o nome do usuário
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Order Created Email */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Pedido Criado</Badge>
+                        <Switch
+                          checked={settings.email_templates.order_created.enabled}
+                          onCheckedChange={(checked) => setSettings({
+                            ...settings,
+                            email_templates: {
+                              ...settings.email_templates,
+                              order_created: { ...settings.email_templates.order_created, enabled: checked }
+                            }
+                          })}
+                        />
+                      </div>
+                      <Zap className="w-4 h-4 text-blue-500" />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="order_email_subject">Assunto</Label>
+                      <Input
+                        id="order_email_subject"
+                        value={settings.email_templates.order_created.subject}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          email_templates: {
+                            ...settings.email_templates,
+                            order_created: { ...settings.email_templates.order_created, subject: e.target.value }
+                          }
+                        })}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="order_email_body">Mensagem</Label>
+                      <Textarea
+                        id="order_email_body"
+                        value={settings.email_templates.order_created.body}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          email_templates: {
+                            ...settings.email_templates,
+                            order_created: { ...settings.email_templates.order_created, body: e.target.value }
+                          }
+                        })}
+                        className="mt-1"
+                        rows={3}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use {'{orderNumber}, {orderTotal}, {userName}'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status Changed Email */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Status Alterado</Badge>
+                        <Switch
+                          checked={settings.email_templates.status_changed.enabled}
+                          onCheckedChange={(checked) => setSettings({
+                            ...settings,
+                            email_templates: {
+                              ...settings.email_templates,
+                              status_changed: { ...settings.email_templates.status_changed, enabled: checked }
+                            }
+                          })}
+                        />
+                      </div>
+                      <Zap className="w-4 h-4 text-orange-500" />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="status_email_subject">Assunto</Label>
+                      <Input
+                        id="status_email_subject"
+                        value={settings.email_templates.status_changed.subject}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          email_templates: {
+                            ...settings.email_templates,
+                            status_changed: { ...settings.email_templates.status_changed, subject: e.target.value }
+                          }
+                        })}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="status_email_body">Mensagem</Label>
+                      <Textarea
+                        id="status_email_body"
+                        value={settings.email_templates.status_changed.body}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          email_templates: {
+                            ...settings.email_templates,
+                            status_changed: { ...settings.email_templates.status_changed, body: e.target.value }
+                          }
+                        })}
+                        className="mt-1"
+                        rows={3}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use {'{orderNumber}, {newStatus}, {userName}'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* SMS Templates */}
+              <Card className="hover-scale">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5" />
+                    Templates de SMS
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Welcome SMS */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Conta Criada</Badge>
+                        <Switch
+                          checked={settings.sms_templates.welcome.enabled}
+                          onCheckedChange={(checked) => setSettings({
+                            ...settings,
+                            sms_templates: {
+                              ...settings.sms_templates,
+                              welcome: { ...settings.sms_templates.welcome, enabled: checked }
+                            }
+                          })}
+                        />
+                      </div>
+                      <Zap className="w-4 h-4 text-green-500" />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="welcome_sms_body">Mensagem SMS</Label>
+                      <Textarea
+                        id="welcome_sms_body"
+                        value={settings.sms_templates.welcome.body}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          sms_templates: {
+                            ...settings.sms_templates,
+                            welcome: { ...settings.sms_templates.welcome, body: e.target.value }
+                          }
+                        })}
+                        placeholder="Mensagem do SMS"
+                        className="mt-1"
+                        rows={2}
+                        maxLength={160}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use {'{userName}'} • Máx: 160 caracteres • {settings.sms_templates.welcome.body.length}/160
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Order Created SMS */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Pedido Criado</Badge>
+                        <Switch
+                          checked={settings.sms_templates.order_created.enabled}
+                          onCheckedChange={(checked) => setSettings({
+                            ...settings,
+                            sms_templates: {
+                              ...settings.sms_templates,
+                              order_created: { ...settings.sms_templates.order_created, enabled: checked }
+                            }
+                          })}
+                        />
+                      </div>
+                      <Zap className="w-4 h-4 text-blue-500" />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="order_sms_body">Mensagem SMS</Label>
+                      <Textarea
+                        id="order_sms_body"
+                        value={settings.sms_templates.order_created.body}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          sms_templates: {
+                            ...settings.sms_templates,
+                            order_created: { ...settings.sms_templates.order_created, body: e.target.value }
+                          }
+                        })}
+                        className="mt-1"
+                        rows={2}
+                        maxLength={160}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use {'{orderNumber}, {orderTotal}'} • {settings.sms_templates.order_created.body.length}/160
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status Changed SMS */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">Status Alterado</Badge>
+                        <Switch
+                          checked={settings.sms_templates.status_changed.enabled}
+                          onCheckedChange={(checked) => setSettings({
+                            ...settings,
+                            sms_templates: {
+                              ...settings.sms_templates,
+                              status_changed: { ...settings.sms_templates.status_changed, enabled: checked }
+                            }
+                          })}
+                        />
+                      </div>
+                      <Zap className="w-4 h-4 text-orange-500" />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="status_sms_body">Mensagem SMS</Label>
+                      <Textarea
+                        id="status_sms_body"
+                        value={settings.sms_templates.status_changed.body}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          sms_templates: {
+                            ...settings.sms_templates,
+                            status_changed: { ...settings.sms_templates.status_changed, body: e.target.value }
+                          }
+                        })}
+                        className="mt-1"
+                        rows={2}
+                        maxLength={160}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use {'{orderNumber}, {newStatus}'} • {settings.sms_templates.status_changed.body.length}/160
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Template Variables Guide */}
+            <Card className="bg-muted/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Guia de Variáveis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <h4 className="font-semibold mb-2">Usuário</h4>
+                    <div className="space-y-1 text-muted-foreground">
+                      <p><code>{'{userName}'}</code> - Nome do usuário</p>
+                      <p><code>{'{userEmail}'}</code> - Email do usuário</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Pedido</h4>
+                    <div className="space-y-1 text-muted-foreground">
+                      <p><code>{'{orderNumber}'}</code> - Número do pedido</p>
+                      <p><code>{'{orderTotal}'}</code> - Valor total</p>
+                      <p><code>{'{newStatus}'}</code> - Novo status</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-2">Loja</h4>
+                    <div className="space-y-1 text-muted-foreground">
+                      <p><code>{'{storeName}'}</code> - Nome da loja</p>
+                      <p><code>{'{storePhone}'}</code> - Telefone da loja</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

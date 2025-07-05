@@ -31,19 +31,47 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Create SMS message
+    // Get notification templates
+    const { data: templateSettings } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'notification_templates')
+      .single();
+
+    // Create SMS message using template
     let message = '';
 
-    switch (type) {
-      case 'welcome':
-        message = `Bem-vindo à SuperLoja, ${userName}! Sua conta foi criada com sucesso. Aproveite nossas ofertas!`;
-        break;
-      case 'order_created':
-        message = `SuperLoja: Pedido #${orderNumber} confirmado! Total: ${orderTotal ? new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(orderTotal) : 'N/A'}`;
-        break;
-      case 'status_changed':
-        message = `SuperLoja: Pedido #${orderNumber} - Status: ${newStatus}`;
-        break;
+    if (templateSettings?.value?.sms_templates?.[type]) {
+      const template = templateSettings.value.sms_templates[type];
+      message = template.body || '';
+    } else {
+      // Fallback to default messages
+      switch (type) {
+        case 'welcome':
+          message = `Bem-vindo à SuperLoja, ${userName}! Sua conta foi criada com sucesso. Aproveite nossas ofertas!`;
+          break;
+        case 'order_created':
+          message = `SuperLoja: Pedido #${orderNumber} confirmado! Total: ${orderTotal ? new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(orderTotal) : 'N/A'}`;
+          break;
+        case 'status_changed':
+          message = `SuperLoja: Pedido #${orderNumber} - Status: ${newStatus}`;
+          break;
+      }
+    }
+
+    // Replace template variables
+    if (userName) {
+      message = message.replace(/{userName}/g, userName);
+    }
+    if (orderNumber) {
+      message = message.replace(/{orderNumber}/g, orderNumber);
+    }
+    if (orderTotal) {
+      const formattedTotal = new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(orderTotal);
+      message = message.replace(/{orderTotal}/g, formattedTotal);
+    }
+    if (newStatus) {
+      message = message.replace(/{newStatus}/g, newStatus);
     }
 
     // Create SMS log entry

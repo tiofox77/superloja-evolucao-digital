@@ -48,6 +48,26 @@ export const useNotifications = () => {
 
   const sendEmailNotification = async (props: SendEmailNotificationProps) => {
     try {
+      // Get template configuration
+      const { data: templateSettings } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'notification_templates')
+        .single();
+
+      let shouldSend = true;
+      if (templateSettings?.value) {
+        const templates = templateSettings.value as any;
+        if (templates?.email_templates?.[props.type]) {
+          shouldSend = templates.email_templates[props.type].enabled;
+        }
+      }
+
+      if (!shouldSend) {
+        console.log(`Email template for ${props.type} is disabled`);
+        return { success: true, skipped: true };
+      }
+
       const { error } = await supabase.functions.invoke('send-notification-email', {
         body: props
       });
@@ -70,6 +90,26 @@ export const useNotifications = () => {
     newStatus?: string;
   }) => {
     try {
+      // Get template configuration
+      const { data: templateSettings } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'notification_templates')
+        .single();
+
+      let shouldSend = true;
+      if (templateSettings?.value) {
+        const templates = templateSettings.value as any;
+        if (templates?.sms_templates?.[props.type]) {
+          shouldSend = templates.sms_templates[props.type].enabled;
+        }
+      }
+
+      if (!shouldSend) {
+        console.log(`SMS template for ${props.type} is disabled`);
+        return { success: true, skipped: true };
+      }
+
       const { error } = await supabase.functions.invoke('send-notification-sms', {
         body: props
       });
