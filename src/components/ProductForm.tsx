@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Upload, Image as ImageIcon, Loader2, Star, Images, Sparkles } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Loader2, Star, Images, Sparkles, Package, Palette, Ruler } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ImageAIEditor from '@/components/ImageAIEditor';
@@ -25,6 +25,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
   const [categories, setCategories] = useState([]);
   const [seoSuggestions, setSeoSuggestions] = useState(null);
   const [generatingSEO, setGeneratingSEO] = useState(false);
+  const [newColor, setNewColor] = useState('');
+  const [newSize, setNewSize] = useState('');
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -40,7 +42,19 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
     images: product?.images || [],
     seo_title: product?.seo_title || '',
     seo_description: product?.seo_description || '',
-    seo_keywords: product?.seo_keywords || ''
+    seo_keywords: product?.seo_keywords || '',
+    // Novos campos
+    product_type: product?.product_type || 'physical',
+    is_digital: product?.is_digital ?? false,
+    digital_file_url: product?.digital_file_url || '',
+    license_key: product?.license_key || '',
+    download_limit: product?.download_limit || 0,
+    variants: product?.variants || [],
+    colors: product?.colors || [],
+    sizes: product?.sizes || [],
+    material: product?.material || '',
+    weight: product?.weight || '',
+    dimensions: product?.dimensions || ''
   });
 
   useEffect(() => {
@@ -146,7 +160,18 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
         seo_title: formData.seo_title || null,
         seo_description: formData.seo_description || null,
-        seo_keywords: formData.seo_keywords || null
+        seo_keywords: formData.seo_keywords || null,
+        // Novos campos avançados
+        product_type: formData.product_type,
+        is_digital: formData.is_digital,
+        digital_file_url: formData.digital_file_url || null,
+        license_key: formData.license_key || null,
+        download_limit: formData.download_limit || null,
+        colors: formData.colors.length > 0 ? formData.colors : [],
+        sizes: formData.sizes.length > 0 ? formData.sizes : [],
+        material: formData.material || null,
+        weight: formData.weight ? parseFloat(formData.weight) : null,
+        dimensions: formData.dimensions || null
       };
 
       let result;
@@ -270,6 +295,40 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
       title: "Sugestão aplicada!",
       description: `Campo ${field.replace('seo_', '').toUpperCase()} atualizado.`
     });
+  };
+
+  const addColor = () => {
+    if (newColor && !formData.colors.includes(newColor)) {
+      setFormData(prev => ({
+        ...prev,
+        colors: [...prev.colors, newColor]
+      }));
+      setNewColor('');
+    }
+  };
+
+  const removeColor = (colorToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      colors: prev.colors.filter(color => color !== colorToRemove)
+    }));
+  };
+
+  const addSize = () => {
+    if (newSize && !formData.sizes.includes(newSize)) {
+      setFormData(prev => ({
+        ...prev,
+        sizes: [...prev.sizes, newSize]
+      }));
+      setNewSize('');
+    }
+  };
+
+  const removeSize = (sizeToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      sizes: prev.sizes.filter(size => size !== sizeToRemove)
+    }));
   };
 
   return (
@@ -739,6 +798,294 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Configurações Avançadas */}
+        <div className="space-y-6">
+          <Tabs defaultValue="variants" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="variants">Variantes</TabsTrigger>
+              <TabsTrigger value="physical">Físico</TabsTrigger>
+              <TabsTrigger value="digital">Digital</TabsTrigger>
+              <TabsTrigger value="type">Tipo</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="variants" className="space-y-4">
+              <Card className="hover-scale border-l-4 border-l-green-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-green-600">
+                    <Palette className="w-5 h-5" />
+                    Variantes do Produto
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Configure cores, tamanhos e outras variações do produto
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Cores */}
+                  <div>
+                    <Label className="text-base font-semibold">Cores Disponíveis</Label>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="Ex: Azul, Vermelho..."
+                        className="flex-1"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addColor();
+                          }
+                        }}
+                      />
+                      <Button type="button" onClick={addColor} variant="outline">
+                        Adicionar
+                      </Button>
+                    </div>
+                    {formData.colors.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {formData.colors.map((color, index) => (
+                          <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                            <span className="w-3 h-3 rounded-full bg-current opacity-30"></span>
+                            {color}
+                            <button
+                              type="button"
+                              onClick={() => removeColor(color)}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tamanhos */}
+                  <div>
+                    <Label className="text-base font-semibold">Tamanhos Disponíveis</Label>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        value={newSize}
+                        onChange={(e) => setNewSize(e.target.value)}
+                        placeholder="Ex: P, M, G, XG..."
+                        className="flex-1"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addSize();
+                          }
+                        }}
+                      />
+                      <Button type="button" onClick={addSize} variant="outline">
+                        Adicionar
+                      </Button>
+                    </div>
+                    {formData.sizes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {formData.sizes.map((size, index) => (
+                          <Badge key={index} variant="outline" className="flex items-center gap-1">
+                            {size}
+                            <button
+                              type="button"
+                              onClick={() => removeSize(size)}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="physical" className="space-y-4">
+              <Card className="hover-scale border-l-4 border-l-blue-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-blue-600">
+                    <Ruler className="w-5 h-5" />
+                    Propriedades Físicas
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Configure peso, dimensões e material do produto
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="weight">Peso (kg)</Label>
+                      <Input
+                        id="weight"
+                        type="number"
+                        step="0.001"
+                        value={formData.weight}
+                        onChange={(e) => setFormData({...formData, weight: e.target.value})}
+                        placeholder="0.500"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="material">Material</Label>
+                      <Input
+                        id="material"
+                        value={formData.material}
+                        onChange={(e) => setFormData({...formData, material: e.target.value})}
+                        placeholder="Ex: Algodão, Plástico, Metal..."
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="dimensions">Dimensões</Label>
+                    <Input
+                      id="dimensions"
+                      value={formData.dimensions}
+                      onChange={(e) => setFormData({...formData, dimensions: e.target.value})}
+                      placeholder="Ex: 20x15x5 cm"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Formato sugerido: comprimento x largura x altura
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="digital" className="space-y-4">
+              <Card className="hover-scale border-l-4 border-l-purple-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-purple-600">
+                    <Package className="w-5 h-5" />
+                    Produto Digital
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Configure downloads, licenças e arquivos digitais
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="is_digital"
+                      checked={formData.is_digital}
+                      onCheckedChange={(checked) => setFormData({...formData, is_digital: checked})}
+                    />
+                    <Label htmlFor="is_digital" className="font-medium">Este é um produto digital</Label>
+                  </div>
+
+                  {formData.is_digital && (
+                    <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200">
+                      <div>
+                        <Label htmlFor="digital_file_url">URL do Arquivo Digital</Label>
+                        <Input
+                          id="digital_file_url"
+                          value={formData.digital_file_url}
+                          onChange={(e) => setFormData({...formData, digital_file_url: e.target.value})}
+                          placeholder="https://exemplo.com/arquivo.zip"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Link para download do arquivo (zip, pdf, exe, etc.)
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="license_key">Chave de Licença</Label>
+                        <Input
+                          id="license_key"
+                          value={formData.license_key}
+                          onChange={(e) => setFormData({...formData, license_key: e.target.value})}
+                          placeholder="XXXX-XXXX-XXXX-XXXX"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Chave de ativação para software/licenças
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="download_limit">Limite de Downloads</Label>
+                        <Input
+                          id="download_limit"
+                          type="number"
+                          value={formData.download_limit}
+                          onChange={(e) => setFormData({...formData, download_limit: parseInt(e.target.value) || 0})}
+                          placeholder="3"
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Quantas vezes o cliente pode baixar (0 = ilimitado)
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="type" className="space-y-4">
+              <Card className="hover-scale border-l-4 border-l-orange-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-orange-600">
+                    <Package className="w-5 h-5" />
+                    Tipo de Produto
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Defina se é produto físico, digital ou serviço
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Tipo do Produto</Label>
+                    <Select 
+                      value={formData.product_type} 
+                      onValueChange={(value) => setFormData({...formData, product_type: value})}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="physical">
+                          📦 Produto Físico
+                        </SelectItem>
+                        <SelectItem value="digital">
+                          💾 Produto Digital
+                        </SelectItem>
+                        <SelectItem value="service">
+                          🛠️ Serviço
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    <div className={`p-4 rounded-lg border-2 ${formData.product_type === 'physical' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <h4 className="font-semibold text-blue-600">📦 Físico</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Produto que precisa ser enviado fisicamente
+                      </p>
+                    </div>
+                    <div className={`p-4 rounded-lg border-2 ${formData.product_type === 'digital' ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <h4 className="font-semibold text-purple-600">💾 Digital</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Download, software, ebook, curso online
+                      </p>
+                    </div>
+                    <div className={`p-4 rounded-lg border-2 ${formData.product_type === 'service' ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+                      <h4 className="font-semibold text-green-600">🛠️ Serviço</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Consultoria, manutenção, instalação
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Botões de Ação */}

@@ -333,65 +333,98 @@ export type Database = {
         Row: {
           active: boolean | null
           category_id: string | null
+          colors: Json | null
           created_at: string
           description: string | null
+          digital_file_url: string | null
+          dimensions: string | null
+          download_limit: number | null
           featured: boolean | null
           id: string
           image_url: string | null
           images: string[] | null
           in_stock: boolean | null
+          is_digital: boolean | null
+          license_key: string | null
+          material: string | null
           name: string
           og_image: string | null
           original_price: number | null
           price: number
+          product_type: string | null
           seo_description: string | null
           seo_keywords: string | null
           seo_title: string | null
+          sizes: Json | null
           slug: string
           stock_quantity: number | null
           updated_at: string
+          variants: Json | null
+          weight: number | null
         }
         Insert: {
           active?: boolean | null
           category_id?: string | null
+          colors?: Json | null
           created_at?: string
           description?: string | null
+          digital_file_url?: string | null
+          dimensions?: string | null
+          download_limit?: number | null
           featured?: boolean | null
           id?: string
           image_url?: string | null
           images?: string[] | null
           in_stock?: boolean | null
+          is_digital?: boolean | null
+          license_key?: string | null
+          material?: string | null
           name: string
           og_image?: string | null
           original_price?: number | null
           price: number
+          product_type?: string | null
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
+          sizes?: Json | null
           slug: string
           stock_quantity?: number | null
           updated_at?: string
+          variants?: Json | null
+          weight?: number | null
         }
         Update: {
           active?: boolean | null
           category_id?: string | null
+          colors?: Json | null
           created_at?: string
           description?: string | null
+          digital_file_url?: string | null
+          dimensions?: string | null
+          download_limit?: number | null
           featured?: boolean | null
           id?: string
           image_url?: string | null
           images?: string[] | null
           in_stock?: boolean | null
+          is_digital?: boolean | null
+          license_key?: string | null
+          material?: string | null
           name?: string
           og_image?: string | null
           original_price?: number | null
           price?: number
+          product_type?: string | null
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
+          sizes?: Json | null
           slug?: string
           stock_quantity?: number | null
           updated_at?: string
+          variants?: Json | null
+          weight?: number | null
         }
         Relationships: [
           {
