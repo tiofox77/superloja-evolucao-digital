@@ -69,12 +69,16 @@ export const Footer = () => {
           {/* Brand section */}
           <div className="space-y-6">
             <div className="flex items-center gap-2">
-              <img src={logoImage} alt="SuperLoja" className="h-10 w-auto" />
+              {settings.logo_url ? (
+                <img src={settings.logo_url} alt={settings.store_name} className="h-10 w-auto" />
+              ) : (
+                <img src={logoImage} alt="SuperLoja" className="h-10 w-auto" />
+              )}
               <div>
                 <h3 className="text-xl font-bold bg-hero-gradient bg-clip-text text-transparent">
-                  SUPER LOJA
+                  {settings.store_name.toUpperCase()}
                 </h3>
-                <p className="text-xs text-muted-foreground">Sua loja moderna</p>
+                <p className="text-xs text-muted-foreground">{settings.store_description}</p>
               </div>
             </div>
             
@@ -233,7 +237,7 @@ export const Footer = () => {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground text-center md:text-left">
-              © 2024 SuperLoja. Todos os direitos reservados.
+              © 2024 {settings.store_name}. Todos os direitos reservados.
             </p>
             <p className="text-sm text-muted-foreground text-center md:text-right">
               Desenvolvido com ❤️ em Angola
