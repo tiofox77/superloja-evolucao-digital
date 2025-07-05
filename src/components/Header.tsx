@@ -8,12 +8,15 @@ import { CartSidebar } from './CartSidebar';
 import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
+import { useSettings } from '@/contexts/SettingsContext';
+import SuperLojaAvatar from '@/components/SuperLojaAvatar';
 
 export const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const { itemCount, setIsOpen } = useCart();
+  const { settings } = useSettings();
 
   useEffect(() => {
     // Get initial session
@@ -47,12 +50,23 @@ export const Header: React.FC = () => {
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 hero-gradient rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">S</span>
-                </div>
+                {settings.logo_url ? (
+                  <SuperLojaAvatar 
+                    src={settings.logo_url} 
+                    alt={settings.store_name}
+                    size="md"
+                    className="rounded-lg"
+                  />
+                ) : (
+                  <div className="w-10 h-10 hero-gradient rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-xl">
+                      {settings.store_name.charAt(0)}
+                    </span>
+                  </div>
+                )}
                 <div>
-                  <h1 className="text-xl font-bold text-foreground">SuperLoja</h1>
-                  <p className="text-xs text-muted-foreground">Tecnologia & Inovação</p>
+                  <h1 className="text-xl font-bold text-foreground">{settings.store_name}</h1>
+                  <p className="text-xs text-muted-foreground">{settings.store_description}</p>
                 </div>
               </div>
             </Link>

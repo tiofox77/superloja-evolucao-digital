@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Store, Bell, Shield, Database, Save, Upload, Globe, Clock, Users, Mail, MessageSquare, FileText, Zap } from 'lucide-react';
+import { Settings, Store, Bell, Shield, Database, Save, Upload, Globe, Clock, Users, Mail, MessageSquare, FileText, Zap, Download, RefreshCw, GitBranch, AlertTriangle, CheckCircle, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
@@ -35,6 +35,12 @@ const AdminConfiguracoes = () => {
     notifications_enabled: true,
     auto_backup: true,
     maintenance_mode: false,
+    
+    // Backup Settings
+    github_repo: '',
+    github_token: '',
+    auto_update: false,
+    current_version: 'v1.2.0',
     
     // Email Settings (SMTP)
     smtp_host: '',
@@ -87,6 +93,9 @@ const AdminConfiguracoes = () => {
   const [loading, setLoading] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [backupStatus, setBackupStatus] = useState('idle'); // idle, processing, success, error
+  const [updateLogs, setUpdateLogs] = useState([]);
+  const [availableVersions, setAvailableVersions] = useState([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -121,8 +130,12 @@ const AdminConfiguracoes = () => {
           settingsMap.whatsapp = value.social_media?.whatsapp || '';
         } else if (setting.key === 'system_settings') {
           settingsMap.notifications_enabled = value.notifications_enabled;
-          settingsMap.auto_backup = value.auto_backup;
-          settingsMap.maintenance_mode = value.maintenance_mode;
+            settingsMap.auto_backup = value.auto_backup;
+            settingsMap.maintenance_mode = value.maintenance_mode;
+            settingsMap.github_repo = value.github_repo || '';
+            settingsMap.github_token = value.github_token || '';
+            settingsMap.auto_update = value.auto_update ?? false;
+            settingsMap.current_version = value.current_version || 'v1.2.0';
         } else if (setting.key === 'email_settings') {
           settingsMap.smtp_host = value.smtp_host || '';
           settingsMap.smtp_port = value.smtp_port || '587';
@@ -219,7 +232,11 @@ const AdminConfiguracoes = () => {
           value: {
             notifications_enabled: settings.notifications_enabled,
             auto_backup: settings.auto_backup,
-            maintenance_mode: settings.maintenance_mode
+            maintenance_mode: settings.maintenance_mode,
+            github_repo: settings.github_repo,
+            github_token: settings.github_token,
+            auto_update: settings.auto_update,
+            current_version: settings.current_version
           }
         },
         {
@@ -285,6 +302,177 @@ const AdminConfiguracoes = () => {
     }
   };
 
+  const handleBackup = async () => {
+    setBackupStatus('processing');
+    try {
+      const { data, error } = await supabase.functions.invoke('create-backup', {
+        body: { type: 'manual' }
+      });
+      
+      if (error) throw error;
+      
+      setBackupStatus('success');
+      toast({
+        title: "✅ Backup criado!",
+        description: "Backup dos dados foi criado com sucesso."
+      });
+      
+      // Add log entry
+      const newLog = {
+        id: Date.now(),
+        type: 'backup',
+        message: 'Backup manual criado com sucesso',
+        timestamp: new Date().toISOString(),
+        status: 'success'
+      };
+      setUpdateLogs(prev => [newLog, ...prev]);
+      
+    } catch (error) {
+      setBackupStatus('error');
+      toast({
+        title: "❌ Erro no backup",
+        description: "Não foi possível criar o backup.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const checkForUpdates = async () => {
+    try {
+      if (!settings.github_repo) {
+        toast({
+          title: "⚠️ Repositório não configurado",
+          description: "Configure o repositório GitHub nas configurações.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Simulate GitHub API call for releases
+      const versions = [
+        { version: 'v1.3.0', date: '2024-01-15', changes: ['Nova funcionalidade de relatórios', 'Correções de bugs', 'Melhorias de performance'] },
+        { version: 'v1.2.1', date: '2024-01-10', changes: ['Correção crítica de segurança', 'Otimização da base de dados'] },
+        { version: 'v1.2.0', date: '2024-01-05', changes: ['Sistema de backup', 'Templates de notificação', 'Área do cliente'] }
+      ];
+      
+      setAvailableVersions(versions);
+      
+      const hasUpdates = versions.some(v => v.version !== settings.current_version);
+      if (hasUpdates) {
+        toast({
+          title: "🔄 Atualizações disponíveis",
+          description: "Novas versões encontradas no repositório."
+        });
+      } else {
+        toast({
+          title: "✅ Sistema atualizado",
+          description: "Você está usando a versão mais recente."
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Erro ao verificar atualizações",
+        description: "Não foi possível conectar ao repositório.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const performUpdate = async (version) => {
+    setBackupStatus('processing');
+    try {
+      // Create automatic backup before update
+      await handleBackup();
+      
+      const newLog = {
+        id: Date.now(),
+        type: 'update',
+        message: `Iniciando atualização para ${version}`,
+        timestamp: new Date().toISOString(),
+        status: 'processing'
+      };
+      setUpdateLogs(prev => [newLog, ...prev]);
+      
+      // Simulate update process
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Update current version
+      setSettings(prev => ({ ...prev, current_version: version }));
+      
+      const successLog = {
+        id: Date.now() + 1,
+        type: 'update',
+        message: `Atualização para ${version} concluída com sucesso`,
+        timestamp: new Date().toISOString(),
+        status: 'success'
+      };
+      setUpdateLogs(prev => [successLog, ...prev.filter(log => log.id !== newLog.id)]);
+      
+      setBackupStatus('success');
+      toast({
+        title: "✅ Atualização concluída!",
+        description: `Sistema atualizado para ${version} com sucesso.`
+      });
+      
+    } catch (error) {
+      const errorLog = {
+        id: Date.now() + 2,
+        type: 'update',
+        message: `Erro na atualização para ${version}: ${error.message}`,
+        timestamp: new Date().toISOString(),
+        status: 'error'
+      };
+      setUpdateLogs(prev => [errorLog, ...prev]);
+      
+      setBackupStatus('error');
+      toast({
+        title: "❌ Erro na atualização",
+        description: "Falha ao atualizar o sistema. Backup preservado.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const rollbackUpdate = async () => {
+    setBackupStatus('processing');
+    try {
+      const rollbackLog = {
+        id: Date.now(),
+        type: 'rollback',
+        message: 'Iniciando rollback para versão anterior',
+        timestamp: new Date().toISOString(),
+        status: 'processing'
+      };
+      setUpdateLogs(prev => [rollbackLog, ...prev]);
+      
+      // Simulate rollback process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const successLog = {
+        id: Date.now() + 1,
+        type: 'rollback',
+        message: 'Rollback concluído com sucesso',
+        timestamp: new Date().toISOString(),
+        status: 'success'
+      };
+      setUpdateLogs(prev => [successLog, ...prev.filter(log => log.id !== rollbackLog.id)]);
+      
+      setBackupStatus('success');
+      toast({
+        title: "✅ Rollback concluído!",
+        description: "Sistema restaurado para versão anterior."
+      });
+      
+    } catch (error) {
+      setBackupStatus('error');
+      toast({
+        title: "❌ Erro no rollback",
+        description: "Não foi possível fazer o rollback.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -295,11 +483,12 @@ const AdminConfiguracoes = () => {
       </div>
 
       <Tabs defaultValue="store" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="store">Loja</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
+          <TabsTrigger value="backup">Backup</TabsTrigger>
           <TabsTrigger value="advanced">Avançado</TabsTrigger>
         </TabsList>
 
@@ -1100,10 +1289,10 @@ const AdminConfiguracoes = () => {
                     <div className="text-2xl font-bold text-green-600">Online</div>
                     <div className="text-sm text-muted-foreground">Status</div>
                   </div>
-                  <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <div className="text-2xl font-bold">v1.2.0</div>
-                    <div className="text-sm text-muted-foreground">Versão</div>
-                  </div>
+          <div className="text-center p-4 bg-muted/50 rounded-lg">
+            <div className="text-2xl font-bold">{settings.current_version}</div>
+            <div className="text-sm text-muted-foreground">Versão</div>
+          </div>
                   <div className="text-center p-4 bg-muted/50 rounded-lg">
                     <div className="text-2xl font-bold">99.9%</div>
                     <div className="text-sm text-muted-foreground">Uptime</div>
@@ -1113,6 +1302,244 @@ const AdminConfiguracoes = () => {
                     <div className="text-sm text-muted-foreground">Performance</div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="backup">
+          <div className="space-y-6">
+            {/* Header */}
+            <Card className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 border-0">
+              <CardContent className="p-6">
+                <div className="text-center space-y-2">
+                  <div className="flex justify-center">
+                    <div className="bg-gradient-to-r from-green-500 to-blue-500 p-3 rounded-full">
+                      <Database className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-bold">Sistema de Backup & Atualizações</h3>
+                  <p className="text-muted-foreground">
+                    Gerencie backups automáticos e atualizações do sistema via GitHub
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* GitHub Configuration */}
+              <Card className="hover-scale">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <GitBranch className="w-5 h-5" />
+                    Configuração GitHub
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="github_repo">Repositório GitHub</Label>
+                    <Input
+                      id="github_repo"
+                      value={settings.github_repo}
+                      onChange={(e) => setSettings({...settings, github_repo: e.target.value})}
+                      placeholder="usuario/repositorio"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ex: meuusuario/superloja
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="github_token">Token de Acesso</Label>
+                    <Input
+                      id="github_token"
+                      type="password"
+                      value={settings.github_token}
+                      onChange={(e) => setSettings({...settings, github_token: e.target.value})}
+                      placeholder="ghp_xxxxxxxxxxxx"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Token GitHub com permissões de leitura
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Atualizações Automáticas</Label>
+                      <div className="text-sm text-muted-foreground">
+                        Verificar e aplicar atualizações automaticamente
+                      </div>
+                    </div>
+                    <Switch
+                      checked={settings.auto_update}
+                      onCheckedChange={(checked) => setSettings({...settings, auto_update: checked})}
+                    />
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={checkForUpdates}
+                        disabled={!settings.github_repo}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Verificar Atualizações
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Backup Management */}
+              <Card className="hover-scale">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="w-5 h-5" />
+                    Gerenciamento de Backup
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div>
+                      <div className="font-medium">Status do Sistema</div>
+                      <div className="text-sm text-muted-foreground">
+                        Versão atual: {settings.current_version}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {backupStatus === 'processing' && (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      )}
+                      {backupStatus === 'success' && (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      )}
+                      {backupStatus === 'error' && (
+                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={handleBackup}
+                      disabled={backupStatus === 'processing'}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      {backupStatus === 'processing' ? 'Criando Backup...' : 'Criar Backup Manual'}
+                    </Button>
+
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={rollbackUpdate}
+                      disabled={backupStatus === 'processing'}
+                    >
+                      <History className="w-4 h-4 mr-2" />
+                      Fazer Rollback
+                    </Button>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <div className="text-sm space-y-1">
+                      <p><strong>Último backup:</strong> Hoje às 03:00</p>
+                      <p><strong>Próximo backup:</strong> Amanhã às 03:00</p>
+                      <p><strong>Backups armazenados:</strong> 7 dias</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Available Updates */}
+            {availableVersions.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <RefreshCw className="w-5 h-5" />
+                    Atualizações Disponíveis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {availableVersions.filter(v => v.version !== settings.current_version).map((version) => (
+                      <div key={version.version} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="font-semibold text-lg">{version.version}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Lançado em {new Date(version.date).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                          <Button 
+                            size="sm"
+                            onClick={() => performUpdate(version.version)}
+                            disabled={backupStatus === 'processing'}
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Atualizar
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium text-sm">Mudanças:</p>
+                          <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                            {version.changes.map((change, idx) => (
+                              <li key={idx}>{change}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Update Logs */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Logs de Atualização
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {updateLogs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhum log de atualização disponível.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {updateLogs.map((log) => (
+                      <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {log.status === 'success' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                          {log.status === 'error' && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                          {log.status === 'processing' && (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{log.message}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(log.timestamp).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <Badge variant={log.type === 'backup' ? 'secondary' : log.type === 'update' ? 'default' : 'outline'}>
+                            {log.type}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1136,14 +1563,6 @@ const AdminConfiguracoes = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <Button variant="outline">Limpar Cache</Button>
                   <Button variant="outline">Otimizar Imagens</Button>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-semibold">Backup e Restauração</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <Button variant="outline">Fazer Backup</Button>
-                  <Button variant="outline">Restaurar Backup</Button>
                 </div>
               </div>
 

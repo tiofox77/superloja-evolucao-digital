@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { User, MapPin, ShoppingBag, Settings, LogOut, Eye, Package, Phone } from 'lucide-react';
+import { User, MapPin, ShoppingBag, Settings, LogOut, Eye, Package, Phone, FileText } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -400,12 +400,25 @@ const Cliente = () => {
                           <span className="font-semibold">
                             {new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(order.total_amount)}
                           </span>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to={`/fatura/${order.id}`}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              Ver Detalhes
-                            </Link>
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link to={`/fatura/${order.id}`}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Ver Detalhes
+                              </Link>
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                // Generate PDF functionality will be implemented
+                                window.open(`/fatura/${order.id}?pdf=true`, '_blank');
+                              }}
+                            >
+                              <FileText className="w-4 h-4 mr-2" />
+                              PDF
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
