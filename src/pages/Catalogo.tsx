@@ -98,8 +98,28 @@ const Catalogo = () => {
     fetchData();
   }, [selectedCategory, searchQuery, sortBy]);
 
+  // Rastrear pesquisas
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    if (term.length > 2) {
+      trackEvent('search', { query: term, results_count: filteredProducts.length });
+    }
+  };
+
+  // Rastrear filtros por categoria
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    trackEvent('filter_category', { category: categoryId });
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead 
+        pageType="category"
+        title="Catálogo de Produtos - SuperLoja Angola"
+        description="Explore nossa ampla variedade de produtos eletrônicos. Smartphones, computadores, acessórios e muito mais com os melhores preços de Angola."
+        keywords="catálogo Angola, produtos eletrônicos, smartphones Angola, computadores Luanda"
+      />
       <Header />
       
       <main className="container mx-auto px-4 py-8">
@@ -127,7 +147,7 @@ const Catalogo = () => {
             </div>
 
             {/* Categoria */}
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <Select value={selectedCategory} onValueChange={handleCategoryChange}>
               <SelectTrigger className="w-full lg:w-48">
                 <SelectValue placeholder="Categoria" />
               </SelectTrigger>

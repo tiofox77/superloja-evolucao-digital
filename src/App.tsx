@@ -27,6 +27,7 @@ import AdminRelatorios from "@/pages/admin/AdminRelatorios";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 
 function App() {
   return (
@@ -34,9 +35,10 @@ function App() {
       <SettingsProvider>
         <CartProvider>
         <Router>
-        <div className="min-h-screen bg-background">
-          <Suspense fallback={<div>Loading...</div>}>
-            <Routes>
+          <div className="min-h-screen bg-background">
+            <AnalyticsTracker />
+            <Suspense fallback={<div>Loading...</div>}>
+              <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/catalogo" element={<Catalogo />} />
               <Route path="/produto/:slug" element={<Produto />} />
