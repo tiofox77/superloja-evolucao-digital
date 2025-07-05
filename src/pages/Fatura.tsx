@@ -276,7 +276,8 @@ const Fatura = () => {
                       <SuperLojaAvatar 
                         src={item.products.image_url}
                         alt={item.products.name}
-                        size="md"
+                        size="sm"
+                        className="print:w-6 print:h-6"
                       />
                       <div className="flex-1">
                         <h4 className="font-medium">{item.products.name}</h4>
