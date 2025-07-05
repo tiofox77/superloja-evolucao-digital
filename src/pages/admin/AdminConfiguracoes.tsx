@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Store, Bell, Shield, Database, Save, Upload, Globe, Clock, Users, Mail, MessageSquare, FileText, Zap, Download, RefreshCw, GitBranch, AlertTriangle, CheckCircle, History } from 'lucide-react';
+import { Settings, Store, Bell, Shield, Database, Save, Upload, Globe, Clock, Users, Mail, MessageSquare, FileText, Zap, Download, RefreshCw, GitBranch, AlertTriangle, CheckCircle, History, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
@@ -62,6 +62,10 @@ const AdminConfiguracoes = () => {
     seo_keywords: '',
     og_image: '',
     twitter_handle: '',
+    auto_seo: true,
+    internal_analytics: true,
+    analytics_cookies: true,
+    google_analytics: '',
     
     // Notification Templates
     email_templates: {
@@ -1055,6 +1059,134 @@ const AdminConfiguracoes = () => {
                       <p><code>{'{storePhone}'}</code> - Telefone da loja</p>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="seo">
+          <div className="space-y-6">
+            {/* SEO Global */}
+            <Card className="hover-scale">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="w-5 h-5" />
+                  Configurações SEO Globais
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Configure as meta tags padrão que serão aplicadas em todo o site
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="seo_title">Título SEO Padrão</Label>
+                  <Input
+                    id="seo_title"
+                    value={settings.seo_title}
+                    onChange={(e) => setSettings({...settings, seo_title: e.target.value})}
+                    placeholder="SuperLoja - A melhor loja de eletrônicos de Angola"
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Recomendado: 50-60 caracteres</p>
+                </div>
+
+                <div>
+                  <Label htmlFor="seo_description">Descrição SEO Padrão</Label>
+                  <Textarea
+                    id="seo_description"
+                    value={settings.seo_description}
+                    onChange={(e) => setSettings({...settings, seo_description: e.target.value})}
+                    placeholder="Descubra os melhores produtos tecnológicos com ofertas imperdíveis. Smartphones, computadores, acessórios e muito mais na SuperLoja!"
+                    className="mt-1"
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Recomendado: 150-160 caracteres</p>
+                </div>
+
+                <div>
+                  <Label htmlFor="seo_keywords">Palavras-chave</Label>
+                  <Input
+                    id="seo_keywords"
+                    value={settings.seo_keywords}
+                    onChange={(e) => setSettings({...settings, seo_keywords: e.target.value})}
+                    placeholder="eletrônicos, tecnologia, smartphones, Angola, Luanda"
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Separe por vírgulas</p>
+                </div>
+
+                <div>
+                  <Label htmlFor="twitter_handle">Handle do Twitter</Label>
+                  <Input
+                    id="twitter_handle"
+                    value={settings.twitter_handle}
+                    onChange={(e) => setSettings({...settings, twitter_handle: e.target.value})}
+                    placeholder="@superloja"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="auto_seo">SEO Automático com IA</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Gerar automaticamente SEO para novos produtos usando IA
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto_seo"
+                    checked={settings.auto_seo || false}
+                    onCheckedChange={(checked) => setSettings({...settings, auto_seo: checked})}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Analytics & Cookies */}
+            <Card className="hover-scale">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  Analytics e Cookies
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Analytics Interno</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Rastrear visitantes e comportamento no site
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.internal_analytics || true}
+                    onCheckedChange={(checked) => setSettings({...settings, internal_analytics: checked})}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Cookies de Analytics</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Usar cookies para melhorar precisão dos dados
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.analytics_cookies || true}
+                    onCheckedChange={(checked) => setSettings({...settings, analytics_cookies: checked})}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="google_analytics">Google Analytics ID</Label>
+                  <Input
+                    id="google_analytics"
+                    value={settings.google_analytics || ''}
+                    onChange={(e) => setSettings({...settings, google_analytics: e.target.value})}
+                    placeholder="GA4-XXXXXXXXXX"
+                    className="mt-1"
+                  />
                 </div>
               </CardContent>
             </Card>

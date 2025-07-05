@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useCookieAnalytics } from '@/hooks/useCookieAnalytics';
 
 export const AnalyticsTracker: React.FC = () => {
   const location = useLocation();
   const { trackPageView, trackEvent } = useAnalytics();
+  const { cookieData } = useCookieAnalytics();
 
   useEffect(() => {
     // Rastrear mudança de página
