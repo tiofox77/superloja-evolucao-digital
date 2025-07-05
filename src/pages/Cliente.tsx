@@ -32,6 +32,8 @@ const Cliente = () => {
     city: '',
     street: ''
   });
+  const [orders, setOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
