@@ -70,12 +70,11 @@ const Checkout = () => {
         .single();
 
       if (profile) {
-        const { data: userData } = await supabase.auth.getUser();
         setFormData(prev => ({
           ...prev,
           name: profile.full_name || '',
           email: profile.email || '',
-          phone: userData.user?.user_metadata?.phone || '',
+          phone: profile.phone || '',
           country: profile.country || '',
           province: profile.province || '',
           city: profile.city || '',
@@ -160,7 +159,7 @@ const Checkout = () => {
 
       if (itemsError) throw itemsError;
 
-      // Salvar endereço no perfil do usuário para uso futuro
+      // Atualizar perfil do usuário com os dados do checkout
       if (user) {
         try {
           await supabase
@@ -169,6 +168,7 @@ const Checkout = () => {
               user_id: user.id,
               email: formData.email,
               full_name: formData.name,
+              phone: formData.phone,
               country: formData.country,
               province: formData.province,
               city: formData.city,
@@ -276,12 +276,26 @@ const Checkout = () => {
                   </div>
                   <div>
                     <Label htmlFor="phone">Telefone *</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      required
-                    />
+                    <div className="flex mt-1">
+                      <div className="flex items-center px-3 border border-r-0 border-input bg-muted rounded-l-md">
+                        <span className="text-sm text-muted-foreground">+244</span>
+                      </div>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/\D/g, '').replace(/^244/, '');
+                          setFormData({...formData, phone: cleaned});
+                        }}
+                        placeholder="912345678"
+                        className="rounded-l-none"
+                        required
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Digite apenas os números sem o código do país
+                    </p>
                   </div>
                 </CardContent>
               </Card>
