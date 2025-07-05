@@ -16,6 +16,7 @@ import AdminCategorias from "@/pages/admin/AdminCategorias";
 import AdminPedidos from "@/pages/admin/AdminPedidos";
 import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 import AdminUpload from "@/pages/admin/AdminUpload";
+import AdminPOS from "@/pages/admin/AdminPOS";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 
@@ -42,6 +43,7 @@ function App() {
                 <Route path="pedidos" element={<AdminPedidos />} />
                 <Route path="usuarios" element={<AdminUsuarios />} />
                 <Route path="upload" element={<AdminUpload />} />
+                <Route path="pos" element={<AdminPOS />} />
               </Route>
               
               <Route path="*" element={<NotFound />} />

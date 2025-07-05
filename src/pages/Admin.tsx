@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
-import { ShoppingBag, Users, Package, DollarSign } from 'lucide-react';
+import { ShoppingBag, Users, Package, DollarSign, ShoppingCart, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Admin = () => {
@@ -180,48 +180,51 @@ const Admin = () => {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card className="hover-scale hover:shadow-lg transition-all duration-300 cursor-pointer border-l-4 border-l-blue-500" 
+              onClick={() => window.location.href = '/admin/pos'}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-blue-600">
+              <ShoppingCart className="h-5 w-5" />
+              POS - Ponto de Venda
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              Sistema de vendas diretas no balcão com carrinho interativo.
+            </p>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white">Abrir POS</Button>
+          </CardContent>
+        </Card>
+
+        <Card className="hover-scale hover:shadow-lg transition-all duration-300 cursor-pointer border-l-4 border-l-green-500"
+              onClick={() => window.location.href = '/admin/produtos'}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-600">
               <Package className="h-5 w-5" />
               Gerenciar Produtos
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              Adicione, edite ou remova produtos do catálogo.
+              Adicione, edite ou remova produtos do catálogo com upload de imagens.
             </p>
-            <Button>Ir para Produtos</Button>
+            <Button className="bg-green-600 hover:bg-green-700 text-white">Ir para Produtos</Button>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+        <Card className="hover-scale hover:shadow-lg transition-all duration-300 cursor-pointer border-l-4 border-l-orange-500"
+              onClick={() => window.location.href = '/admin/pedidos'}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-orange-600">
               <ShoppingBag className="h-5 w-5" />
               Pedidos Recentes
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-4">
-              Visualize e gerencie todos os pedidos realizados.
+              Visualize e gerencie todos os pedidos realizados na loja.
             </p>
-            <Button variant="outline">Ver Pedidos</Button>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Usuários
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">
-              Gerencie usuários e suas permissões.
-            </p>
-            <Button variant="outline">Gerenciar Usuários</Button>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white">Ver Pedidos</Button>
           </CardContent>
         </Card>
       </div>

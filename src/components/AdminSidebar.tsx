@@ -31,6 +31,11 @@ const menuItems = [
     icon: LayoutDashboard,
   },
   {
+    title: 'POS - Vendas',
+    url: '/admin/pos',
+    icon: ShoppingCart,
+  },
+  {
     title: 'Produtos',
     url: '/admin/produtos',
     icon: Package,
