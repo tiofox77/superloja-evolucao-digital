@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { SEOHead } from '@/components/SEOHead';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -22,6 +24,10 @@ interface Product {
   featured: boolean;
   in_stock: boolean;
   stock_quantity: number;
+  seo_title?: string;
+  seo_description?: string;
+  seo_keywords?: string;
+  og_image?: string;
   categories?: {
     name: string;
   };
@@ -35,6 +41,7 @@ const Produto = () => {
   const [selectedImage, setSelectedImage] = useState(0);
   const { addToCart, isLoading } = useCart();
   const { toast } = useToast();
+  const { trackEvent } = useAnalytics();
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -80,6 +87,14 @@ const Produto = () => {
   const handleAddToCart = async () => {
     if (!product) return;
     await addToCart(product.id, quantity);
+    
+    // Rastrear evento de adicionar ao carrinho
+    trackEvent('add_to_cart', {
+      product_id: product.id,
+      product_name: product.name,
+      product_price: product.price,
+      quantity: quantity
+    });
   };
 
   const discountPercentage = product?.original_price 
@@ -127,8 +142,44 @@ const Produto = () => {
     ? product.images 
     : [product.image_url || '/placeholder.svg'];
 
+  // SEO dinâmico baseado no produto
+  const productSEO = product ? {
+    title: product.seo_title || `${product.name} - SuperLoja Angola`,
+    description: product.seo_description || product.description || `Compre ${product.name} na SuperLoja com o melhor preço de Angola. ${product.description}`,
+    keywords: product.seo_keywords || `${product.name}, ${product.categories?.name}, Angola, eletrônicos`,
+    ogImage: product.og_image || product.image_url,
+    schemaMarkup: {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": product.name,
+      "description": product.description,
+      "image": product.image_url,
+      "offers": {
+        "@type": "Offer",
+        "price": product.price,
+        "priceCurrency": "AOA",
+        "availability": product.in_stock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+      },
+      "brand": {
+        "@type": "Brand",
+        "name": "SuperLoja"
+      }
+    }
+  } : null;
+
   return (
     <div className="min-h-screen bg-background">
+      {product && (
+        <SEOHead 
+          pageType="product"
+          pageSlug={product.slug}
+          title={productSEO.title}
+          description={productSEO.description}
+          keywords={productSEO.keywords}
+          ogImage={productSEO.ogImage}
+          schemaMarkup={productSEO.schemaMarkup}
+        />
+      )}
       <Header />
       
       <main className="container mx-auto px-4 py-8">

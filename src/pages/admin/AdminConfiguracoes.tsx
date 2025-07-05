@@ -56,6 +56,13 @@ const AdminConfiguracoes = () => {
     twilio_phone_number: '',
     sms_notifications_enabled: false,
     
+    // SEO Settings
+    seo_title: '',
+    seo_description: '',
+    seo_keywords: '',
+    og_image: '',
+    twitter_handle: '',
+    
     // Notification Templates
     email_templates: {
       welcome: {

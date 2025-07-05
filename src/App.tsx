@@ -23,14 +23,17 @@ import AdminConfiguracoes from "@/pages/admin/AdminConfiguracoes";
 import AdminPromocoes from "@/pages/admin/AdminPromocoes";
 import AdminPerfil from "@/pages/admin/AdminPerfil";
 import AdminLogs from "@/pages/admin/AdminLogs";
+import AdminRelatorios from "@/pages/admin/AdminRelatorios";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
+import { HelmetProvider } from 'react-helmet-async';
 
 function App() {
   return (
-    <SettingsProvider>
-      <CartProvider>
-      <Router>
+    <HelmetProvider>
+      <SettingsProvider>
+        <CartProvider>
+        <Router>
         <div className="min-h-screen bg-background">
           <Suspense fallback={<div>Loading...</div>}>
             <Routes>
@@ -56,6 +59,7 @@ function App() {
                 <Route path="pos" element={<AdminPOS />} />
                 <Route path="configuracoes" element={<AdminConfiguracoes />} />
                 <Route path="promocoes" element={<AdminPromocoes />} />
+                <Route path="relatorios" element={<AdminRelatorios />} />
                 <Route path="logs" element={<AdminLogs />} />
               </Route>
               
@@ -64,9 +68,10 @@ function App() {
           </Suspense>
         </div>
         <Toaster />
-      </Router>
-    </CartProvider>
-    </SettingsProvider>
+        </Router>
+      </CartProvider>
+      </SettingsProvider>
+    </HelmetProvider>
   );
 }
 

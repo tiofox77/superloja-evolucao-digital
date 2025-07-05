@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          event_data: Json | null
+          event_type: string
+          id: string
+          page_url: string
+          session_id: string
+          timestamp: string
+          visitor_id: string
+        }
+        Insert: {
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          page_url: string
+          session_id: string
+          timestamp?: string
+          visitor_id: string
+        }
+        Update: {
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          page_url?: string
+          session_id?: string
+          timestamp?: string
+          visitor_id?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string
@@ -311,8 +341,12 @@ export type Database = {
           images: string[] | null
           in_stock: boolean | null
           name: string
+          og_image: string | null
           original_price: number | null
           price: number
+          seo_description: string | null
+          seo_keywords: string | null
+          seo_title: string | null
           slug: string
           stock_quantity: number | null
           updated_at: string
@@ -328,8 +362,12 @@ export type Database = {
           images?: string[] | null
           in_stock?: boolean | null
           name: string
+          og_image?: string | null
           original_price?: number | null
           price: number
+          seo_description?: string | null
+          seo_keywords?: string | null
+          seo_title?: string | null
           slug: string
           stock_quantity?: number | null
           updated_at?: string
@@ -345,8 +383,12 @@ export type Database = {
           images?: string[] | null
           in_stock?: boolean | null
           name?: string
+          og_image?: string | null
           original_price?: number | null
           price?: number
+          seo_description?: string | null
+          seo_keywords?: string | null
+          seo_title?: string | null
           slug?: string
           stock_quantity?: number | null
           updated_at?: string
@@ -448,6 +490,105 @@ export type Database = {
         }
         Relationships: []
       }
+      reports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          parameters: Json | null
+          report_type: string
+          schedule: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          parameters?: Json | null
+          report_type: string
+          schedule?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          parameters?: Json | null
+          report_type?: string
+          schedule?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      seo_settings: {
+        Row: {
+          canonical_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          keywords: string | null
+          og_description: string | null
+          og_image: string | null
+          og_title: string | null
+          page_slug: string | null
+          page_type: string
+          robots: string | null
+          schema_markup: Json | null
+          title: string | null
+          twitter_description: string | null
+          twitter_image: string | null
+          twitter_title: string | null
+          updated_at: string
+        }
+        Insert: {
+          canonical_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          keywords?: string | null
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
+          page_slug?: string | null
+          page_type: string
+          robots?: string | null
+          schema_markup?: Json | null
+          title?: string | null
+          twitter_description?: string | null
+          twitter_image?: string | null
+          twitter_title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          canonical_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          keywords?: string | null
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
+          page_slug?: string | null
+          page_type?: string
+          robots?: string | null
+          schema_markup?: Json | null
+          title?: string | null
+          twitter_description?: string | null
+          twitter_image?: string | null
+          twitter_title?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           created_at: string
@@ -472,6 +613,81 @@ export type Database = {
           key?: string
           updated_at?: string
           value?: Json
+        }
+        Relationships: []
+      }
+      visitor_analytics: {
+        Row: {
+          browser: string | null
+          city: string | null
+          conversion_event: string | null
+          country: string | null
+          created_at: string
+          device_type: string | null
+          id: string
+          ip_address: unknown | null
+          is_bounce: boolean | null
+          language: string | null
+          os: string | null
+          page_title: string | null
+          page_url: string
+          page_views: number | null
+          referrer: string | null
+          region: string | null
+          screen_resolution: string | null
+          session_id: string
+          updated_at: string
+          user_agent: string | null
+          visit_duration: number | null
+          visitor_id: string
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          conversion_event?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          ip_address?: unknown | null
+          is_bounce?: boolean | null
+          language?: string | null
+          os?: string | null
+          page_title?: string | null
+          page_url: string
+          page_views?: number | null
+          referrer?: string | null
+          region?: string | null
+          screen_resolution?: string | null
+          session_id: string
+          updated_at?: string
+          user_agent?: string | null
+          visit_duration?: number | null
+          visitor_id: string
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          conversion_event?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          ip_address?: unknown | null
+          is_bounce?: boolean | null
+          language?: string | null
+          os?: string | null
+          page_title?: string | null
+          page_url?: string
+          page_views?: number | null
+          referrer?: string | null
+          region?: string | null
+          screen_resolution?: string | null
+          session_id?: string
+          updated_at?: string
+          user_agent?: string | null
+          visit_duration?: number | null
+          visitor_id?: string
         }
         Relationships: []
       }
