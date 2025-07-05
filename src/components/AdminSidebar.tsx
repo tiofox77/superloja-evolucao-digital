@@ -9,7 +9,8 @@ import {
   Settings,
   Tag,
   Upload,
-  FileText
+  FileText,
+  Activity
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -72,6 +73,11 @@ const toolsItems = [
     title: 'Promoções',
     url: '/admin/promocoes',
     icon: Tag,
+  },
+  {
+    title: 'Logs',
+    url: '/admin/logs',
+    icon: Activity,
   },
   {
     title: 'Configurações',

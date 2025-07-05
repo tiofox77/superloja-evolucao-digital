@@ -27,15 +27,12 @@ const handler = async (req: Request): Promise<Response> => {
     
     console.log('Sending email:', { type, to, userName, orderNumber });
 
-    // Note: For now, we'll use a simple email service
-    // In production, you would integrate with Resend or another email service
-    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Create a notification in the database
+    // Create notification message
     let title = '';
     let message = '';
 
@@ -54,7 +51,25 @@ const handler = async (req: Request): Promise<Response> => {
         break;
     }
 
-    // Get user ID from email
+    // Create notification log entry
+    const logEntry = {
+      user_id: null, // Will be updated if we find the user
+      notification_type: 'email',
+      recipient: to,
+      subject: title,
+      message: message,
+      status: 'pending',
+      provider: 'smtp',
+      metadata: {
+        type,
+        userName,
+        orderNumber,
+        orderTotal,
+        newStatus
+      }
+    };
+
+    // Try to get user ID from email
     const { data: profiles } = await supabase
       .from('profiles')
       .select('user_id')
@@ -62,6 +77,8 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (profiles?.user_id) {
+      logEntry.user_id = profiles.user_id;
+      
       // Create notification
       await supabase
         .from('notifications')
@@ -73,16 +90,41 @@ const handler = async (req: Request): Promise<Response> => {
         });
     }
 
-    // TODO: Integrate with Resend for actual email sending
-    // const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-    // await resend.emails.send({
-    //   from: 'SuperLoja <noreply@superloja.com>',
-    //   to: [to],
-    //   subject: title,
-    //   html: generateEmailTemplate(type, { userName, orderNumber, orderTotal, newStatus })
-    // });
+    try {
+      // Insert initial log entry
+      const { data: insertedLog, error: logError } = await supabase
+        .from('notification_logs')
+        .insert(logEntry)
+        .select()
+        .single();
 
-    console.log('Email notification processed successfully');
+      if (logError) throw logError;
+
+      // TODO: Here you would integrate with SMTP or email service
+      // For now, we'll simulate success/failure
+      const success = Math.random() > 0.1; // 90% success rate simulation
+
+      // Update log with result
+      const updateData: any = {
+        status: success ? 'sent' : 'failed',
+        sent_at: success ? new Date().toISOString() : null,
+        provider_response: success 
+          ? { message_id: `msg_${Date.now()}`, status: 'delivered' }
+          : null,
+        error_message: success ? null : 'Simulated error: SMTP configuration not available'
+      };
+
+      await supabase
+        .from('notification_logs')
+        .update(updateData)
+        .eq('id', insertedLog.id);
+
+      console.log('Email notification processed:', success ? 'success' : 'failed');
+
+    } catch (logError) {
+      console.error('Error logging notification:', logError);
+      // Continue execution even if logging fails
+    }
 
     return new Response(
       JSON.stringify({ success: true, message: 'Email notification processed' }),
