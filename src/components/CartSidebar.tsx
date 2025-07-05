@@ -19,9 +19,10 @@ export const CartSidebar: React.FC = () => {
   } = useCart();
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+    return new Intl.NumberFormat('pt-AO', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'AOA',
+      minimumFractionDigits: 0
     }).format(price);
   };
 
@@ -127,8 +128,8 @@ export const CartSidebar: React.FC = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Button className="w-full" size="lg">
-                    Finalizar Compra
+                  <Button className="w-full" size="lg" asChild>
+                    <Link to="/checkout">Finalizar Compra</Link>
                   </Button>
                   
                   <div className="flex gap-2">

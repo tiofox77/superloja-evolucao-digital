@@ -35,9 +35,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const { addToCart, isLoading } = useCart();
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+    return new Intl.NumberFormat('pt-AO', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'AOA',
+      minimumFractionDigits: 0
     }).format(price);
   };
 
