@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Settings, User, LogOut } from 'lucide-react';
+import { Search, Settings, User, LogOut, ExternalLink, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -60,6 +60,16 @@ export const AdminHeader: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => window.open('/', '_blank')}
+            className="hover:bg-primary hover:text-primary-foreground transition-colors"
+          >
+            <Globe className="w-4 h-4 mr-2" />
+            Ver Site
+          </Button>
+
           <NotificationBell />
 
           <DropdownMenu>

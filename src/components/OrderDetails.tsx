@@ -4,15 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Package, User, Phone, Mail, Calendar, CreditCard, Download, FileText, Image } from 'lucide-react';
+import { Package, User, Phone, Mail, Calendar, CreditCard, Download, FileText, Image, Printer } from 'lucide-react';
 
 interface OrderDetailsProps {
   order: any;
   items: any[];
   onStatusUpdate: (orderId: string, newStatus: string) => void;
+  onGeneratePDF?: (order: any, items: any[]) => void;
 }
 
-const OrderDetails: React.FC<OrderDetailsProps> = ({ order, items, onStatusUpdate }) => {
+const OrderDetails: React.FC<OrderDetailsProps> = ({ order, items, onStatusUpdate, onGeneratePDF }) => {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-AO', {
       style: 'currency',
@@ -55,6 +56,20 @@ const OrderDetails: React.FC<OrderDetailsProps> = ({ order, items, onStatusUpdat
 
   return (
     <div className="space-y-6">
+      {/* Actions */}
+      <div className="flex justify-end space-x-2">
+        {onGeneratePDF && (
+          <Button 
+            variant="outline" 
+            onClick={() => onGeneratePDF(order, items)}
+            className="hover-scale"
+          >
+            <Printer className="w-4 h-4 mr-2" />
+            Gerar PDF
+          </Button>
+        )}
+      </div>
+
       {/* Informações do Pedido */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="hover-scale border-0 shadow-md">

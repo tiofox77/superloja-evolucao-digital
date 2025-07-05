@@ -172,6 +172,21 @@ const AdminPedidos = () => {
 
       if (error) throw error;
 
+      // Atualizar estado local imediatamente
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === orderId 
+            ? { ...order, order_status: newStatus }
+            : order
+        )
+      );
+      
+      setSelectedOrder(prev => 
+        prev?.id === orderId 
+          ? { ...prev, order_status: newStatus }
+          : prev
+      );
+
       // Enviar notificações de mudança de status
       if (orderData?.customer_email) {
         try {
@@ -210,7 +225,6 @@ const AdminPedidos = () => {
         description: "Status do pedido foi atualizado com sucesso."
       });
 
-      loadOrders();
       loadStats();
     } catch (error) {
       toast({
@@ -219,6 +233,86 @@ const AdminPedidos = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const generateOrderPDF = (order, items) => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Pedido #${order.order_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+            .info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .section { margin-bottom: 15px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .total { font-weight: bold; font-size: 1.2em; text-align: right; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>SuperLoja</h1>
+            <h2>Pedido #${order.order_number}</h2>
+          </div>
+          
+          <div class="info">
+            <div>
+              <div class="section">
+                <strong>Cliente:</strong> ${order.customer_name || 'Não informado'}<br>
+                <strong>Telefone:</strong> ${order.customer_phone || 'Não informado'}<br>
+                <strong>Email:</strong> ${order.customer_email || 'Não informado'}
+              </div>
+            </div>
+            <div>
+              <div class="section">
+                <strong>Data:</strong> ${new Date(order.created_at).toLocaleDateString('pt-BR')}<br>
+                <strong>Status:</strong> ${order.order_status}<br>
+                <strong>Pagamento:</strong> ${order.payment_method}
+              </div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Quantidade</th>
+                <th>Preço Unit.</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(item => `
+                <tr>
+                  <td>${item.products?.name}</td>
+                  <td>${item.quantity}</td>
+                  <td>${formatPrice(item.unit_price)}</td>
+                  <td>${formatPrice(item.total_price)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="total">
+            Total: ${formatPrice(order.total_amount)}
+          </div>
+
+          ${order.notes ? `
+            <div class="section" style="margin-top: 20px;">
+              <strong>Observações:</strong><br>
+              ${order.notes}
+            </div>
+          ` : ''}
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   const formatPrice = (price: number) => {
@@ -518,6 +612,7 @@ const AdminPedidos = () => {
                                 order={selectedOrder} 
                                 items={orderItems}
                                 onStatusUpdate={updateOrderStatus}
+                                onGeneratePDF={generateOrderPDF}
                               />
                             )}
                           </DialogContent>

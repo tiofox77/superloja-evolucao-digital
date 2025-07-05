@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Minus, ShoppingCart, Trash2, Calculator, CreditCard } from 'lucide-react';
+import { Search, Plus, Minus, ShoppingCart, Trash2, Calculator, CreditCard, FileText, Printer } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -146,7 +146,17 @@ const AdminPOS = () => {
 
       toast({
         title: "Venda realizada!",
-        description: `Pedido #${orderData.id.slice(0, 8)} - Total: ${formatPrice(getTotalAmount())}`,
+        description: `Pedido #${orderData.order_number} - Total: ${formatPrice(getTotalAmount())}`,
+        action: (
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={() => generateReceiptPDF(orderData, cart)}
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            PDF
+          </Button>
+        )
       });
 
       clearCart();
@@ -167,6 +177,70 @@ const AdminPOS = () => {
       currency: 'AOA',
       minimumFractionDigits: 0
     }).format(price);
+  };
+
+  const generateReceiptPDF = (order, items) => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Recibo - Pedido #${order.order_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; max-width: 400px; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+            .info { margin-bottom: 15px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border-bottom: 1px solid #ddd; padding: 5px; text-align: left; }
+            .total { font-weight: bold; font-size: 1.1em; text-align: right; margin-top: 15px; border-top: 2px solid #333; padding-top: 10px; }
+            .footer { text-align: center; margin-top: 20px; font-size: 0.9em; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>SuperLoja</h2>
+            <p>Recibo de Venda #${order.order_number}</p>
+          </div>
+          
+          <div class="info">
+            <p><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+            <p><strong>Cliente:</strong> ${order.customer_name || 'Balcão'}</p>
+            <p><strong>Pagamento:</strong> ${order.payment_method === 'cash' ? 'Dinheiro' : 'Transferência'}</p>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qtd</th>
+                <th>Preço</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(item => `
+                <tr>
+                  <td>${item.name}</td>
+                  <td>${item.quantity}</td>
+                  <td>${formatPrice(item.price * item.quantity)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="total">
+            TOTAL: ${formatPrice(order.total_amount)}
+          </div>
+
+          <div class="footer">
+            <p>Obrigado pela preferência!</p>
+            <p>SuperLoja - A sua loja de confiança</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   const filteredProducts = products.filter(product =>

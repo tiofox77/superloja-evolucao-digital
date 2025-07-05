@@ -407,9 +407,11 @@ const AdminProdutos = () => {
                         </span>
                       )}
                     </div>
-                    <Badge variant={product.in_stock ? "default" : "secondary"}>
-                      {product.in_stock ? "Em estoque" : "Fora de estoque"}
-                    </Badge>
+                    <div className="text-right">
+                      <Badge variant={product.in_stock ? "default" : "secondary"} className="text-xs">
+                        {product.in_stock ? `${product.stock_quantity || 0} unid.` : "Sem estoque"}
+                      </Badge>
+                    </div>
                   </div>
                   
                   <div className="flex space-x-1">
