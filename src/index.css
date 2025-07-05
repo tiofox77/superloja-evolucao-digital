@@ -163,6 +163,7 @@
   .smooth-transition {
     transition: var(--transition-smooth);
   }
+}
 
 @layer utilities {
   .line-clamp-2 {
