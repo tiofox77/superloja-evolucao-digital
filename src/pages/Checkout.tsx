@@ -44,12 +44,7 @@ const Checkout = () => {
         
         // Preencher dados do usuário logado
         if (session?.user) {
-          setFormData(prev => ({
-            ...prev,
-            name: session.user.user_metadata?.full_name || '',
-            email: session.user.email || '',
-            phone: session.user.user_metadata?.phone || ''
-          }));
+          loadUserProfile(session.user.id);
         }
       }
     );
@@ -59,17 +54,38 @@ const Checkout = () => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        setFormData(prev => ({
-          ...prev,
-          name: session.user.user_metadata?.full_name || '',
-          email: session.user.email || '',
-          phone: session.user.user_metadata?.phone || ''
-        }));
+        loadUserProfile(session.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (profile) {
+        const { data: userData } = await supabase.auth.getUser();
+        setFormData(prev => ({
+          ...prev,
+          name: profile.full_name || '',
+          email: profile.email || '',
+          phone: userData.user?.user_metadata?.phone || '',
+          country: profile.country || '',
+          province: profile.province || '',
+          city: profile.city || '',
+          street: profile.street || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar perfil:', error);
+    }
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-AO', {
@@ -143,6 +159,26 @@ const Checkout = () => {
         .insert(orderItems);
 
       if (itemsError) throw itemsError;
+
+      // Salvar endereço no perfil do usuário para uso futuro
+      if (user) {
+        try {
+          await supabase
+            .from('profiles')
+            .upsert({
+              user_id: user.id,
+              email: formData.email,
+              full_name: formData.name,
+              country: formData.country,
+              province: formData.province,
+              city: formData.city,
+              street: formData.street
+            });
+        } catch (profileError) {
+          console.error('Erro ao atualizar perfil:', profileError);
+          // Não falhar se não conseguir salvar o perfil
+        }
+      }
 
       // Toast de sucesso
       toast({
