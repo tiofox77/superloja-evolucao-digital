@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCart } from '@/contexts/CartContext';
 import { ArrowLeft, CreditCard, Building, Banknote, User, Upload, MapPin, Globe } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
@@ -17,9 +17,11 @@ import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 const Checkout = () => {
   const { items, totalAmount, clearCart } = useCart();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -79,16 +81,93 @@ const Checkout = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     
-    toast({
-      title: "Pedido enviado!",
-      description: "Entraremos em contato para confirmar o pagamento.",
-    });
+    try {
+      // Validações básicas
+      if (!formData.name || !formData.email || !formData.phone) {
+        throw new Error('Preencha todos os campos obrigatórios');
+      }
 
-    // Simular processamento
-    setTimeout(() => {
+      let proofUrl = '';
+      
+      // Upload do comprovante se for transferência
+      if (formData.paymentMethod === 'transfer' && paymentProof) {
+        const fileExt = paymentProof.name.split('.').pop();
+        const fileName = `payment_proof_${Date.now()}.${fileExt}`;
+        const { error: uploadError, data } = await supabase.storage
+          .from('product-images')
+          .upload(`payment-proofs/${fileName}`, paymentProof);
+
+        if (uploadError) throw uploadError;
+        
+        const { data: urlData } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(`payment-proofs/${fileName}`);
+        
+        proofUrl = urlData.publicUrl;
+      }
+
+      // Criar o pedido
+      const orderData = {
+        customer_name: formData.name,
+        customer_email: formData.email,
+        customer_phone: formData.phone,
+        total_amount: totalAmount,
+        payment_method: formData.paymentMethod,
+        payment_status: formData.paymentMethod === 'cash' ? 'pending' : 'paid',
+        order_status: 'pending',
+        order_source: 'online',
+        notes: `${formData.notes}\n\nEndereço: ${formData.address}\nCidade: ${formData.city}, ${formData.province}\nPaís: ${formData.country}\nRua: ${formData.street}${proofUrl ? `\nComprovante: ${proofUrl}` : ''}`
+      };
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Criar itens do pedido
+      const orderItems = items.map(item => ({
+        order_id: order.id,
+        product_id: item.product_id, // Use product_id from cart item
+        quantity: item.quantity,
+        unit_price: item.product.price,
+        total_price: item.product.price * item.quantity
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Toast de sucesso
+      toast({
+        title: "✅ Pedido criado com sucesso!",
+        description: "Seu pedido foi registrado. Redirecionando para a fatura..."
+      });
+
+      // Limpar carrinho
       clearCart();
-    }, 1000);
+      
+      // Redirecionar para fatura após um delay
+      setTimeout(() => {
+        navigate(`/fatura/${order.id}`);
+      }, 1500);
+
+    } catch (error: any) {
+      console.error('Erro ao processar pedido:', error);
+      toast({
+        title: "❌ Erro ao processar pedido",
+        description: error.message || "Tente novamente mais tarde.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (items.length === 0) {
@@ -310,8 +389,15 @@ const Checkout = () => {
                 />
               </div>
 
-              <Button type="submit" size="lg" className="w-full">
-                Confirmar Pedido - {formatPrice(totalAmount)}
+              <Button type="submit" size="lg" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Processando...
+                  </>
+                ) : (
+                  `Confirmar Pedido - ${formatPrice(totalAmount)}`
+                )}
               </Button>
             </form>
           </div>

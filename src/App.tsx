@@ -8,6 +8,8 @@ import Produto from "@/pages/Produto";
 import Categorias from "@/pages/Categorias";
 import Sobre from "@/pages/Sobre";
 import Checkout from "@/pages/Checkout";
+import Cliente from "@/pages/Cliente";
+import Fatura from "@/pages/Fatura";
 import Auth from "@/pages/Auth";
 import Admin from "@/pages/Admin";
 import AdminProdutos from "@/pages/admin/AdminProdutos";
@@ -16,7 +18,6 @@ import AdminPedidos from "@/pages/admin/AdminPedidos";
 import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 import AdminUpload from "@/pages/admin/AdminUpload";
 import AdminPOS from "@/pages/admin/AdminPOS";
-import Cliente from "@/pages/Cliente";
 import AdminConfiguracoes from "@/pages/admin/AdminConfiguracoes";
 import AdminPromocoes from "@/pages/admin/AdminPromocoes";
 import NotFound from "@/pages/NotFound";
@@ -37,6 +38,7 @@ function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/cliente" element={<Cliente />} />
+              <Route path="/fatura/:orderId" element={<Fatura />} />
               
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminLayout />}>
