@@ -66,6 +66,7 @@ const AdminConfiguracoes = () => {
     internal_analytics: true,
     analytics_cookies: true,
     google_analytics: '',
+    openai_api_key: '',
     
     // Notification Templates
     email_templates: {
@@ -161,6 +162,17 @@ const AdminConfiguracoes = () => {
         } else if (setting.key === 'notification_templates') {
           settingsMap.email_templates = value.email_templates || settingsMap.email_templates;
           settingsMap.sms_templates = value.sms_templates || settingsMap.sms_templates;
+        } else if (setting.key === 'seo_settings') {
+          settingsMap.seo_title = value.seo_title || '';
+          settingsMap.seo_description = value.seo_description || '';
+          settingsMap.seo_keywords = value.seo_keywords || '';
+          settingsMap.og_image = value.og_image || '';
+          settingsMap.twitter_handle = value.twitter_handle || '';
+          settingsMap.auto_seo = value.auto_seo ?? true;
+          settingsMap.internal_analytics = value.internal_analytics ?? true;
+          settingsMap.analytics_cookies = value.analytics_cookies ?? true;
+          settingsMap.google_analytics = value.google_analytics || '';
+          settingsMap.openai_api_key = value.openai_api_key || '';
         }
       });
       
@@ -273,6 +285,21 @@ const AdminConfiguracoes = () => {
           value: {
             email_templates: settings.email_templates,
             sms_templates: settings.sms_templates
+          }
+        },
+        {
+          key: 'seo_settings',
+          value: {
+            seo_title: settings.seo_title,
+            seo_description: settings.seo_description,
+            seo_keywords: settings.seo_keywords,
+            og_image: settings.og_image,
+            twitter_handle: settings.twitter_handle,
+            auto_seo: settings.auto_seo,
+            internal_analytics: settings.internal_analytics,
+            analytics_cookies: settings.analytics_cookies,
+            google_analytics: settings.google_analytics,
+            openai_api_key: settings.openai_api_key
           }
         }
       ];
@@ -1095,15 +1122,33 @@ const AdminConfiguracoes = () => {
                     Configure sua chave da OpenAI para ativar a geração automática de títulos SEO, 
                     descrições e palavras-chave para produtos usando inteligência artificial.
                   </p>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => window.open('https://platform.openai.com/api-keys', '_blank')}
-                    >
-                      <Globe className="w-4 h-4 mr-2" />
-                      Obter Chave OpenAI
-                    </Button>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <Label htmlFor="openai_api_key">Chave da API OpenAI</Label>
+                      <Input
+                        id="openai_api_key"
+                        type="password"
+                        value={settings.openai_api_key || ''}
+                        onChange={(e) => setSettings({...settings, openai_api_key: e.target.value})}
+                        placeholder="sk-..."
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Sua chave será armazenada de forma segura e usada apenas para gerar SEO automaticamente
+                      </p>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => window.open('https://platform.openai.com/api-keys', '_blank')}
+                      >
+                        <Globe className="w-4 h-4 mr-2" />
+                        Obter Chave OpenAI
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
