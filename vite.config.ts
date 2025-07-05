@@ -5,9 +5,24 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: '/', // Para cPanel, garante que os assets sejam carregados corretamente
   server: {
     host: "::",
     port: 8080,
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: mode === 'development',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+          'supabase-vendor': ['@supabase/supabase-js']
+        }
+      }
+    }
   },
   plugins: [
     react(),

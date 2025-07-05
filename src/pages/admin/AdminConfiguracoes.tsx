@@ -38,7 +38,6 @@ const AdminConfiguracoes = () => {
     
     // Backup Settings
     github_repo: '',
-    github_token: '',
     auto_update: false,
     current_version: 'v1.2.0',
     
@@ -133,7 +132,6 @@ const AdminConfiguracoes = () => {
             settingsMap.auto_backup = value.auto_backup;
             settingsMap.maintenance_mode = value.maintenance_mode;
             settingsMap.github_repo = value.github_repo || '';
-            settingsMap.github_token = value.github_token || '';
             settingsMap.auto_update = value.auto_update ?? false;
             settingsMap.current_version = value.current_version || 'v1.2.0';
         } else if (setting.key === 'email_settings') {
@@ -234,7 +232,6 @@ const AdminConfiguracoes = () => {
             auto_backup: settings.auto_backup,
             maintenance_mode: settings.maintenance_mode,
             github_repo: settings.github_repo,
-            github_token: settings.github_token,
             auto_update: settings.auto_update,
             current_version: settings.current_version
           }
@@ -348,31 +345,39 @@ const AdminConfiguracoes = () => {
         return;
       }
 
-      // Simulate GitHub API call for releases
-      const versions = [
-        { version: 'v1.3.0', date: '2024-01-15', changes: ['Nova funcionalidade de relatórios', 'Correções de bugs', 'Melhorias de performance'] },
-        { version: 'v1.2.1', date: '2024-01-10', changes: ['Correção crítica de segurança', 'Otimização da base de dados'] },
-        { version: 'v1.2.0', date: '2024-01-05', changes: ['Sistema de backup', 'Templates de notificação', 'Área do cliente'] }
-      ];
+      // Call GitHub API for public repository releases
+      const response = await fetch(`https://api.github.com/repos/${settings.github_repo}/releases`);
+      
+      if (!response.ok) {
+        throw new Error('Repositório não encontrado ou não é público');
+      }
+      
+      const releases = await response.json();
+      
+      const versions = releases.slice(0, 5).map(release => ({
+        version: release.tag_name,
+        date: release.published_at.split('T')[0],
+        changes: release.body ? release.body.split('\n').filter(line => line.trim()).slice(0, 3) : ['Veja o changelog no GitHub']
+      }));
       
       setAvailableVersions(versions);
       
       const hasUpdates = versions.some(v => v.version !== settings.current_version);
       if (hasUpdates) {
         toast({
-          title: "🔄 Atualizações disponíveis",
-          description: "Novas versões encontradas no repositório."
+          title: "🔄 Releases disponíveis",
+          description: `${versions.length} releases encontrados no repositório.`
         });
       } else {
         toast({
           title: "✅ Sistema atualizado",
-          description: "Você está usando a versão mais recente."
+          description: "Você está usando a versão mais recente disponível."
         });
       }
     } catch (error) {
       toast({
-        title: "❌ Erro ao verificar atualizações",
-        description: "Não foi possível conectar ao repositório.",
+        title: "❌ Erro ao verificar releases",
+        description: error.message || "Não foi possível conectar ao repositório.",
         variant: "destructive"
       });
     }
@@ -1337,7 +1342,7 @@ const AdminConfiguracoes = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="github_repo">Repositório GitHub</Label>
+                    <Label htmlFor="github_repo">Repositório GitHub Público</Label>
                     <Input
                       id="github_repo"
                       value={settings.github_repo}
@@ -1346,22 +1351,7 @@ const AdminConfiguracoes = () => {
                       className="mt-1"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Ex: meuusuario/superloja
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="github_token">Token de Acesso</Label>
-                    <Input
-                      id="github_token"
-                      type="password"
-                      value={settings.github_token}
-                      onChange={(e) => setSettings({...settings, github_token: e.target.value})}
-                      placeholder="ghp_xxxxxxxxxxxx"
-                      className="mt-1"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Token GitHub com permissões de leitura
+                      Ex: meuusuario/superloja (apenas repositórios públicos)
                     </p>
                   </div>
 
@@ -1369,7 +1359,7 @@ const AdminConfiguracoes = () => {
                     <div className="space-y-0.5">
                       <Label>Atualizações Automáticas</Label>
                       <div className="text-sm text-muted-foreground">
-                        Verificar e aplicar atualizações automaticamente
+                        Verificar releases automaticamente
                       </div>
                     </div>
                     <Switch
@@ -1387,7 +1377,7 @@ const AdminConfiguracoes = () => {
                         disabled={!settings.github_repo}
                       >
                         <RefreshCw className="w-4 h-4 mr-2" />
-                        Verificar Atualizações
+                        Verificar Releases
                       </Button>
                     </div>
                   </div>
