@@ -63,6 +63,25 @@ const Cliente = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const loadOrders = async (userEmail: string) => {
+    if (!userEmail) return;
+    
+    try {
+      setOrdersLoading(true);
+      const { data: ordersData, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_email', userEmail)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(ordersData || []);
+    } catch (error) {
+      console.error('Erro ao carregar pedidos:', error);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
   const loadProfile = async (userId: string) => {
     try {
       const { data: profileData, error } = await supabase
@@ -86,6 +105,11 @@ const Cliente = () => {
           city: profileData.city || '',
           street: profileData.street || ''
         });
+        
+        // Load orders using email from profile
+        if (profileData.email) {
+          loadOrders(profileData.email);
+        }
       } else {
         // Create profile if doesn't exist
         const { data: newProfile, error: createError } = await supabase
@@ -100,6 +124,11 @@ const Cliente = () => {
 
         if (createError) throw createError;
         setProfile(newProfile);
+        
+        // Load orders using user email
+        if (user?.email) {
+          loadOrders(user.email);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
@@ -340,13 +369,48 @@ const Cliente = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <ShoppingBag className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Você ainda não fez nenhum pedido.</p>
-                  <Button asChild className="mt-4">
-                    <Link to="/catalogo">Fazer Primeiro Pedido</Link>
-                  </Button>
-                </div>
+                {ordersLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : orders.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <ShoppingBag className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Você ainda não fez nenhum pedido.</p>
+                    <Button asChild className="mt-4">
+                      <Link to="/catalogo">Fazer Primeiro Pedido</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.map((order) => (
+                      <div key={order.id} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="font-semibold">Pedido #{order.order_number}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(order.created_at).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
+                          <Badge variant={order.order_status === 'completed' ? 'default' : 'secondary'}>
+                            {order.order_status}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold">
+                            {new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA' }).format(order.total_amount)}
+                          </span>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link to={`/fatura/${order.id}`}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Ver Detalhes
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
