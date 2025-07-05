@@ -26,53 +26,61 @@ const Admin = () => {
   });
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Verificar se é admin
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .single();
-          
-          if (profile?.role === 'admin') {
-            setIsAdmin(true);
-            loadStats();
-          } else {
-            setIsAdmin(false);
-            toast({
-              title: "Acesso negado",
-              description: "Você não tem permissão para acessar esta área.",
-              variant: "destructive"
-            });
-            navigate('/');
-          }
-        } else {
-          navigate('/auth');
-        }
-        setLoading(false);
-      }
-    );
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    console.log('Admin useEffect iniciado');
+    
+    const checkAuthAndRole = async (session: any) => {
+      console.log('Verificando sessão:', !!session);
       
-      if (session?.user) {
-        const { data: profile } = await supabase
+      if (!session?.user) {
+        console.log('Sem usuário, redirecionando para auth');
+        navigate('/auth');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Usuário encontrado:', session.user.email);
+      
+      try {
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('role')
           .eq('user_id', session.user.id)
           .single();
         
+        console.log('Profile encontrado:', profile, 'Error:', error);
+        
+        if (error) {
+          console.log('Erro ao buscar perfil, criando...');
+          // Tentar criar perfil se não existir
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: session.user.id,
+              email: session.user.email,
+              full_name: session.user.user_metadata?.full_name || session.user.email,
+              role: 'user'
+            });
+          
+          if (insertError) {
+            console.error('Erro ao criar perfil:', insertError);
+          }
+          
+          toast({
+            title: "Acesso negado",
+            description: "Você não tem permissão para acessar esta área.",
+            variant: "destructive"
+          });
+          navigate('/');
+          setLoading(false);
+          return;
+        }
+        
         if (profile?.role === 'admin') {
+          console.log('Usuário é admin');
           setIsAdmin(true);
           loadStats();
         } else {
+          console.log('Usuário não é admin:', profile?.role);
           setIsAdmin(false);
           toast({
             title: "Acesso negado",
@@ -81,10 +89,28 @@ const Admin = () => {
           });
           navigate('/');
         }
-      } else {
+      } catch (err) {
+        console.error('Erro na verificação:', err);
         navigate('/auth');
       }
+      
       setLoading(false);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, !!session);
+        setSession(session);
+        setUser(session?.user ?? null);
+        await checkAuthAndRole(session);
+      }
+    );
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('Sessão inicial obtida:', !!session);
+      setSession(session);
+      setUser(session?.user ?? null);
+      await checkAuthAndRole(session);
     });
 
     return () => subscription.unsubscribe();
