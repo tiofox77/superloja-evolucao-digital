@@ -161,6 +161,31 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
 
       if (result.error) throw result.error;
 
+      // Se for um novo produto, gerar SEO automaticamente
+      if (!product?.id) {
+        try {
+          const categoryName = categories.find(cat => cat.id === formData.category_id)?.name;
+          
+          await supabase.functions.invoke('generate-product-seo', {
+            body: {
+              productId: result.data.id,
+              productName: formData.name,
+              productDescription: formData.description,
+              categoryName,
+              price: parseFloat(formData.price)
+            }
+          });
+          
+          toast({
+            title: "SEO gerado automaticamente!",
+            description: "Títulos e descrições SEO foram criados para este produto.",
+          });
+        } catch (seoError) {
+          console.error('Erro ao gerar SEO:', seoError);
+          // Não bloquear o salvamento se SEO falhar
+        }
+      }
+
       toast({
         title: product?.id ? "Produto atualizado!" : "Produto criado!",
         description: "Operação realizada com sucesso.",
@@ -226,6 +251,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                     rows={4}
                     className="mt-1"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 Uma boa descrição ajuda a gerar melhor SEO automaticamente
+                  </p>
                 </div>
 
                 <div>
@@ -243,6 +271,23 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Aviso sobre SEO automático */}
+                {!product?.id && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-2">
+                      <Star className="w-4 h-4 text-blue-600 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium text-blue-800 dark:text-blue-200">
+                          SEO Automático Ativado
+                        </p>
+                        <p className="text-blue-700 dark:text-blue-300 mt-1">
+                          Após salvar, será gerado automaticamente título SEO, descrição e palavras-chave otimizadas para este produto.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

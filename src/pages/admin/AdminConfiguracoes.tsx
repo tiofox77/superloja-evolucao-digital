@@ -499,8 +499,9 @@ const AdminConfiguracoes = () => {
       </div>
 
       <Tabs defaultValue="store" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="store">Loja</TabsTrigger>
+          <TabsTrigger value="seo">SEO & API</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="system">Sistema</TabsTrigger>
@@ -1067,10 +1068,77 @@ const AdminConfiguracoes = () => {
 
         <TabsContent value="seo">
           <div className="space-y-6">
-            {/* SEO Global */}
-            <Card className="hover-scale">
+            {/* Configurações de API */}
+            <Card className="hover-scale border-l-4 border-l-blue-500">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-blue-600">
+                  <Zap className="w-5 h-5" />
+                  Configurações de API
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Configure as APIs necessárias para funcionalidades avançadas
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* OpenAI API */}
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="font-semibold">OpenAI API</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Necessária para geração automática de SEO com IA
+                      </p>
+                    </div>
+                    <Badge variant="secondary">Requerida</Badge>
+                  </div>
+                  <p className="text-sm mb-4">
+                    Configure sua chave da OpenAI para ativar a geração automática de títulos SEO, 
+                    descrições e palavras-chave para produtos usando inteligência artificial.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.open('https://platform.openai.com/api-keys', '_blank')}
+                    >
+                      <Globe className="w-4 h-4 mr-2" />
+                      Obter Chave OpenAI
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Google Analytics */}
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="font-semibold">Google Analytics 4</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Analytics externo para complementar dados internos
+                      </p>
+                    </div>
+                    <Badge variant="outline">Opcional</Badge>
+                  </div>
+                  <div>
+                    <Label htmlFor="google_analytics">ID do Google Analytics</Label>
+                    <Input
+                      id="google_analytics"
+                      value={settings.google_analytics || ''}
+                      onChange={(e) => setSettings({...settings, google_analytics: e.target.value})}
+                      placeholder="G-XXXXXXXXXX"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Formato: G-XXXXXXXXXX (Google Analytics 4)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* SEO Global */}
+            <Card className="hover-scale border-l-4 border-l-green-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-green-600">
                   <Globe className="w-5 h-5" />
                   Configurações SEO Globais
                 </CardTitle>
@@ -1088,7 +1156,12 @@ const AdminConfiguracoes = () => {
                     placeholder="SuperLoja - A melhor loja de eletrônicos de Angola"
                     className="mt-1"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Recomendado: 50-60 caracteres</p>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Recomendado: 50-60 caracteres</span>
+                    <span className={settings.seo_title.length > 60 ? 'text-destructive' : ''}>
+                      {settings.seo_title.length}/60
+                    </span>
+                  </div>
                 </div>
 
                 <div>
@@ -1101,11 +1174,16 @@ const AdminConfiguracoes = () => {
                     className="mt-1"
                     rows={3}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Recomendado: 150-160 caracteres</p>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>Recomendado: 150-160 caracteres</span>
+                    <span className={settings.seo_description.length > 160 ? 'text-destructive' : ''}>
+                      {settings.seo_description.length}/160
+                    </span>
+                  </div>
                 </div>
 
                 <div>
-                  <Label htmlFor="seo_keywords">Palavras-chave</Label>
+                  <Label htmlFor="seo_keywords">Palavras-chave Globais</Label>
                   <Input
                     id="seo_keywords"
                     value={settings.seo_keywords}
@@ -1116,20 +1194,43 @@ const AdminConfiguracoes = () => {
                   <p className="text-xs text-muted-foreground mt-1">Separe por vírgulas</p>
                 </div>
 
-                <div>
-                  <Label htmlFor="twitter_handle">Handle do Twitter</Label>
-                  <Input
-                    id="twitter_handle"
-                    value={settings.twitter_handle}
-                    onChange={(e) => setSettings({...settings, twitter_handle: e.target.value})}
-                    placeholder="@superloja"
-                    className="mt-1"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="twitter_handle">Handle do Twitter</Label>
+                    <Input
+                      id="twitter_handle"
+                      value={settings.twitter_handle}
+                      onChange={(e) => setSettings({...settings, twitter_handle: e.target.value})}
+                      placeholder="@superloja"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="og_image_default">Imagem OG Padrão (URL)</Label>
+                    <Input
+                      id="og_image_default"
+                      value={settings.og_image || ''}
+                      onChange={(e) => setSettings({...settings, og_image: e.target.value})}
+                      placeholder="https://exemplo.com/logo-og.jpg"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
 
+            {/* Configurações de SEO Automático */}
+            <Card className="hover-scale border-l-4 border-l-purple-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-purple-600">
+                  <MessageSquare className="w-5 h-5" />
+                  SEO Automático com IA
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label htmlFor="auto_seo">SEO Automático com IA</Label>
+                    <Label htmlFor="auto_seo">Ativar SEO Automático</Label>
                     <p className="text-sm text-muted-foreground">
                       Gerar automaticamente SEO para novos produtos usando IA
                     </p>
@@ -1140,15 +1241,53 @@ const AdminConfiguracoes = () => {
                     onCheckedChange={(checked) => setSettings({...settings, auto_seo: checked})}
                   />
                 </div>
+
+                {settings.auto_seo && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-blue-800 dark:text-blue-200">
+                          SEO Automático Ativado
+                        </h4>
+                        <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                          Quando você criar um novo produto, o sistema gerará automaticamente:
+                        </p>
+                        <ul className="text-sm text-blue-700 dark:text-blue-300 mt-2 space-y-1 ml-4">
+                          <li>• Título SEO otimizado</li>
+                          <li>• Meta descrição atrativa</li>
+                          <li>• Palavras-chave relevantes</li>
+                          <li>• Tags Open Graph</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!settings.auto_seo && (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-amber-800 dark:text-amber-200">
+                          Configure a API OpenAI
+                        </h4>
+                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                          Para usar o SEO automático, você precisa configurar sua chave da OpenAI primeiro.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Analytics & Cookies */}
-            <Card className="hover-scale">
+            {/* Analytics e Cookies */}
+            <Card className="hover-scale border-l-4 border-l-orange-500">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-orange-600">
                   <BarChart3 className="w-5 h-5" />
-                  Analytics e Cookies
+                  Analytics e Rastreamento
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1160,7 +1299,7 @@ const AdminConfiguracoes = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={settings.internal_analytics || true}
+                    checked={settings.internal_analytics !== false}
                     onCheckedChange={(checked) => setSettings({...settings, internal_analytics: checked})}
                   />
                 </div>
@@ -1173,20 +1312,33 @@ const AdminConfiguracoes = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={settings.analytics_cookies || true}
+                    checked={settings.analytics_cookies !== false}
                     onCheckedChange={(checked) => setSettings({...settings, analytics_cookies: checked})}
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="google_analytics">Google Analytics ID</Label>
-                  <Input
-                    id="google_analytics"
-                    value={settings.google_analytics || ''}
-                    onChange={(e) => setSettings({...settings, google_analytics: e.target.value})}
-                    placeholder="GA4-XXXXXXXXXX"
-                    className="mt-1"
-                  />
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2">Informações Coletadas</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium mb-1">Dados Básicos:</p>
+                      <ul className="text-muted-foreground space-y-1">
+                        <li>• Páginas visitadas</li>
+                        <li>• Tempo no site</li>
+                        <li>• Origem do tráfego</li>
+                        <li>• Dispositivo usado</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium mb-1">Dados Avançados:</p>
+                      <ul className="text-muted-foreground space-y-1">
+                        <li>• Localização (país/cidade)</li>
+                        <li>• Campanhas UTM</li>
+                        <li>• Interações com produtos</li>
+                        <li>• Funil de conversão</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
