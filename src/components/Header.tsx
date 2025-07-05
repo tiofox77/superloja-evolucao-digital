@@ -100,8 +100,11 @@ export const Header: React.FC = () => {
                   variant="ghost" 
                   size="icon"
                   className="hover:bg-muted transition-colors"
+                  asChild
                 >
-                  <User className="w-5 h-5" />
+                  <Link to="/auth">
+                    <User className="w-5 h-5" />
+                  </Link>
                 </Button>
               </div>
 

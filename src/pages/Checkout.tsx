@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -8,13 +8,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCart } from '@/contexts/CartContext';
-import { ArrowLeft, CreditCard, Building, Banknote } from 'lucide-react';
+import { ArrowLeft, CreditCard, Building, Banknote, User, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
 const Checkout = () => {
   const { items, totalAmount, clearCart } = useCart();
   const { toast } = useToast();
+  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,6 +29,41 @@ const Checkout = () => {
     paymentMethod: 'transfer',
     notes: ''
   });
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Preencher dados do usuário logado
+        if (session?.user) {
+          setFormData(prev => ({
+            ...prev,
+            name: session.user.user_metadata?.full_name || '',
+            email: session.user.email || '',
+            phone: session.user.user_metadata?.phone || ''
+          }));
+        }
+      }
+    );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        setFormData(prev => ({
+          ...prev,
+          name: session.user.user_metadata?.full_name || '',
+          email: session.user.email || '',
+          phone: session.user.user_metadata?.phone || ''
+        }));
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-AO', {
@@ -35,16 +76,15 @@ const Checkout = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Simular processamento do pedido
     toast({
       title: "Pedido enviado!",
       description: "Entraremos em contato para confirmar o pagamento.",
     });
 
-    // Limpar carrinho após 2 segundos
+    // Simular processamento
     setTimeout(() => {
       clearCart();
-    }, 2000);
+    }, 1000);
   };
 
   if (items.length === 0) {
@@ -78,7 +118,17 @@ const Checkout = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Formulário */}
           <div>
-            <h1 className="text-2xl font-bold mb-6">Finalizar Pedido</h1>
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-2xl font-bold">Finalizar Pedido</h1>
+              {!user && (
+                <Button variant="outline" asChild>
+                  <Link to="/auth">
+                    <User className="w-4 h-4 mr-2" />
+                    Login / Cadastrar
+                  </Link>
+                </Button>
+              )}
+            </div>
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <Card>
@@ -159,14 +209,32 @@ const Checkout = () => {
                   </RadioGroup>
 
                   {formData.paymentMethod === 'transfer' && (
-                    <div className="mt-4 p-4 bg-muted rounded-lg">
-                      <h4 className="font-semibold mb-2">Dados Bancários:</h4>
-                      <p className="text-sm">
-                        <strong>Banco:</strong> BAI<br/>
-                        <strong>Conta:</strong> 123456789<br/>
-                        <strong>IBAN:</strong> AO06.0001.0000.1234.5678.9012.3<br/>
-                        <strong>Titular:</strong> SuperLoja Lda
-                      </p>
+                    <div className="mt-4 space-y-4">
+                      <div className="p-4 bg-muted rounded-lg">
+                        <h4 className="font-semibold mb-2">Dados Bancários:</h4>
+                        <p className="text-sm">
+                          <strong>Banco:</strong> BAI<br/>
+                          <strong>Conta:</strong> 123456789<br/>
+                          <strong>IBAN:</strong> AO06.0001.0000.1234.5678.9012.3<br/>
+                          <strong>Titular:</strong> SuperLoja Lda
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="paymentProof">Comprovante de Pagamento</Label>
+                        <div className="mt-2">
+                          <Input
+                            id="paymentProof"
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={(e) => setPaymentProof(e.target.files?.[0] || null)}
+                            className="cursor-pointer"
+                          />
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Anexe o comprovante de transferência (imagem ou PDF)
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </CardContent>

@@ -9,6 +9,8 @@ import Categorias from "@/pages/Categorias";
 import Sobre from "@/pages/Sobre";
 import Contato from "@/pages/Contato";
 import Checkout from "@/pages/Checkout";
+import Auth from "@/pages/Auth";
+import Admin from "@/pages/Admin";
 import NotFound from "@/pages/NotFound";
 
 function App() {
@@ -23,6 +25,8 @@ function App() {
               <Route path="/produto/:slug" element={<Produto />} />
               <Route path="/categorias" element={<Categorias />} />
               <Route path="/sobre" element={<Sobre />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
