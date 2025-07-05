@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { ProductCard } from '@/components/ProductCard';
+import { SEOHead } from '@/components/SEOHead';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -36,6 +38,7 @@ const Catalogo = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('name');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const { trackEvent } = useAnalytics();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,9 +103,9 @@ const Catalogo = () => {
 
   // Rastrear pesquisas
   const handleSearch = (term: string) => {
-    setSearchTerm(term);
+    setSearchQuery(term);
     if (term.length > 2) {
-      trackEvent('search', { query: term, results_count: filteredProducts.length });
+      trackEvent('search', { query: term, results_count: products.length });
     }
   };
 
@@ -141,7 +144,7 @@ const Catalogo = () => {
                 type="text"
                 placeholder="Buscar produtos..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
                 className="pl-10"
               />
             </div>
