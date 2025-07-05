@@ -1055,105 +1055,12 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
 
         {/* Configurações Avançadas */}
         <div className="space-y-6">
-          <Tabs defaultValue="variants" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="variants">Variantes</TabsTrigger>
+          <Tabs defaultValue="physical" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="physical">Físico</TabsTrigger>
               <TabsTrigger value="digital">Digital</TabsTrigger>
               <TabsTrigger value="type">Tipo</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="variants" className="space-y-4">
-              <Card className="hover-scale border-l-4 border-l-green-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-600">
-                    <Palette className="w-5 h-5" />
-                    Variantes do Produto
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Configure cores, tamanhos e outras variações do produto
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Cores */}
-                  <div>
-                    <Label className="text-base font-semibold">Cores Disponíveis</Label>
-                    <div className="flex gap-2 mt-2">
-                      <Input
-                        value={newColor}
-                        onChange={(e) => setNewColor(e.target.value)}
-                        placeholder="Ex: Azul, Vermelho..."
-                        className="flex-1"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addColor();
-                          }
-                        }}
-                      />
-                      <Button type="button" onClick={addColor} variant="outline">
-                        Adicionar
-                      </Button>
-                    </div>
-                    {formData.colors.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {formData.colors.map((color, index) => (
-                          <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                            <span className="w-3 h-3 rounded-full bg-current opacity-30"></span>
-                            {color}
-                            <button
-                              type="button"
-                              onClick={() => removeColor(color)}
-                              className="ml-1 hover:text-destructive"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Tamanhos */}
-                  <div>
-                    <Label className="text-base font-semibold">Tamanhos Disponíveis</Label>
-                    <div className="flex gap-2 mt-2">
-                      <Input
-                        value={newSize}
-                        onChange={(e) => setNewSize(e.target.value)}
-                        placeholder="Ex: P, M, G, XG..."
-                        className="flex-1"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addSize();
-                          }
-                        }}
-                      />
-                      <Button type="button" onClick={addSize} variant="outline">
-                        Adicionar
-                      </Button>
-                    </div>
-                    {formData.sizes.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {formData.sizes.map((size, index) => (
-                          <Badge key={index} variant="outline" className="flex items-center gap-1">
-                            {size}
-                            <button
-                              type="button"
-                              onClick={() => removeSize(size)}
-                              className="ml-1 hover:text-destructive"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             <TabsContent value="physical" className="space-y-4">
               <Card className="hover-scale border-l-4 border-l-blue-500">
