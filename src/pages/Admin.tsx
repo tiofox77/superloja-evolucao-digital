@@ -41,17 +41,34 @@ const Admin = () => {
       console.log('Usuário encontrado:', session.user.email);
       
       try {
-        const { data: profile, error } = await supabase
+        console.log('Buscando perfil para user_id:', session.user.id);
+        
+        // Primeiro tentar buscar por user_id
+        let { data: profile, error } = await supabase
           .from('profiles')
           .select('role')
           .eq('user_id', session.user.id)
           .single();
         
-        console.log('Profile encontrado:', profile, 'Error:', error);
+        console.log('Busca por user_id - Profile:', profile, 'Error:', error);
         
-        if (error) {
-          console.log('Erro ao buscar perfil, criando...');
-          // Tentar criar perfil se não existir
+        // Se não encontrar por user_id, tentar por email
+        if (error && session.user.email) {
+          console.log('Tentando buscar por email:', session.user.email);
+          const result = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('email', session.user.email)
+            .single();
+          
+          profile = result.data;
+          error = result.error;
+          console.log('Busca por email - Profile:', profile, 'Error:', error);
+        }
+        
+        if (error || !profile) {
+          console.log('Perfil não encontrado, criando novo perfil de usuário');
+          
           const { error: insertError } = await supabase
             .from('profiles')
             .insert({
@@ -75,8 +92,10 @@ const Admin = () => {
           return;
         }
         
+        console.log('Role do usuário:', profile.role);
+        
         if (profile?.role === 'admin') {
-          console.log('Usuário é admin');
+          console.log('Usuário é admin - permitindo acesso');
           setIsAdmin(true);
           loadStats();
         } else {
