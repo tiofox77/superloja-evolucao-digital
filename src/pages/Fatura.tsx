@@ -13,6 +13,7 @@ import SuperLojaAvatar from '@/components/SuperLojaAvatar';
 
 interface Order {
   id: string;
+  order_number: number;
   customer_name: string;
   customer_email: string;
   customer_phone: string;
@@ -22,6 +23,7 @@ interface Order {
   order_status: string;
   notes: string;
   created_at: string;
+  order_date: string;
 }
 
 interface OrderItem {
@@ -220,16 +222,21 @@ const Fatura = () => {
                 <div>
                   <h2 className="text-xl font-bold">FATURA</h2>
                   <p className="text-sm text-muted-foreground">
-                    Pedido #{order.id.slice(-6)}
+                    Pedido Nº {order.order_number?.toString().padStart(6, '0')}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">Data do Pedido</p>
                   <p className="font-semibold">
                     {new Date(order.created_at).toLocaleDateString('pt-BR', {
+                      weekday: 'long',
                       day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(order.created_at).toLocaleTimeString('pt-BR', {
                       hour: '2-digit',
                       minute: '2-digit'
                     })}
