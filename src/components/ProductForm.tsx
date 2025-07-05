@@ -386,6 +386,10 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                   </Button>
                 </div>
 
+                <div className="text-center text-xs text-muted-foreground">
+                  💡 Configure a chave OpenAI em Configurações → SEO & API para ativar
+                </div>
+
                 {!formData.name || !formData.description ? (
                   <div className="text-center p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm text-muted-foreground">

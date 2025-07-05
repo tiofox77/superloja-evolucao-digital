@@ -64,23 +64,55 @@ const getDeviceInfo = () => {
   };
 };
 
-// Obter localização via IP (usando serviço gratuito)
+// Obter localização via IP (usando múltiplas APIs com fallback)
 const getLocationData = async () => {
-  try {
-    const response = await fetch('https://ipapi.co/json/');
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        country: data.country_name,
-        region: data.region,
-        city: data.city,
-        ip_address: data.ip
-      };
+  const apis = [
+    {
+      url: 'https://ipapi.co/json/',
+      parser: (data: any) => ({
+        country: data.country_name || 'Angola',
+        region: data.region || 'Luanda',
+        city: data.city || 'Luanda',
+        ip_address: data.ip || 'unknown'
+      })
     }
-  } catch (error) {
-    console.log('Não foi possível obter dados de localização:', error);
+  ];
+  
+  for (const api of apis) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 segundos timeout
+      
+      const response = await fetch(api.url, { 
+        signal: controller.signal,
+        mode: 'cors',
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        const parsed = api.parser(data);
+        // Se conseguiu dados úteis, retornar
+        if (parsed.country || parsed.ip_address) {
+          return parsed;
+        }
+      }
+    } catch (error: any) {
+      console.info(`API ${api.url} falhou:`, error?.message || 'Unknown error');
+      continue; // Tentar próxima API
+    }
   }
-  return {};
+  
+  // Fallback padrão para Angola se todas as APIs falharam
+  console.info('Usando localização padrão (Angola) - APIs indisponíveis');
+  return {
+    country: 'Angola',
+    region: 'Luanda',
+    city: 'Luanda',
+    ip_address: 'unknown'
+  };
 };
 
 export const useAnalytics = () => {
