@@ -342,13 +342,21 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Informações Básicas */}
-          <div className="lg:col-span-2 space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          {/* Coluna Principal - Informações do Produto */}
+          <div className="xl:col-span-2 space-y-8">
+            
+            {/* 1. Informações Básicas */}
             <Card className="hover-scale">
               <CardHeader>
-                <CardTitle>Informações Básicas</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  1. Informações Básicas
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Nome, descrição e categoria do produto
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -359,25 +367,27 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
                     required
                     className="mt-1"
+                    placeholder="Ex: iPhone 15 Pro Max"
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="description">Descrição</Label>
+                  <Label htmlFor="description">Descrição do Produto</Label>
                   <Textarea
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                     rows={4}
                     className="mt-1"
+                    placeholder="Descreva os benefícios, características e especificações do produto..."
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    💡 Uma boa descrição ajuda a gerar melhor SEO automaticamente
+                    💡 Uma descrição completa melhora o SEO e converte mais vendas
                   </p>
                 </div>
 
                 <div>
-                  <Label htmlFor="category">Categoria</Label>
+                  <Label htmlFor="category">Categoria *</Label>
                   <Select value={formData.category_id} onValueChange={(value) => setFormData({...formData, category_id: value})}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Selecione uma categoria" />
@@ -391,264 +401,375 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Aviso sobre SEO automático */}
-                {!product?.id && (
-                  <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start gap-2">
-                      <Star className="w-4 h-4 text-blue-600 mt-0.5" />
-                      <div className="text-sm">
-                        <p className="font-medium text-blue-800 dark:text-blue-200">
-                          SEO Automático Ativado
-                        </p>
-                        <p className="text-blue-700 dark:text-blue-300 mt-1">
-                          Após salvar, será gerado automaticamente título SEO, descrição e palavras-chave otimizadas para este produto.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
-            {/* Sugestões SEO com IA */}
-            <Card className="hover-scale border-l-4 border-l-purple-500">
+            {/* 2. Tipo de Produto */}
+            <Card className="hover-scale border-l-4 border-l-orange-500">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-purple-600">
-                  <Sparkles className="w-5 h-5" />
-                  Sugestões SEO com IA
+                <CardTitle className="flex items-center gap-2 text-orange-600">
+                  <Package className="w-5 h-5" />
+                  2. Tipo de Produto
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Gere título, descrição e palavras-chave otimizadas usando inteligência artificial
+                  Configure se é produto físico, digital ou serviço
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-center">
-                  <Button 
-                    type="button"
-                    variant="outline" 
-                    onClick={generateSEOSuggestions}
-                    disabled={generatingSEO || !formData.name || !formData.description}
-                    className="bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200"
+                <div>
+                  <Label>Tipo do Produto *</Label>
+                  <Select 
+                    value={formData.product_type} 
+                    onValueChange={(value) => {
+                      setFormData({
+                        ...formData, 
+                        product_type: value,
+                        is_digital: value === 'digital'
+                      });
+                    }}
                   >
-                    {generatingSEO ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Gerando sugestões...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Gerar Sugestões SEO
-                      </>
-                    )}
-                  </Button>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="physical">
+                        📦 Produto Físico - Precisa ser enviado
+                      </SelectItem>
+                      <SelectItem value="digital">
+                        💾 Produto Digital - Download/Licença
+                      </SelectItem>
+                      <SelectItem value="service">
+                        🛠️ Serviço - Consultoria/Trabalho
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <div className="text-center text-xs text-muted-foreground">
-                  💡 Configure a chave OpenAI em Configurações → SEO & API para ativar
-                </div>
-
-                {!formData.name || !formData.description ? (
-                  <div className="text-center p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm text-muted-foreground">
-                      Preencha o nome e descrição do produto para gerar sugestões de SEO
-                    </p>
-                  </div>
-                ) : null}
-
-                {seoSuggestions && (
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
-                      <h4 className="font-semibold text-purple-800 mb-3">✨ Título SEO Sugerido</h4>
-                      <div className="bg-white p-3 rounded border border-purple-100 mb-2">
-                        <p className="text-sm">{seoSuggestions.seo_title}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          type="button"
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => applySEOSuggestion('seo_title', seoSuggestions.seo_title)}
-                        >
-                          Aplicar
-                        </Button>
-                        <div className="text-xs text-muted-foreground flex items-center">
-                          {seoSuggestions.seo_title?.length || 0}/60 caracteres
-                        </div>
-                      </div>
+                {/* Configurações para Produto Digital */}
+                {(formData.product_type === 'digital' || formData.is_digital) && (
+                  <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <h4 className="font-semibold text-purple-800 dark:text-purple-200">
+                        Configurações de Produto Digital
+                      </h4>
                     </div>
-
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
-                      <h4 className="font-semibold text-purple-800 mb-3">📝 Descrição SEO Sugerida</h4>
-                      <div className="bg-white p-3 rounded border border-purple-100 mb-2">
-                        <p className="text-sm">{seoSuggestions.seo_description}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          type="button"
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => applySEOSuggestion('seo_description', seoSuggestions.seo_description)}
-                        >
-                          Aplicar
-                        </Button>
-                        <div className="text-xs text-muted-foreground flex items-center">
-                          {seoSuggestions.seo_description?.length || 0}/160 caracteres
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
-                      <h4 className="font-semibold text-purple-800 mb-3">🔑 Palavras-chave Sugeridas</h4>
-                      <div className="bg-white p-3 rounded border border-purple-100 mb-2">
-                        <p className="text-sm">{seoSuggestions.seo_keywords}</p>
-                      </div>
-                      <Button 
-                        type="button"
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => applySEOSuggestion('seo_keywords', seoSuggestions.seo_keywords)}
-                      >
-                        Aplicar
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Campos SEO Atuais */}
-                {(formData.seo_title || formData.seo_description || formData.seo_keywords) && (
-                  <div className="space-y-4 pt-4 border-t">
-                    <h4 className="font-semibold text-sm">SEO Atual do Produto</h4>
                     
-                    {formData.seo_title && (
-                      <div>
-                        <Label>Título SEO</Label>
-                        <div className="bg-muted/50 p-2 rounded text-sm mt-1">
-                          {formData.seo_title}
-                        </div>
-                      </div>
-                    )}
+                    <div>
+                      <Label htmlFor="digital_file_url">URL do Arquivo Digital</Label>
+                      <Input
+                        id="digital_file_url"
+                        value={formData.digital_file_url}
+                        onChange={(e) => setFormData({...formData, digital_file_url: e.target.value})}
+                        placeholder="https://exemplo.com/arquivo.zip"
+                        className="mt-1"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Link direto para download (ZIP, PDF, EXE, etc.)
+                      </p>
+                    </div>
 
-                    {formData.seo_description && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label>Descrição SEO</Label>
-                        <div className="bg-muted/50 p-2 rounded text-sm mt-1">
-                          {formData.seo_description}
-                        </div>
+                        <Label htmlFor="license_key">Chave de Licença</Label>
+                        <Input
+                          id="license_key"
+                          value={formData.license_key}
+                          onChange={(e) => setFormData({...formData, license_key: e.target.value})}
+                          placeholder="XXXX-XXXX-XXXX-XXXX"
+                          className="mt-1"
+                        />
                       </div>
-                    )}
-
-                    {formData.seo_keywords && (
                       <div>
-                        <Label>Palavras-chave</Label>
-                        <div className="bg-muted/50 p-2 rounded text-sm mt-1">
-                          {formData.seo_keywords}
-                        </div>
+                        <Label htmlFor="download_limit">Limite de Downloads</Label>
+                        <Input
+                          id="download_limit"
+                          type="number"
+                          min="0"
+                          value={formData.download_limit}
+                          onChange={(e) => setFormData({...formData, download_limit: parseInt(e.target.value) || 0})}
+                          placeholder="0 = ilimitado"
+                          className="mt-1"
+                        />
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="hover-scale">
+            {/* 3. Preços e Estoque */}
+            <Card className="hover-scale border-l-4 border-l-green-500">
               <CardHeader>
-                <CardTitle>Preços e Estoque</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-green-600">
+                  <Star className="w-5 h-5" />
+                  3. Preços e Estoque
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Configure preços, desconto e controle de estoque
+                </p>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="price">Preço de Venda (Kz) *</Label>
+                    <Label htmlFor="price">Preço de Venda (AOA) *</Label>
                     <Input
                       id="price"
                       type="number"
                       step="0.01"
+                      min="0"
                       value={formData.price}
                       onChange={(e) => setFormData({...formData, price: e.target.value})}
                       required
                       className="mt-1"
+                      placeholder="0.00"
                     />
                     {formData.price && (
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-sm font-medium text-green-600 mt-1">
                         {formatPrice(parseFloat(formData.price))}
                       </p>
                     )}
                   </div>
 
                   <div>
-                    <Label htmlFor="original_price">Preço Original (Kz)</Label>
+                    <Label htmlFor="original_price">Preço Original (AOA)</Label>
                     <Input
                       id="original_price"
                       type="number"
                       step="0.01"
+                      min="0"
                       value={formData.original_price}
                       onChange={(e) => setFormData({...formData, original_price: e.target.value})}
                       className="mt-1"
+                      placeholder="Preço antes do desconto"
                     />
-                    {formData.original_price && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {formatPrice(parseFloat(formData.original_price))}
+                    {formData.original_price && formData.price && parseFloat(formData.original_price) > parseFloat(formData.price) && (
+                      <p className="text-sm text-red-500 mt-1">
+                        Desconto: {Math.round((1 - parseFloat(formData.price) / parseFloat(formData.original_price)) * 100)}%
                       </p>
                     )}
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="stock">Quantidade em Estoque</Label>
-                  <Input
-                    id="stock"
-                    type="number"
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})}
-                    className="mt-1"
-                  />
-                </div>
+                {formData.product_type !== 'digital' && (
+                  <div>
+                    <Label htmlFor="stock">Quantidade em Estoque</Label>
+                    <Input
+                      id="stock"
+                      type="number"
+                      min="0"
+                      value={formData.stock_quantity}
+                      onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})}
+                      className="mt-1"
+                      placeholder="0"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Deixe 0 para produtos sem controle de estoque
+                    </p>
+                  </div>
+                )}
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="in_stock"
-                        checked={formData.in_stock}
-                        onCheckedChange={(checked) => setFormData({...formData, in_stock: checked})}
-                      />
-                      <Label htmlFor="in_stock">Em Estoque</Label>
-                    </div>
+                <div className="flex flex-wrap items-center gap-6">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="in_stock"
+                      checked={formData.in_stock}
+                      onCheckedChange={(checked) => setFormData({...formData, in_stock: checked})}
+                    />
+                    <Label htmlFor="in_stock" className="font-medium">
+                      {formData.in_stock ? '✅ Disponível' : '❌ Esgotado'}
+                    </Label>
+                  </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="featured"
-                        checked={formData.featured}
-                        onCheckedChange={(checked) => setFormData({...formData, featured: checked})}
-                      />
-                      <Label htmlFor="featured">Produto em Destaque</Label>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="featured"
+                      checked={formData.featured}
+                      onCheckedChange={(checked) => setFormData({...formData, featured: checked})}
+                    />
+                    <Label htmlFor="featured" className="font-medium">
+                      ⭐ Produto em Destaque
+                    </Label>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* 4. Variantes do Produto */}
+            <Card className="hover-scale border-l-4 border-l-blue-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-blue-600">
+                  <Palette className="w-5 h-5" />
+                  4. Variantes do Produto
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Cores, tamanhos e outras variações disponíveis
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Cores */}
+                <div>
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    🎨 Cores Disponíveis
+                  </Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      value={newColor}
+                      onChange={(e) => setNewColor(e.target.value)}
+                      placeholder="Ex: Azul Royal, Vermelho Ferrari..."
+                      className="flex-1"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addColor();
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={addColor} variant="outline">
+                      Adicionar
+                    </Button>
+                  </div>
+                  {formData.colors.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {formData.colors.map((color, index) => (
+                        <Badge key={index} variant="secondary" className="flex items-center gap-2 py-1 px-3">
+                          <span className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-purple-400"></span>
+                          {color}
+                          <button
+                            type="button"
+                            onClick={() => removeColor(color)}
+                            className="ml-1 hover:text-destructive transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tamanhos */}
+                <div>
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    📏 Tamanhos Disponíveis
+                  </Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      value={newSize}
+                      onChange={(e) => setNewSize(e.target.value)}
+                      placeholder="Ex: PP, P, M, G, GG, XG..."
+                      className="flex-1"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addSize();
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={addSize} variant="outline">
+                      Adicionar
+                    </Button>
+                  </div>
+                  {formData.sizes.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {formData.sizes.map((size, index) => (
+                        <Badge key={index} variant="outline" className="flex items-center gap-1 py-1 px-3">
+                          <Ruler className="w-3 h-3" />
+                          {size}
+                          <button
+                            type="button"
+                            onClick={() => removeSize(size)}
+                            className="ml-1 hover:text-destructive transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 5. Propriedades Físicas (apenas para produtos físicos) */}
+            {formData.product_type === 'physical' && (
+              <Card className="hover-scale border-l-4 border-l-purple-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-purple-600">
+                    <Ruler className="w-5 h-5" />
+                    5. Propriedades Físicas
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Peso, dimensões e material para cálculo de frete
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="weight">⚖️ Peso (kg)</Label>
+                      <Input
+                        id="weight"
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={formData.weight}
+                        onChange={(e) => setFormData({...formData, weight: e.target.value})}
+                        placeholder="0.500"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="material">🏗️ Material</Label>
+                      <Input
+                        id="material"
+                        value={formData.material}
+                        onChange={(e) => setFormData({...formData, material: e.target.value})}
+                        placeholder="Algodão, Plástico, Metal..."
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="dimensions">📐 Dimensões</Label>
+                      <Input
+                        id="dimensions"
+                        value={formData.dimensions}
+                        onChange={(e) => setFormData({...formData, dimensions: e.target.value})}
+                        placeholder="20x15x5 cm"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    ℹ️ Essas informações são importantes para cálculo de frete e logística
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {/* Upload de Imagens */}
-          <div className="space-y-6">
-            <Card className="hover-scale">
+          {/* Coluna Lateral - Imagens e SEO */}
+          <div className="space-y-8">
+            {/* 6. Imagens do Produto */}
+            <Card className="hover-scale border-l-4 border-l-teal-500">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-teal-600">
                   <Images className="w-5 h-5" />
-                  Imagens do Produto
+                  6. Imagens do Produto
                 </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Upload manual ou geração com IA
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Tabs defaultValue="upload" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="upload">Upload Manual</TabsTrigger>
-                    <TabsTrigger value="ai">IA Assistant</TabsTrigger>
+                    <TabsTrigger value="upload">📤 Upload</TabsTrigger>
+                    <TabsTrigger value="ai">🤖 IA</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="upload" className="space-y-4">
                     {/* Upload Area */}
-                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-teal-300 transition-colors">
                       <ImageIcon className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground mb-2">
                         Arraste imagens aqui ou clique para selecionar
@@ -712,53 +833,52 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                   </TabsContent>
                 </Tabs>
 
-                {/* Imagem de Destaque */}
+                {/* Preview de Imagens */}
                 {formData.image_url && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <Star className="w-4 h-4 text-yellow-500" />
-                      <Label className="font-medium">Imagem de Destaque</Label>
+                      <Label className="font-medium">Imagem Principal</Label>
                     </div>
                     <div className="relative group">
                       <div className="aspect-square bg-muted rounded-lg overflow-hidden border-2 border-yellow-200">
                         <img
                           src={formData.image_url}
-                          alt="Imagem de destaque"
+                          alt="Imagem principal"
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <Badge className="absolute top-2 left-2 bg-yellow-500">
-                        Destaque
+                      <Badge className="absolute top-2 left-2 bg-yellow-500 text-white">
+                        Principal
                       </Badge>
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => {
-                            const newImages = formData.images.filter(img => img !== formData.image_url);
-                            setFormData(prev => ({
-                              ...prev,
-                              image_url: newImages[0] || '',
-                              images: newImages
-                            }));
-                          }}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => {
+                          const newImages = formData.images.filter(img => img !== formData.image_url);
+                          setFormData(prev => ({
+                            ...prev,
+                            image_url: newImages[0] || '',
+                            images: newImages
+                          }));
+                        }}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
                 )}
 
                 {/* Galeria de Imagens */}
                 {formData.images.length > 1 && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <Images className="w-4 h-4" />
-                      <Label>Galeria ({formData.images.length - 1} imagens)</Label>
+                      <Label>Galeria ({formData.images.length - 1})</Label>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {formData.images.filter(img => img !== formData.image_url).map((imageUrl, index) => (
                         <div key={index} className="relative group">
                           <div className="aspect-square bg-muted rounded-lg overflow-hidden">
@@ -768,18 +888,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                               className="w-full h-full object-cover"
                             />
                           </div>
-
-                          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => removeImage(imageUrl)}
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => removeImage(imageUrl)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
                           <Button
                             type="button"
                             size="sm"
@@ -787,11 +904,147 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                             className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                             onClick={() => setMainImage(imageUrl)}
                           >
-                            <Star className="w-3 h-3 mr-1" />
-                            Destaque
+                            ⭐
                           </Button>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 7. SEO e Marketing */}
+            <Card className="hover-scale border-l-4 border-l-pink-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-pink-600">
+                  <Sparkles className="w-5 h-5" />
+                  7. SEO e Marketing
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Otimização para mecanismos de busca
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Botão para Gerar SEO */}
+                <div className="text-center">
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    onClick={generateSEOSuggestions}
+                    disabled={generatingSEO || !formData.name || !formData.description}
+                    className="w-full bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 border-pink-200"
+                  >
+                    {generatingSEO ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Gerando SEO com IA...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        ✨ Gerar SEO Automático
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 Preencha nome e descrição primeiro
+                  </p>
+                </div>
+
+                {/* SEO Suggestions */}
+                {seoSuggestions && (
+                  <div className="space-y-3 animate-fade-in">
+                    <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-3 rounded-lg border border-pink-200">
+                      <h4 className="font-semibold text-pink-800 text-sm mb-2">✨ Título SEO</h4>
+                      <div className="bg-white p-2 rounded border text-xs mb-2">
+                        {seoSuggestions.seo_title}
+                      </div>
+                      <Button 
+                        type="button"
+                        size="sm" 
+                        variant="outline"
+                        className="w-full text-xs"
+                        onClick={() => applySEOSuggestion('seo_title', seoSuggestions.seo_title)}
+                      >
+                        Aplicar Título
+                      </Button>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-3 rounded-lg border border-pink-200">
+                      <h4 className="font-semibold text-pink-800 text-sm mb-2">📝 Descrição SEO</h4>
+                      <div className="bg-white p-2 rounded border text-xs mb-2">
+                        {seoSuggestions.seo_description}
+                      </div>
+                      <Button 
+                        type="button"
+                        size="sm" 
+                        variant="outline"
+                        className="w-full text-xs"
+                        onClick={() => applySEOSuggestion('seo_description', seoSuggestions.seo_description)}
+                      >
+                        Aplicar Descrição
+                      </Button>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-3 rounded-lg border border-pink-200">
+                      <h4 className="font-semibold text-pink-800 text-sm mb-2">🔑 Palavras-chave</h4>
+                      <div className="bg-white p-2 rounded border text-xs mb-2">
+                        {seoSuggestions.seo_keywords}
+                      </div>
+                      <Button 
+                        type="button"
+                        size="sm" 
+                        variant="outline"
+                        className="w-full text-xs"
+                        onClick={() => applySEOSuggestion('seo_keywords', seoSuggestions.seo_keywords)}
+                      >
+                        Aplicar Palavras-chave
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* SEO Status */}
+                {(formData.seo_title || formData.seo_description || formData.seo_keywords) && (
+                  <div className="space-y-3 pt-3 border-t">
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      ✅ SEO Configurado
+                    </h4>
+                    
+                    {formData.seo_title && (
+                      <div className="bg-green-50 p-2 rounded text-xs">
+                        <strong>Título:</strong> {formData.seo_title}
+                      </div>
+                    )}
+
+                    {formData.seo_description && (
+                      <div className="bg-green-50 p-2 rounded text-xs">
+                        <strong>Descrição:</strong> {formData.seo_description}
+                      </div>
+                    )}
+
+                    {formData.seo_keywords && (
+                      <div className="bg-green-50 p-2 rounded text-xs">
+                        <strong>Palavras-chave:</strong> {formData.seo_keywords}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Aviso SEO Automático para novos produtos */}
+                {!product?.id && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200">
+                    <div className="flex items-start gap-2">
+                      <Star className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs">
+                        <p className="font-medium text-blue-800 dark:text-blue-200">
+                          SEO Automático Ativo
+                        </p>
+                        <p className="text-blue-700 dark:text-blue-300 mt-1">
+                          Ao salvar, será gerado SEO automaticamente se não configurado manualmente.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
