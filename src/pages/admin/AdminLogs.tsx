@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Activity, Mail, MessageSquare, Search, RefreshCw, Eye, AlertCircle, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Activity, Mail, MessageSquare, Search, RefreshCw, Eye, AlertCircle, CheckCircle, Clock, XCircle, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useNotifications } from '@/hooks/useNotifications';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -37,7 +38,12 @@ const AdminLogs = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedLog, setSelectedLog] = useState<NotificationLog | null>(null);
+  const [testEmail, setTestEmail] = useState('');
+  const [testPhone, setTestPhone] = useState('');
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testingSms, setTestingSms] = useState(false);
   const { toast } = useToast();
+  const { sendTestEmail, sendTestSms } = useNotifications();
 
   useEffect(() => {
     loadLogs();
@@ -63,6 +69,80 @@ const AdminLogs = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmail) {
+      toast({
+        title: "❌ Erro",
+        description: "Digite um email válido",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setTestingEmail(true);
+    try {
+      const result = await sendTestEmail(testEmail);
+      if (result.success) {
+        toast({
+          title: "✅ Sucesso",
+          description: "Email de teste enviado! Verifique os logs."
+        });
+        loadLogs(); // Refresh logs
+      } else {
+        toast({
+          title: "❌ Erro",
+          description: result.error || "Falha ao enviar email",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao enviar email de teste",
+        variant: "destructive"
+      });
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
+  const handleTestSms = async () => {
+    if (!testPhone) {
+      toast({
+        title: "❌ Erro",
+        description: "Digite um número válido",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setTestingSms(true);
+    try {
+      const result = await sendTestSms(testPhone);
+      if (result.success) {
+        toast({
+          title: "✅ Sucesso",
+          description: "SMS de teste enviado! Verifique os logs."
+        });
+        loadLogs(); // Refresh logs
+      } else {
+        toast({
+          title: "❌ Erro",
+          description: result.error || "Falha ao enviar SMS",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao enviar SMS de teste",
+        variant: "destructive"
+      });
+    } finally {
+      setTestingSms(false);
     }
   };
 
@@ -112,6 +192,37 @@ const AdminLogs = () => {
 
   const LogsTable = ({ logs, type }: { logs: NotificationLog[], type: 'email' | 'sms' }) => (
     <div className="space-y-4">
+      {/* Test Section */}
+      <Card className="bg-muted/30">
+        <CardHeader>
+          <CardTitle className="text-sm flex items-center gap-2">
+            {type === 'email' ? <Mail className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+            Teste de {type === 'email' ? 'Email' : 'SMS'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              placeholder={type === 'email' ? 'Digite um email...' : 'Digite um número de telefone...'}
+              value={type === 'email' ? testEmail : testPhone}
+              onChange={(e) => type === 'email' ? setTestEmail(e.target.value) : setTestPhone(e.target.value)}
+              className="flex-1"
+            />
+            <Button 
+              onClick={type === 'email' ? handleTestEmail : handleTestSms}
+              disabled={type === 'email' ? testingEmail : testingSms}
+              size="sm"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {type === 'email' 
+                ? (testingEmail ? 'Enviando...' : 'Enviar Email')
+                : (testingSms ? 'Enviando...' : 'Enviar SMS')
+              }
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex gap-4 items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />

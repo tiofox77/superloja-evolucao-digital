@@ -61,6 +61,44 @@ export const useNotifications = () => {
     }
   };
 
+  const sendSmsNotification = async (props: {
+    type: 'welcome' | 'order_created' | 'status_changed';
+    to: string;
+    userName?: string;
+    orderNumber?: string;
+    orderTotal?: number;
+    newStatus?: string;
+  }) => {
+    try {
+      const { error } = await supabase.functions.invoke('send-notification-sms', {
+        body: props
+      });
+
+      if (error) throw error;
+      
+      return { success: true };
+    } catch (error: any) {
+      console.error('Erro ao enviar SMS:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const sendTestEmail = async (email: string) => {
+    return await sendEmailNotification({
+      type: 'welcome',
+      to: email,
+      userName: 'Teste'
+    });
+  };
+
+  const sendTestSms = async (phone: string) => {
+    return await sendSmsNotification({
+      type: 'welcome',
+      to: phone,
+      userName: 'Teste'
+    });
+  };
+
   const createOrderNotification = async (orderData: {
     userEmail: string;
     userName: string;
@@ -123,7 +161,10 @@ export const useNotifications = () => {
   return {
     createNotification,
     sendEmailNotification,
+    sendSmsNotification,
     createOrderNotification,
-    createWelcomeNotification
+    createWelcomeNotification,
+    sendTestEmail,
+    sendTestSms
   };
 };
