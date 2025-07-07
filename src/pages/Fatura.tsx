@@ -10,6 +10,7 @@ import { ArrowLeft, Download, Printer, CheckCircle, Clock, AlertCircle } from 'l
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
+import { generateModernInvoicePDF } from '@/components/ModernInvoicePDF';
 
 interface Order {
   id: string;
@@ -201,6 +202,20 @@ const Fatura = () => {
           </Button>
           
           <div className="flex gap-2 no-print">
+            <Button 
+              variant="outline" 
+              onClick={() => generateModernInvoicePDF(order.id, false)}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Fatura PDF
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => generateModernInvoicePDF(order.id, true)}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Recibo PDF
+            </Button>
             <Button variant="outline" onClick={handlePrint}>
               <Printer className="w-4 h-4 mr-2" />
               Imprimir

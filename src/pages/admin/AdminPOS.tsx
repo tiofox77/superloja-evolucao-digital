@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Plus, Minus, ShoppingCart, Trash2, Calculator, CreditCard, FileText, Printer } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { generateModernInvoicePDF } from '@/components/ModernInvoicePDF';
 
 const AdminPOS = () => {
   const [products, setProducts] = useState([]);
@@ -148,14 +149,24 @@ const AdminPOS = () => {
         title: "Venda realizada!",
         description: `Pedido #${orderData.order_number} - Total: ${formatPrice(getTotalAmount())}`,
         action: (
-          <Button 
-            size="sm" 
-            variant="outline"
-            onClick={() => generateReceiptPDF(orderData, cart)}
-          >
-            <FileText className="w-4 h-4 mr-1" />
-            PDF
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => generateModernInvoicePDF(orderData.id, false)}
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              Fatura
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => generateModernInvoicePDF(orderData.id, true)}
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              Recibo
+            </Button>
+          </div>
         )
       });
 
