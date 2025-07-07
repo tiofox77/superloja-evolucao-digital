@@ -64,14 +64,6 @@ export const Header: React.FC = () => {
                     </span>
                   </div>
                 )}
-                <div className="space-y-0.5">
-                  <h1 className="text-2xl font-bold bg-hero-gradient bg-clip-text text-transparent">
-                    {settings.store_name}
-                  </h1>
-                  <p className="text-sm text-muted-foreground font-medium">
-                    {settings.store_description}
-                  </p>
-                </div>
               </div>
             </Link>
 
@@ -93,8 +85,20 @@ export const Header: React.FC = () => {
             <div className="flex items-center space-x-4">
             {/* Desktop Menu */}
             <nav className="hidden lg:flex items-center space-x-6">
+              <Link to="/catalogo" className="text-foreground hover:text-primary transition-colors font-medium">
+                Catálogo
+              </Link>
+              <Link to="/categorias" className="text-foreground hover:text-primary transition-colors font-medium">
+                Categorias
+              </Link>
               <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full">
                 Leilões
+              </Link>
+              <Link to="/sobre" className="text-foreground hover:text-primary transition-colors font-medium">
+                Sobre
+              </Link>
+              <Link to="/contato" className="text-foreground hover:text-primary transition-colors font-medium">
+                Contato
               </Link>
             </nav>
 
@@ -166,8 +170,20 @@ export const Header: React.FC = () => {
             {isMobileMenuOpen && (
               <div className="lg:hidden mt-4 py-4 border-t border-border animate-fade-in">
                 <nav className="flex flex-col space-y-4">
+                  <Link to="/catalogo" className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                    Catálogo
+                  </Link>
+                  <Link to="/categorias" className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                    Categorias
+                  </Link>
                   <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium py-2">
                     Leilões
+                  </Link>
+                  <Link to="/sobre" className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                    Sobre
+                  </Link>
+                  <Link to="/contato" className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                    Contato
                   </Link>
                   <Link to={user ? "/cliente" : "/auth"} className="text-foreground hover:text-primary transition-colors font-medium py-2">
                     {user ? 'Área do Cliente' : 'Entrar'}
