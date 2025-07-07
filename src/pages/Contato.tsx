@@ -1,70 +1,65 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { SEOHead } from '@/components/SEOHead';
-import { supabase } from '@/integrations/supabase/client';
+import { StaticPageLayout } from '@/components/StaticPageLayout';
 
 const Contato = () => {
-  const [pageData, setPageData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPageData = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('static_pages')
-          .select('*')
-          .eq('page_key', 'contact')
-          .eq('is_active', true)
-          .single();
-
-        if (error) throw error;
-        setPageData(data);
-      } catch (error) {
-        console.error('Erro ao carregar página:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPageData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container mx-auto px-4 py-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-64"></div>
-            <div className="h-4 bg-muted rounded w-full"></div>
-            <div className="h-4 bg-muted rounded w-3/4"></div>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
+  const sections = [
+    {
+      type: 'hero' as const,
+      title: 'Entre em Contato',
+      content: 'Estamos aqui para ajudar! Entre em contato conosco através dos nossos canais de atendimento e teremos prazer em responder às suas dúvidas.'
+    },
+    {
+      type: 'contact' as const,
+      title: 'Nossos Canais de Atendimento',
+      items: [
+        {
+          title: 'WhatsApp',
+          description: '+244 923 456 789\nAtendimento rápido via WhatsApp, de segunda a sábado das 8h às 18h.',
+          icon: 'phone'
+        },
+        {
+          title: 'Email',
+          description: 'contato@superloja.ao\nEnvie suas dúvidas por email e responderemos em até 24 horas.',
+          icon: 'mail'
+        },
+        {
+          title: 'Localização',
+          description: 'Rua dos Coqueiros, 123\nLuanda, Angola\nVisite nossa loja física.',
+          icon: 'location'
+        },
+        {
+          title: 'Horário de Funcionamento',
+          description: 'Segunda a Sexta: 8h às 18h\nSábado: 8h às 14h\nDomingo: Fechado',
+          icon: 'clock'
+        }
+      ]
+    },
+    {
+      type: 'text' as const,
+      title: 'Suporte Especializado',
+      content: 'Nossa equipe de suporte está preparada para ajudar com dúvidas sobre produtos, pedidos, entregas e qualquer questão relacionada à sua experiência de compra na SuperLoja Angola.'
+    },
+    {
+      type: 'cta' as const,
+      title: 'Precisa de Ajuda Imediata?',
+      content: 'Nossa equipe está pronta para atender você. Entre em contato através do WhatsApp para atendimento rápido e personalizado.'
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-background">
       <SEOHead 
         pageType="custom"
-        title={pageData?.title || "Contato - SuperLoja Angola"}
-        description={pageData?.meta_description || "Entre em contato com a SuperLoja"}
+        title="Contato - SuperLoja Angola"
+        description="Entre em contato com a SuperLoja Angola. WhatsApp, email e atendimento personalizado para suas dúvidas."
       />
       <Header />
       
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-foreground mb-6">
-            {pageData?.title || "Contato"}
-          </h1>
-          
-          <div className="prose prose-lg max-w-none text-muted-foreground">
-            <p>{pageData?.content || "Carregando conteúdo..."}</p>
-          </div>
-        </div>
+      <main>
+        <StaticPageLayout sections={sections} />
       </main>
 
       <Footer />

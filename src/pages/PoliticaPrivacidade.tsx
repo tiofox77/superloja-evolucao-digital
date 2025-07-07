@@ -1,70 +1,70 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { SEOHead } from '@/components/SEOHead';
-import { supabase } from '@/integrations/supabase/client';
+import { StaticPageLayout } from '@/components/StaticPageLayout';
 
 const PoliticaPrivacidade = () => {
-  const [pageData, setPageData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchPageData = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('static_pages')
-          .select('*')
-          .eq('page_key', 'privacy')
-          .eq('is_active', true)
-          .single();
-
-        if (error) throw error;
-        setPageData(data);
-      } catch (error) {
-        console.error('Erro ao carregar página:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPageData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="container mx-auto px-4 py-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-64"></div>
-            <div className="h-4 bg-muted rounded w-full"></div>
-            <div className="h-4 bg-muted rounded w-3/4"></div>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
+  const sections = [
+    {
+      type: 'hero' as const,
+      title: 'Política de Privacidade',
+      content: 'A SuperLoja Angola valoriza sua privacidade. Esta política explica como coletamos, usamos e protegemos suas informações pessoais.'
+    },
+    {
+      type: 'features' as const,
+      title: 'Como Protegemos Seus Dados',
+      items: [
+        {
+          title: 'Coleta de Dados',
+          description: 'Coletamos apenas informações necessárias para processar pedidos e melhorar sua experiência: nome, email, telefone e endereço.',
+          icon: 'shield'
+        },
+        {
+          title: 'Uso das Informações',
+          description: 'Suas informações são usadas exclusivamente para processar pedidos, comunicações e melhorar nossos serviços.',
+          icon: 'check'
+        },
+        {
+          title: 'Compartilhamento',
+          description: 'Não compartilhamos suas informações com terceiros, exceto parceiros de entrega para completar seu pedido.',
+          icon: 'shield'
+        },
+        {
+          title: 'Segurança',
+          description: 'Utilizamos criptografia SSL e medidas de segurança avançadas para proteger seus dados contra acesso não autorizado.',
+          icon: 'check'
+        }
+      ]
+    },
+    {
+      type: 'text' as const,
+      title: 'Seus Direitos',
+      content: 'Você tem o direito de acessar, corrigir ou excluir suas informações pessoais a qualquer momento. Para exercer esses direitos, entre em contato conosco através dos nossos canais de atendimento. Respondemos a todas as solicitações em até 30 dias.'
+    },
+    {
+      type: 'text' as const,
+      title: 'Cookies e Tecnologias',
+      content: 'Utilizamos cookies para melhorar sua experiência de navegação, lembrar suas preferências e analisar o tráfego do site. Você pode desabilitar os cookies nas configurações do seu navegador, mas isso pode afetar algumas funcionalidades do site.'
+    },
+    {
+      type: 'cta' as const,
+      title: 'Dúvidas sobre Privacidade?',
+      content: 'Se você tiver dúvidas sobre nossa política de privacidade ou como tratamos seus dados, entre em contato conosco.'
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-background">
       <SEOHead 
         pageType="custom"
-        title={pageData?.title || "Política de Privacidade - SuperLoja Angola"}
-        description={pageData?.meta_description || "Política de privacidade da SuperLoja"}
+        title="Política de Privacidade - SuperLoja Angola"
+        description="Conheça como a SuperLoja Angola protege suas informações pessoais. Política de privacidade transparente e segura."
       />
       <Header />
       
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold text-foreground mb-6">
-            {pageData?.title || "Política de Privacidade"}
-          </h1>
-          
-          <div className="prose prose-lg max-w-none text-muted-foreground">
-            <p>{pageData?.content || "Carregando conteúdo..."}</p>
-          </div>
-        </div>
+      <main>
+        <StaticPageLayout sections={sections} />
       </main>
 
       <Footer />
