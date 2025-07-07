@@ -29,7 +29,11 @@ const Auth = () => {
     email: '',
     password: '',
     fullName: '',
-    phone: ''
+    phone: '',
+    country: '',
+    province: '',
+    city: '',
+    street: ''
   });
 
   useEffect(() => {
@@ -127,7 +131,11 @@ const Auth = () => {
           emailRedirectTo: redirectUrl,
           data: {
             full_name: signupData.fullName,
-            phone: signupData.phone
+            phone: signupData.phone,
+            country: signupData.country,
+            province: signupData.province,
+            city: signupData.city,
+            street: signupData.street
           }
         }
       });
@@ -242,12 +250,60 @@ const Auth = () => {
                     </div>
                     <div>
                       <Label htmlFor="phone">Telefone</Label>
+                      <div className="flex">
+                        <div className="flex items-center px-3 border border-r-0 border-input bg-muted rounded-l-md">
+                          <span className="text-sm text-muted-foreground">+244</span>
+                        </div>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={signupData.phone}
+                          onChange={(e) => {
+                            const cleaned = e.target.value.replace(/\D/g, '').replace(/^244/, '');
+                            setSignupData({...signupData, phone: cleaned});
+                          }}
+                          placeholder="912345678"
+                          className="rounded-l-none"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Digite apenas os números sem o código do país
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="country">País</Label>
                       <Input
-                        id="phone"
-                        type="tel"
-                        value={signupData.phone}
-                        onChange={(e) => setSignupData({...signupData, phone: e.target.value})}
-                        placeholder="+244 XXX XXX XXX"
+                        id="country"
+                        value={signupData.country || ''}
+                        onChange={(e) => setSignupData({...signupData, country: e.target.value})}
+                        placeholder="Ex: Angola"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="province">Província</Label>
+                      <Input
+                        id="province"
+                        value={signupData.province || ''}
+                        onChange={(e) => setSignupData({...signupData, province: e.target.value})}
+                        placeholder="Ex: Luanda"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="city">Cidade</Label>
+                      <Input
+                        id="city"
+                        value={signupData.city || ''}
+                        onChange={(e) => setSignupData({...signupData, city: e.target.value})}
+                        placeholder="Ex: Luanda"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="street">Endereço (opcional)</Label>
+                      <Input
+                        id="street"
+                        value={signupData.street || ''}
+                        onChange={(e) => setSignupData({...signupData, street: e.target.value})}
+                        placeholder="Rua, bairro, número (opcional para entrega)"
                       />
                     </div>
                     <div>
