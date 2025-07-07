@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Link } from 'react-router-dom';
 import { Gavel, Clock, TrendingUp, User, Phone, Mail, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +20,7 @@ import { User as SupabaseUser } from '@supabase/supabase-js';
 interface Product {
   id: string;
   name: string;
+  slug: string;
   description?: string;
   price: number;
   image_url?: string;
@@ -326,12 +328,11 @@ const Leiloes = () => {
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        setSelectedProduct(product);
-                        loadBids(product.id);
-                      }}
+                      asChild
                     >
-                      <TrendingUp className="w-4 h-4" />
+                      <Link to={`/leilao/${product.slug}`}>
+                        <TrendingUp className="w-4 h-4" />
+                      </Link>
                     </Button>
                   </div>
                 </CardContent>

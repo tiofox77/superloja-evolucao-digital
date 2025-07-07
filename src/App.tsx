@@ -36,6 +36,7 @@ import AdminCriarLeilao from "@/pages/admin/AdminCriarLeilao";
 import SolicitarProduto from "@/pages/SolicitarProduto";
 import Contato from "@/pages/Contato";
 import Leiloes from "@/pages/Leiloes";
+import LeilaoDetalhes from "@/pages/LeilaoDetalhes";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
@@ -61,6 +62,7 @@ function App() {
               <Route path="/contato" element={<Contato />} />
               <Route path="/solicitar-produto" element={<SolicitarProduto />} />
               <Route path="/leiloes" element={<Leiloes />} />
+              <Route path="/leilao/:slug" element={<LeilaoDetalhes />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/cliente" element={<Cliente />} />
