@@ -1622,6 +1622,60 @@ const AdminConfiguracoes = () => {
                     onCheckedChange={(checked) => setSettings({...settings, smtp_use_tls: checked})}
                   />
                 </div>
+
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      onClick={generatePhpConfig}
+                      disabled={generatingConfig}
+                    >
+                      {generatingConfig ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Gerando...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Gerar Config SMTP
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      onClick={testPhpEmail}
+                      disabled={!settings.smtp_host || !settings.smtp_user}
+                    >
+                      <Mail className="w-4 h-4 mr-2" />
+                      Testar Email PHP
+                    </Button>
+                  </div>
+                  
+                  {phpSystemStatus && (
+                    <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Database className="w-4 h-4" />
+                        Status do Sistema PHP
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Diretório Config:</span>
+                          <Badge variant={phpSystemStatus.directories?.config?.exists ? "default" : "destructive"}>
+                            {phpSystemStatus.directories?.config?.exists ? "OK" : "Erro"}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Config SMTP:</span>
+                          <Badge variant={phpSystemStatus.config_files?.smtp?.exists ? "default" : "destructive"}>
+                            {phpSystemStatus.config_files?.smtp?.exists ? "OK" : "Pendente"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
