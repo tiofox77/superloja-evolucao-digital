@@ -65,52 +65,30 @@ export const PWAInstallPrompt: React.FC = () => {
       setShowPrompt(false);
     };
 
-    // Check if PWA criteria are met and show fallback prompt
-    const checkPWAEligibility = () => {
-      // Show prompt for mobile users after delay if no beforeinstallprompt event
-      if (isMobile && !sessionStorage.getItem('pwa-prompt-dismissed')) {
-        setTimeout(() => {
-          if (!deferredPrompt) {
-            console.log('PWA: Exibindo prompt fallback para mobile');
-            setShowPrompt(true);
-          }
-        }, pwaSettings.install_prompt_delay + 2000);
-      }
-    };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
-    
-    // Check eligibility after settings are loaded
-    if (pwaSettings.name !== 'SuperLoja' || pwaSettings.install_prompt_enabled) {
-      checkPWAEligibility();
-    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [pwaSettings, isMobile, deferredPrompt]);
+  }, [pwaSettings]);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      try {
-        await deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        
-        if (outcome === 'accepted') {
-          console.log('PWA instalado com sucesso');
-        }
-        
-        setDeferredPrompt(null);
-        setShowPrompt(false);
-      } catch (error) {
-        console.error('Erro ao instalar PWA:', error);
+    if (!deferredPrompt) return;
+
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('PWA instalado com sucesso');
       }
-    } else {
-      // Fallback: provide manual installation instructions
-      alert(`Para instalar ${pwaSettings.name}:\n\n1. No Chrome: Menu → "Instalar app"\n2. No Safari: Compartilhar → "Adicionar à Tela de Início"\n3. No Firefox: Menu → "Instalar"`);
+      
+      setDeferredPrompt(null);
       setShowPrompt(false);
+    } catch (error) {
+      console.error('Erro ao instalar PWA:', error);
     }
   };
 
@@ -120,8 +98,8 @@ export const PWAInstallPrompt: React.FC = () => {
     sessionStorage.setItem('pwa-prompt-dismissed', 'true');
   };
 
-  // Don't show if not mobile, already dismissed, or prompt disabled
-  if (!isMobile || !showPrompt || sessionStorage.getItem('pwa-prompt-dismissed')) {
+  // Only show if mobile, has deferredPrompt, and not dismissed
+  if (!isMobile || !showPrompt || !deferredPrompt || sessionStorage.getItem('pwa-prompt-dismissed')) {
     return null;
   }
 
