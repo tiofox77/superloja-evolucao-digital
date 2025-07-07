@@ -186,7 +186,7 @@ const SolicitarProduto = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="estimated_price">Faixa de Preço (R$)</Label>
+                  <Label htmlFor="estimated_price">Faixa de Preço (Kz)</Label>
                   <Input
                     id="estimated_price"
                     type="number"
@@ -199,23 +199,25 @@ const SolicitarProduto = () => {
                 {/* Contact Info */}
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="contact_email">Email para Contato *</Label>
+                    <Label htmlFor="contact_phone">Telefone *</Label>
+                    <Input
+                      id="contact_phone"
+                      value={formData.contact_phone}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
+                      placeholder="+244 900 000 000"
+                      pattern="^\+244\s[0-9]{3}\s[0-9]{3}\s[0-9]{3}$"
+                      title="Formato: +244 900 000 000"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contact_email">Email para Contato</Label>
                     <Input
                       id="contact_email"
                       type="email"
                       value={formData.contact_email}
                       onChange={(e) => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
                       placeholder="seu@email.com"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contact_phone">Telefone</Label>
-                    <Input
-                      id="contact_phone"
-                      value={formData.contact_phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
-                      placeholder="(11) 99999-9999"
                     />
                   </div>
                 </div>
