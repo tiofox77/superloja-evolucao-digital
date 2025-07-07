@@ -78,10 +78,7 @@ const Produto = () => {
   }, [slug, toast]);
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(price);
+    return `${price.toFixed(2)} Kz`;
   };
 
   const handleAddToCart = async () => {
@@ -154,12 +151,12 @@ const Produto = () => {
       "name": product.name,
       "description": product.description,
       "image": product.image_url,
-      "offers": {
-        "@type": "Offer",
-        "price": product.price,
-        "priceCurrency": "AOA",
-        "availability": product.in_stock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
-      },
+        "offers": {
+          "@type": "Offer",
+          "price": product.price,
+          "priceCurrency": "AOA",
+          "availability": product.in_stock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+        },
       "brand": {
         "@type": "Brand",
         "name": "SuperLoja"
@@ -359,7 +356,7 @@ const Produto = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <Truck className="w-5 h-5 text-primary" />
-                <span>Frete grátis para compras acima de R$ 299</span>
+                <span>Frete grátis para compras acima de 15.000 Kz</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Shield className="w-5 h-5 text-primary" />

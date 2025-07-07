@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 interface Product {
   id: string;
   name: string;
+  slug: string;
   description?: string;
   price: number;
   image_url?: string;
@@ -260,11 +261,36 @@ const LeilaoDetalhes = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead 
-        title={`${product.name} - Leilão - SuperLoja`}
-        description={product.description || `Participe do leilão do produto ${product.name}`}
-        keywords={`leilão, ${product.name}, ofertas, lance`}
-      />
+      {product && (
+        <SEOHead 
+          pageType="product"
+          pageSlug={product.slug}
+          title={`${product.name} - Leilão Ativo - SuperLoja`}
+          description={product.description || `Participe do leilão do produto ${product.name}. Lance atual: ${(product.current_bid || product.starting_bid || 0).toFixed(2)} Kz`}
+          keywords={`leilão, ${product.name}, ofertas, lance, Angola, ${product.auction_end_date ? 'ativo' : 'finalizado'}`}
+          ogImage={product.image_url}
+          schemaMarkup={{
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": product.name,
+            "description": product.description,
+            "image": product.image_url,
+            "offers": {
+              "@type": "Offer",
+              "price": product.current_bid || product.starting_bid || 0,
+              "priceCurrency": "AOA",
+              "availability": "https://schema.org/InStock",
+              "validFrom": product.auction_start_date,
+              "validThrough": product.auction_end_date
+            },
+            "brand": {
+              "@type": "Brand",
+              "name": "SuperLoja"
+            },
+            "category": "Auction"
+          }}
+        />
+      )}
       <Header />
       
       <main className="container mx-auto px-4 py-8">

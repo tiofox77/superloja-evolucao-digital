@@ -54,7 +54,16 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   const finalTitle = seoData?.title || title || `${settings.store_name} - ${settings.store_description}`;
   const finalDescription = seoData?.description || description || settings.store_description;
   const finalKeywords = seoData?.keywords || keywords || 'eletrônicos, tecnologia, smartphones, Angola';
-  const finalOgImage = seoData?.og_image || ogImage || '/src/assets/superloja-logo.png';
+  
+  // Criar URL completa para imagens
+  const getFullImageUrl = (imageUrl: string | undefined) => {
+    if (!imageUrl) return `${window.location.origin}/src/assets/superloja-logo.png`;
+    if (imageUrl.startsWith('http')) return imageUrl;
+    if (imageUrl.startsWith('/')) return `${window.location.origin}${imageUrl}`;
+    return `${window.location.origin}/${imageUrl}`;
+  };
+  
+  const finalOgImage = getFullImageUrl(seoData?.og_image || ogImage || settings.logo_url);
   const finalCanonicalUrl = seoData?.canonical_url || canonicalUrl || window.location.href;
 
   const structuredData = seoData?.schema_markup || schemaMarkup || {
