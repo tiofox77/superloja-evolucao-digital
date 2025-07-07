@@ -1,11 +1,34 @@
 import { Facebook, Instagram, Twitter, Youtube, Mail, Phone, MapPin, CreditCard, Truck, Shield, Headphones } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Link } from "react-router-dom";
 import logoImage from "@/assets/superloja-logo.png";
 import { useSettings } from "@/contexts/SettingsContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 
 export const Footer = () => {
   const { settings, loading } = useSettings();
+  const [categories, setCategories] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('id, name, slug, icon')
+          .limit(6)
+          .order('name');
+
+        if (error) throw error;
+        setCategories(data || []);
+      } catch (error) {
+        console.error('Erro ao carregar categorias:', error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const openSocialMedia = (url: string) => {
     if (url) {
@@ -26,7 +49,7 @@ export const Footer = () => {
               </div>
               <div>
                 <h4 className="font-semibold text-foreground">Frete Grátis</h4>
-                <p className="text-sm text-muted-foreground">Acima de 50.000 AOA</p>
+                <p className="text-sm text-muted-foreground">Para todo Angola</p>
               </div>
             </div>
 
@@ -158,24 +181,24 @@ export const Footer = () => {
           <div className="space-y-6">
             <h4 className="text-lg font-semibold text-foreground">Links Rápidos</h4>
             <nav className="space-y-3">
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
+              <Link to="/sobre" className="block text-muted-foreground hover:text-primary transition-colors">
                 Sobre Nós
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
+              </Link>
+              <Link to="/contato" className="block text-muted-foreground hover:text-primary transition-colors">
                 Contato
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
+              </Link>
+              <Link to="/faq" className="block text-muted-foreground hover:text-primary transition-colors">
                 FAQ
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
+              </Link>
+              <Link to="/termos-uso" className="block text-muted-foreground hover:text-primary transition-colors">
                 Termos de Uso
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
+              </Link>
+              <Link to="/politica-privacidade" className="block text-muted-foreground hover:text-primary transition-colors">
                 Política de Privacidade
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
+              </Link>
+              <Link to="/politica-devolucao" className="block text-muted-foreground hover:text-primary transition-colors">
                 Política de Devolução
-              </a>
+              </Link>
             </nav>
           </div>
 
@@ -183,24 +206,19 @@ export const Footer = () => {
           <div className="space-y-6">
             <h4 className="text-lg font-semibold text-foreground">Categorias</h4>
             <nav className="space-y-3">
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
-                📱 Smartphones
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
-                💻 Computadores
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
-                🎧 Áudio & Vídeo
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
-                ⌚ Wearables
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
-                🏠 Casa Inteligente
-              </a>
-              <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">
-                🔥 Ofertas Especiais
-              </a>
+              {categories.map((category) => (
+                <Link 
+                  key={category.id}
+                  to={`/categorias/${category.slug}`} 
+                  className="block text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {category.icon && <span className="mr-2">{category.icon}</span>}
+                  {category.name}
+                </Link>
+              ))}
+              {categories.length === 0 && (
+                <p className="text-sm text-muted-foreground">Carregando categorias...</p>
+              )}
             </nav>
           </div>
 

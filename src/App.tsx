@@ -35,8 +35,13 @@ import AdminLeiloes from "@/pages/admin/AdminLeiloes";
 import AdminCriarLeilao from "@/pages/admin/AdminCriarLeilao";
 import AdminLeiloesBids from "@/pages/admin/AdminLeiloesBids";
 import AdminSolicitacoes from "@/pages/admin/AdminSolicitacoes";
+import AdminPaginasEstaticas from "@/pages/admin/AdminPaginasEstaticas";
 import SolicitarProduto from "@/pages/SolicitarProduto";
 import Contato from "@/pages/Contato";
+import FAQ from "@/pages/FAQ";
+import TermosUso from "@/pages/TermosUso";
+import PoliticaPrivacidade from "@/pages/PoliticaPrivacidade";
+import PoliticaDevolucao from "@/pages/PoliticaDevolucao";
 import Leiloes from "@/pages/Leiloes";
 import LeilaoDetalhes from "@/pages/LeilaoDetalhes";
 import NotFound from "@/pages/NotFound";
@@ -62,6 +67,10 @@ function App() {
               <Route path="/categorias" element={<Categorias />} />
               <Route path="/sobre" element={<Sobre />} />
               <Route path="/contato" element={<Contato />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/termos-uso" element={<TermosUso />} />
+              <Route path="/politica-privacidade" element={<PoliticaPrivacidade />} />
+              <Route path="/politica-devolucao" element={<PoliticaDevolucao />} />
               <Route path="/solicitar-produto" element={<SolicitarProduto />} />
               <Route path="/leiloes" element={<Leiloes />} />
               <Route path="/leilao/:slug" element={<LeilaoDetalhes />} />
@@ -91,6 +100,7 @@ function App() {
                 <Route path="leiloes-bids" element={<AdminLeiloesBids />} />
                 <Route path="criar-leilao" element={<AdminCriarLeilao />} />
                 <Route path="solicitacoes" element={<AdminSolicitacoes />} />
+                <Route path="paginas-estaticas" element={<AdminPaginasEstaticas />} />
                 <Route path="logs" element={<AdminLogs />} />
               </Route>
               

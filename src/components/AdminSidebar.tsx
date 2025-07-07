@@ -119,6 +119,11 @@ const toolsItems = [
     icon: Settings,
   },
   {
+    title: 'Páginas Estáticas',
+    url: '/admin/paginas-estaticas',
+    icon: FileText,
+  },
+  {
     title: 'Configurações',
     url: '/admin/configuracoes',
     icon: Settings,

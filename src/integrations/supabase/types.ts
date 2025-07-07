@@ -130,6 +130,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          icon: string | null
           id: string
           image_url: string | null
           name: string
@@ -139,6 +140,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          icon?: string | null
           id?: string
           image_url?: string | null
           name: string
@@ -148,6 +150,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          icon?: string | null
           id?: string
           image_url?: string | null
           name?: string
@@ -961,6 +964,39 @@ export type Database = {
           key?: string
           updated_at?: string
           value?: Json
+        }
+        Relationships: []
+      }
+      static_pages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          meta_description: string | null
+          page_key: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          meta_description?: string | null
+          page_key: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          meta_description?: string | null
+          page_key?: string
+          title?: string
+          updated_at?: string
         }
         Relationships: []
       }

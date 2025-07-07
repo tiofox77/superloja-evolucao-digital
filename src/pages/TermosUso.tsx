@@ -4,7 +4,7 @@ import { Footer } from '@/components/Footer';
 import { SEOHead } from '@/components/SEOHead';
 import { supabase } from '@/integrations/supabase/client';
 
-const Contato = () => {
+const TermosUso = () => {
   const [pageData, setPageData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -14,7 +14,7 @@ const Contato = () => {
         const { data, error } = await supabase
           .from('static_pages')
           .select('*')
-          .eq('page_key', 'contact')
+          .eq('page_key', 'terms')
           .eq('is_active', true)
           .single();
 
@@ -50,15 +50,15 @@ const Contato = () => {
     <div className="min-h-screen bg-background">
       <SEOHead 
         pageType="custom"
-        title={pageData?.title || "Contato - SuperLoja Angola"}
-        description={pageData?.meta_description || "Entre em contato com a SuperLoja"}
+        title={pageData?.title || "Termos de Uso - SuperLoja Angola"}
+        description={pageData?.meta_description || "Termos de uso da SuperLoja"}
       />
       <Header />
       
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold text-foreground mb-6">
-            {pageData?.title || "Contato"}
+            {pageData?.title || "Termos de Uso"}
           </h1>
           
           <div className="prose prose-lg max-w-none text-muted-foreground">
@@ -72,4 +72,4 @@ const Contato = () => {
   );
 };
 
-export default Contato;
+export default TermosUso;

@@ -78,7 +78,11 @@ const Produto = () => {
   }, [slug, toast]);
 
   const formatPrice = (price: number) => {
-    return `${price.toFixed(2)} Kz`;
+    return new Intl.NumberFormat('pt-AO', {
+      style: 'currency',
+      currency: 'AOA',
+      minimumFractionDigits: 0
+    }).format(price);
   };
 
   const handleAddToCart = async () => {
@@ -338,7 +342,7 @@ const Produto = () => {
                   size="lg"
                   className="flex-1"
                   onClick={handleAddToCart}
-                  disabled={!product.in_stock || isLoading}
+                  disabled={!product.in_stock || isLoading || product.stock_quantity <= 0}
                 >
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   {isLoading ? 'Adicionando...' : 'Adicionar ao Carrinho'}
@@ -356,11 +360,11 @@ const Produto = () => {
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <Truck className="w-5 h-5 text-primary" />
-                <span>Frete grátis para compras acima de 15.000 Kz</span>
+                <span>Frete grátis para todo Angola</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Shield className="w-5 h-5 text-primary" />
-                <span>Garantia de 1 ano do fabricante</span>
+                <span>Garantia de 1 ano</span>
               </div>
             </div>
           </div>
