@@ -91,30 +91,12 @@ export const Header: React.FC = () => {
 
             {/* Actions */}
             <div className="flex items-center space-x-4">
-              {/* Desktop Menu */}
-              <nav className="hidden lg:flex items-center space-x-6">
-                <Link to="/" className="text-foreground hover:text-primary transition-colors font-medium">
-                  Home
-                </Link>
-                <Link to="/catalogo" className="text-foreground hover:text-primary transition-colors font-medium">
-                  Catálogo
-                </Link>
-                <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium">
-                  Leilões
-                </Link>
-                <Link to="/categorias" className="text-foreground hover:text-primary transition-colors font-medium">
-                  Categorias
-                </Link>
-                <Link to="/sobre" className="text-foreground hover:text-primary transition-colors font-medium">
-                  Sobre
-                </Link>
-                <Link to="/contato" className="text-foreground hover:text-primary transition-colors font-medium">
-                  Contato
-                </Link>
-                <Link to="/solicitar-produto" className="text-foreground hover:text-primary transition-colors font-medium bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full">
-                  Solicitar Produto
-                </Link>
-              </nav>
+            {/* Desktop Menu */}
+            <nav className="hidden lg:flex items-center space-x-6">
+              <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full">
+                Leilões
+              </Link>
+            </nav>
 
               {/* User actions */}
               <div className="flex items-center space-x-2">
@@ -180,34 +162,19 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Mobile Menu */}
-          {isMobileMenuOpen && (
-            <div className="lg:hidden mt-4 py-4 border-t border-border animate-fade-in">
-              <nav className="flex flex-col space-y-4">
-                <Link to="/" className="text-foreground hover:text-primary transition-colors font-medium py-2">
-                  Home
-                </Link>
-                <Link to="/catalogo" className="text-foreground hover:text-primary transition-colors font-medium py-2">
-                  Catálogo
-                </Link>
-                <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium py-2">
-                  Leilões
-                </Link>
-                <Link to="/categorias" className="text-foreground hover:text-primary transition-colors font-medium py-2">
-                  Categorias
-                </Link>
-                <Link to="/sobre" className="text-foreground hover:text-primary transition-colors font-medium py-2">
-                  Sobre
-                </Link>
-                <Link to="/contato" className="text-foreground hover:text-primary transition-colors font-medium py-2">
-                  Contato
-                </Link>
-                <Link to={user ? "/cliente" : "/auth"} className="text-foreground hover:text-primary transition-colors font-medium py-2">
-                  {user ? 'Área do Cliente' : 'Entrar'}
-                </Link>
-              </nav>
-            </div>
-          )}
+            {/* Mobile Menu */}
+            {isMobileMenuOpen && (
+              <div className="lg:hidden mt-4 py-4 border-t border-border animate-fade-in">
+                <nav className="flex flex-col space-y-4">
+                  <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                    Leilões
+                  </Link>
+                  <Link to={user ? "/cliente" : "/auth"} className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                    {user ? 'Área do Cliente' : 'Entrar'}
+                  </Link>
+                </nav>
+              </div>
+            )}
         </div>
       </header>
       

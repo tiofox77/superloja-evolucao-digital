@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Gavel, Clock, TrendingUp, User, Phone, Mail } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Gavel, Clock, TrendingUp, User, Phone, Mail, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -13,6 +14,7 @@ import { ptBR } from 'date-fns/locale';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { SEOHead } from '@/components/SEOHead';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface Product {
   id: string;
@@ -50,6 +52,7 @@ const Leiloes = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [bids, setBids] = useState<AuctionBid[]>([]);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [bidForm, setBidForm] = useState<BidForm>({
     bidder_name: '',
     bidder_email: '',
@@ -62,16 +65,35 @@ const Leiloes = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
     loadActiveAuctions();
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (selectedProduct) {
+    if (selectedProduct && user) {
       loadBids(selectedProduct.id);
       const minBid = (selectedProduct.current_bid || selectedProduct.starting_bid || 0) + (selectedProduct.bid_increment || 1);
-      setBidForm(prev => ({ ...prev, bid_amount: minBid }));
+      setBidForm(prev => ({ 
+        ...prev, 
+        bid_amount: minBid,
+        bidder_name: user.user_metadata?.full_name || '',
+        bidder_email: user.email || ''
+      }));
     }
-  }, [selectedProduct]);
+  }, [selectedProduct, user]);
 
   const loadActiveAuctions = async () => {
     try {
@@ -111,14 +133,21 @@ const Leiloes = () => {
   };
 
   const submitBid = async () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct || !user) {
+      toast({
+        title: "Login necessário",
+        description: "Você precisa estar logado para dar lances.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const minBid = (selectedProduct.current_bid || selectedProduct.starting_bid || 0) + (selectedProduct.bid_increment || 1);
     
     if (bidForm.bid_amount < minBid) {
       toast({
         title: "Lance inválido",
-        description: `O lance mínimo é R$ ${minBid.toFixed(2)}`,
+        description: `O lance mínimo é ${minBid.toFixed(2)} Kz`,
         variant: "destructive"
       });
       return;
@@ -150,12 +179,6 @@ const Leiloes = () => {
       ]);
 
       setDialogOpen(false);
-      setBidForm({
-        bidder_name: '',
-        bidder_email: '',
-        bidder_phone: '',
-        bid_amount: 0
-      });
     } catch (error) {
       console.error('Erro ao enviar lance:', error);
       toast({
@@ -261,14 +284,14 @@ const Leiloes = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Lance Atual:</span>
                       <span className="text-xl font-bold text-primary">
-                        R$ {(product.current_bid || product.starting_bid || 0).toFixed(2)}
+                        {(product.current_bid || product.starting_bid || 0).toFixed(2)} Kz
                       </span>
                     </div>
                     
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Próximo lance:</span>
                       <span className="font-medium">
-                        R$ {getMinimumBid(product).toFixed(2)}
+                        {getMinimumBid(product).toFixed(2)} Kz
                       </span>
                     </div>
                     
@@ -286,6 +309,14 @@ const Leiloes = () => {
                     <Button
                       className="flex-1"
                       onClick={() => {
+                        if (!user) {
+                          toast({
+                            title: "Login necessário",
+                            description: "Você precisa estar logado para dar lances.",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
                         setSelectedProduct(product);
                         setDialogOpen(true);
                       }}
@@ -309,22 +340,29 @@ const Leiloes = () => {
           </div>
         )}
 
-        {/* Dialog para dar lance */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Dar Lance - {selectedProduct?.name}</DialogTitle>
             </DialogHeader>
             
-            {selectedProduct && (
+            {!user ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Login Necessário</AlertTitle>
+                <AlertDescription>
+                  Você precisa estar logado para dar lances. Faça login primeiro.
+                </AlertDescription>
+              </Alert>
+            ) : selectedProduct && (
               <div className="space-y-4">
                 <div className="text-center p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Lance Atual</div>
                   <div className="text-2xl font-bold text-primary">
-                    R$ {(selectedProduct.current_bid || selectedProduct.starting_bid || 0).toFixed(2)}
+                    {(selectedProduct.current_bid || selectedProduct.starting_bid || 0).toFixed(2)} Kz
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Lance mínimo: R$ {getMinimumBid(selectedProduct).toFixed(2)}
+                    Lance mínimo: {getMinimumBid(selectedProduct).toFixed(2)} Kz
                   </div>
                 </div>
 
@@ -358,12 +396,12 @@ const Leiloes = () => {
                       id="bidder_phone"
                       value={bidForm.bidder_phone}
                       onChange={(e) => setBidForm({...bidForm, bidder_phone: e.target.value})}
-                      placeholder="(11) 99999-9999"
+                      placeholder="+244 900 000 000"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="bid_amount">Valor do Lance</Label>
+                    <Label htmlFor="bid_amount">Valor do Lance (Kz)</Label>
                     <Input
                       id="bid_amount"
                       type="number"
@@ -423,7 +461,7 @@ const Leiloes = () => {
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-lg">
-                        R$ {bid.bid_amount.toFixed(2)}
+                        {bid.bid_amount.toFixed(2)} Kz
                       </div>
                       {bid.is_winning && (
                         <Badge variant="default" className="text-xs">

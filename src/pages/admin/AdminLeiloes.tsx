@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 
 interface Product {
   id: string;
@@ -50,6 +51,7 @@ const AdminLeiloes = () => {
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadProducts();
@@ -209,18 +211,24 @@ const AdminLeiloes = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Gestão de Leilões</h1>
-          <p className="text-muted-foreground">
-            Gerencie leilões de produtos e acompanhe lances
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Gestão de Leilões</h1>
+            <p className="text-muted-foreground">
+              Gerencie leilões de produtos e acompanhe lances
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Button onClick={() => navigate('/admin/criar-leilao')} variant="outline">
+              <Plus className="w-4 h-4 mr-2" />
+              Produto Novo
+            </Button>
+            <Button onClick={loadRegularProducts}>
+              <Plus className="w-4 h-4 mr-2" />
+              Produto Existente
+            </Button>
+          </div>
         </div>
-        <Button onClick={loadRegularProducts}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Leilão
-        </Button>
-      </div>
 
       {/* Dialog para selecionar produto */}
       <Dialog open={showProductSelect} onOpenChange={setShowProductSelect}>
@@ -238,7 +246,7 @@ const AdminLeiloes = () => {
                     )}
                     <div className="flex-1">
                       <h3 className="font-medium">{product.name}</h3>
-                      <p className="text-sm text-muted-foreground">R$ {product.price.toFixed(2)}</p>
+                      <p className="text-sm text-muted-foreground">{(product.starting_bid || product.price || 0).toFixed(2)} Kz</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -260,29 +268,29 @@ const AdminLeiloes = () => {
           {selectedProduct && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="starting_bid">Lance Inicial (R$)</Label>
-                  <Input
-                    id="starting_bid"
-                    type="number"
-                    step="0.01"
-                    value={selectedProduct.starting_bid || ''}
-                    onChange={(e) => setSelectedProduct({...selectedProduct, starting_bid: parseFloat(e.target.value) || 0})}
-                    placeholder="0.00"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="bid_increment">Incremento do Lance (R$)</Label>
-                  <Input
-                    id="bid_increment"
-                    type="number"
-                    step="0.01"
-                    value={selectedProduct.bid_increment || ''}
-                    onChange={(e) => setSelectedProduct({...selectedProduct, bid_increment: parseFloat(e.target.value) || 1})}
-                    placeholder="1.00"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="starting_bid">Lance Inicial (Kz)</Label>
+                    <Input
+                      id="starting_bid"
+                      type="number"
+                      step="0.01"
+                      value={selectedProduct.starting_bid || ''}
+                      onChange={(e) => setSelectedProduct({...selectedProduct, starting_bid: parseFloat(e.target.value) || 0})}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="bid_increment">Incremento do Lance (Kz)</Label>
+                    <Input
+                      id="bid_increment"
+                      type="number"
+                      step="0.01"
+                      value={selectedProduct.bid_increment || ''}
+                      onChange={(e) => setSelectedProduct({...selectedProduct, bid_increment: parseFloat(e.target.value) || 1})}
+                      placeholder="1.00"
+                    />
+                  </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="auction_start_date">Data de Início</Label>
@@ -346,7 +354,7 @@ const AdminLeiloes = () => {
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Lance Atual:</span>
                         <span className="font-bold text-primary">
-                          R$ {(product.current_bid || product.starting_bid || 0).toFixed(2)}
+                          {(product.current_bid || product.starting_bid || 0).toFixed(2)} Kz
                         </span>
                       </div>
                       
@@ -381,9 +389,12 @@ const AdminLeiloes = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Inicia: {product.auction_start_date && format(new Date(product.auction_start_date), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                    </p>
+                      <p className="text-sm text-muted-foreground">
+                        Inicia: {product.auction_start_date && format(new Date(product.auction_start_date), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                      </p>
+                      <p className="font-bold">
+                        Lance inicial: {(product.starting_bid || 0).toFixed(2)} Kz
+                      </p>
                   </CardContent>
                 </Card>
               ))}
@@ -404,7 +415,7 @@ const AdminLeiloes = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="font-bold text-green-600">
-                      Lance Vencedor: R$ {(product.current_bid || product.starting_bid || 0).toFixed(2)}
+                      Lance Vencedor: {(product.current_bid || product.starting_bid || 0).toFixed(2)} Kz
                     </p>
                   </CardContent>
                 </Card>
