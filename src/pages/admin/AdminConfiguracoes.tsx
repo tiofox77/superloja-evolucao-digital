@@ -441,7 +441,26 @@ const AdminConfiguracoes = () => {
       // Simulate update process
       await new Promise(resolve => setTimeout(resolve, 3000));
       
-      // Update current version
+      // Update current version in database
+      const { error: updateError } = await supabase
+        .from('settings')
+        .upsert({ 
+          key: 'system_settings', 
+          value: {
+            notifications_enabled: settings.notifications_enabled,
+            auto_backup: settings.auto_backup,
+            maintenance_mode: settings.maintenance_mode,
+            github_repo: settings.github_repo,
+            auto_update: settings.auto_update,
+            current_version: version
+          },
+          description: 'SYSTEM SETTINGS'
+        }, { 
+          onConflict: 'key' 
+        });
+
+      if (updateError) throw updateError;
+      
       setSettings(prev => ({ ...prev, current_version: version }));
       
       const successLog = {
