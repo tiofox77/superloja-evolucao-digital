@@ -200,15 +200,21 @@ const SolicitarProduto = () => {
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="contact_phone">Telefone *</Label>
-                    <Input
-                      id="contact_phone"
-                      value={formData.contact_phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
-                      placeholder="+244 900 000 000"
-                      pattern="^\+244\s[0-9]{3}\s[0-9]{3}\s[0-9]{3}$"
-                      title="Formato: +244 900 000 000"
-                      required
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                        +244
+                      </span>
+                      <Input
+                        id="contact_phone"
+                        value={formData.contact_phone}
+                        onChange={(e) => setFormData(prev => ({ ...prev, contact_phone: e.target.value }))}
+                        placeholder="900 000 000"
+                        className="pl-16"
+                        pattern="^[0-9]{3}\s[0-9]{3}\s[0-9]{3}$"
+                        title="Formato: 900 000 000"
+                        required
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="contact_email">Email para Contato</Label>
