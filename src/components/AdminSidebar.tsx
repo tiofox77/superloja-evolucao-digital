@@ -13,7 +13,8 @@ import {
   Activity,
   User,
   Layout,
-  Smartphone
+  Smartphone,
+  Gavel
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -101,6 +102,16 @@ const toolsItems = [
     title: 'Logs',
     url: '/admin/logs',
     icon: Activity,
+  },
+  {
+    title: 'Meta/Facebook',
+    url: '/admin/meta',
+    icon: Settings,
+  },
+  {
+    title: 'Leilões',
+    url: '/admin/leiloes',
+    icon: Gavel,
   },
   {
     title: 'Configurações',

@@ -30,8 +30,11 @@ import AdminRelatorios from "@/pages/admin/AdminRelatorios";
 import AdminRelatoriosProdutos from "@/pages/admin/AdminRelatoriosProdutos";
 import AdminLayoutEditor from "@/pages/admin/AdminLayoutEditor";
 import AdminPWA from "@/pages/admin/AdminPWA";
+import AdminMeta from "@/pages/admin/AdminMeta";
+import AdminLeiloes from "@/pages/admin/AdminLeiloes";
 import SolicitarProduto from "@/pages/SolicitarProduto";
 import Contato from "@/pages/Contato";
+import Leiloes from "@/pages/Leiloes";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
@@ -56,6 +59,7 @@ function App() {
               <Route path="/sobre" element={<Sobre />} />
               <Route path="/contato" element={<Contato />} />
               <Route path="/solicitar-produto" element={<SolicitarProduto />} />
+              <Route path="/leiloes" element={<Leiloes />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/cliente" element={<Cliente />} />
@@ -77,6 +81,8 @@ function App() {
                 <Route path="relatorios-produtos" element={<AdminRelatoriosProdutos />} />
                 <Route path="layout" element={<AdminLayoutEditor />} />
                 <Route path="pwa" element={<AdminPWA />} />
+                <Route path="meta" element={<AdminMeta />} />
+                <Route path="leiloes" element={<AdminLeiloes />} />
                 <Route path="logs" element={<AdminLogs />} />
               </Route>
               

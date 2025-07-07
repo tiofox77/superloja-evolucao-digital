@@ -44,6 +44,53 @@ export type Database = {
         }
         Relationships: []
       }
+      auction_bids: {
+        Row: {
+          bid_amount: number
+          bid_time: string
+          bidder_email: string
+          bidder_name: string
+          bidder_phone: string | null
+          created_at: string
+          id: string
+          is_winning: boolean | null
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          bid_amount: number
+          bid_time?: string
+          bidder_email: string
+          bidder_name: string
+          bidder_phone?: string | null
+          created_at?: string
+          id?: string
+          is_winning?: boolean | null
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          bid_amount?: number
+          bid_time?: string
+          bidder_email?: string
+          bidder_name?: string
+          bidder_phone?: string | null
+          created_at?: string
+          id?: string
+          is_winning?: boolean | null
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auction_bids_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cart_items: {
         Row: {
           created_at: string
@@ -109,6 +156,47 @@ export type Database = {
         }
         Relationships: []
       }
+      facebook_products: {
+        Row: {
+          created_at: string
+          facebook_product_id: string | null
+          id: string
+          last_sync_at: string | null
+          product_id: string
+          sync_error: string | null
+          sync_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          facebook_product_id?: string | null
+          id?: string
+          last_sync_at?: string | null
+          product_id: string
+          sync_error?: string | null
+          sync_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          facebook_product_id?: string | null
+          id?: string
+          last_sync_at?: string | null
+          product_id?: string
+          sync_error?: string | null
+          sync_status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facebook_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       layout_settings: {
         Row: {
           content: Json
@@ -132,6 +220,48 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           section_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      meta_settings: {
+        Row: {
+          access_token: string | null
+          app_id: string | null
+          app_secret: string | null
+          catalog_id: string | null
+          created_at: string
+          id: string
+          instagram_id: string | null
+          is_active: boolean | null
+          page_id: string | null
+          pixel_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          app_id?: string | null
+          app_secret?: string | null
+          catalog_id?: string | null
+          created_at?: string
+          id?: string
+          instagram_id?: string | null
+          is_active?: boolean | null
+          page_id?: string | null
+          pixel_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          app_id?: string | null
+          app_secret?: string | null
+          catalog_id?: string | null
+          created_at?: string
+          id?: string
+          instagram_id?: string | null
+          is_active?: boolean | null
+          page_id?: string | null
+          pixel_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -409,9 +539,14 @@ export type Database = {
       products: {
         Row: {
           active: boolean | null
+          auction_end_date: string | null
+          auction_start_date: string | null
+          auto_extend_minutes: number | null
+          bid_increment: number | null
           category_id: string | null
           colors: Json | null
           created_at: string
+          current_bid: number | null
           description: string | null
           digital_file_url: string | null
           dimensions: string | null
@@ -421,6 +556,7 @@ export type Database = {
           image_url: string | null
           images: string[] | null
           in_stock: boolean | null
+          is_auction: boolean | null
           is_digital: boolean | null
           license_key: string | null
           material: string | null
@@ -429,11 +565,13 @@ export type Database = {
           original_price: number | null
           price: number
           product_type: string | null
+          reserve_price: number | null
           seo_description: string | null
           seo_keywords: string | null
           seo_title: string | null
           sizes: Json | null
           slug: string
+          starting_bid: number | null
           stock_quantity: number | null
           updated_at: string
           variants: Json | null
@@ -441,9 +579,14 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          auction_end_date?: string | null
+          auction_start_date?: string | null
+          auto_extend_minutes?: number | null
+          bid_increment?: number | null
           category_id?: string | null
           colors?: Json | null
           created_at?: string
+          current_bid?: number | null
           description?: string | null
           digital_file_url?: string | null
           dimensions?: string | null
@@ -453,6 +596,7 @@ export type Database = {
           image_url?: string | null
           images?: string[] | null
           in_stock?: boolean | null
+          is_auction?: boolean | null
           is_digital?: boolean | null
           license_key?: string | null
           material?: string | null
@@ -461,11 +605,13 @@ export type Database = {
           original_price?: number | null
           price: number
           product_type?: string | null
+          reserve_price?: number | null
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
           sizes?: Json | null
           slug: string
+          starting_bid?: number | null
           stock_quantity?: number | null
           updated_at?: string
           variants?: Json | null
@@ -473,9 +619,14 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          auction_end_date?: string | null
+          auction_start_date?: string | null
+          auto_extend_minutes?: number | null
+          bid_increment?: number | null
           category_id?: string | null
           colors?: Json | null
           created_at?: string
+          current_bid?: number | null
           description?: string | null
           digital_file_url?: string | null
           dimensions?: string | null
@@ -485,6 +636,7 @@ export type Database = {
           image_url?: string | null
           images?: string[] | null
           in_stock?: boolean | null
+          is_auction?: boolean | null
           is_digital?: boolean | null
           license_key?: string | null
           material?: string | null
@@ -493,11 +645,13 @@ export type Database = {
           original_price?: number | null
           price?: number
           product_type?: string | null
+          reserve_price?: number | null
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
           sizes?: Json | null
           slug?: string
+          starting_bid?: number | null
           stock_quantity?: number | null
           updated_at?: string
           variants?: Json | null
