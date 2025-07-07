@@ -167,7 +167,7 @@ const Fatura = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <Button variant="ghost" asChild>
-            <Link to="/">
+            <Link to="/cliente">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Link>

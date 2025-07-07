@@ -109,33 +109,34 @@ export class ModernInvoicePDF {
 
   private async addHeader(data: InvoiceData) {
     // Company logo placeholder (if available)
-    this.addRect(this.margin, this.margin, 40, 25, '#f8f9fa', '#e5e5e5');
+    this.addRect(this.margin, this.margin, 35, 20, '#f8f9fa', '#e5e5e5');
     
-    // Company Info
-    this.addText(data.companyInfo.name.toUpperCase(), this.margin + 50, this.margin + 12, 16, 'left', 'bold');
-    this.addText(data.companyInfo.description, this.margin + 50, this.margin + 22, 10, 'left', 'normal', '#666666');
+    // Company Info (left side, below logo)
+    this.addText(data.companyInfo.name.toUpperCase(), this.margin, this.margin + 30, 14, 'left', 'bold');
+    this.addText(data.companyInfo.description, this.margin, this.margin + 42, 9, 'left', 'normal', '#666666');
 
     // Invoice title and number (right side)
-    this.addText('FATURA', this.pageWidth - this.margin, this.margin + 12, 18, 'right', 'bold');
-    this.addText(`Pedido Nº ${data.order.order_number?.toString().padStart(6, '0')}`, this.pageWidth - this.margin, this.margin + 22, 10, 'right', 'normal', '#666666');
+    const rightX = this.pageWidth - this.margin;
+    this.addText('FATURA', rightX, this.margin + 15, 16, 'right', 'bold');
+    this.addText(`Pedido Nº ${data.order.order_number?.toString().padStart(6, '0')}`, rightX, this.margin + 28, 10, 'right', 'normal', '#666666');
 
-    // Date and QR section
-    this.addText(`Data do Pedido`, this.pageWidth - this.margin, this.margin + 35, 9, 'right', 'normal', '#666666');
-    this.addText(this.formatDate(data.order.created_at), this.pageWidth - this.margin, this.margin + 45, 10, 'right', 'bold');
+    // Date section (right side, below invoice info)
+    this.addText('Data do Pedido', rightX, this.margin + 42, 8, 'right', 'normal', '#666666');
+    this.addText(this.formatDate(data.order.created_at), rightX, this.margin + 52, 10, 'right', 'bold');
 
-    // QR Code
+    // QR Code (bottom right)
     const qrUrl = `${window.location.origin}/fatura/${data.order.id}`;
     const qrDataUrl = await this.generateQRCode(qrUrl);
     
     if (qrDataUrl) {
-      this.doc.addImage(qrDataUrl, 'PNG', this.pageWidth - this.margin - 20, this.margin + 50, 20, 20);
-      this.addText('Verificar Online', this.pageWidth - this.margin - 10, this.margin + 75, 7, 'center', 'normal', '#666666');
+      this.doc.addImage(qrDataUrl, 'PNG', rightX - 25, this.margin + 60, 25, 25);
+      this.addText('Verificar Online', rightX - 12.5, this.margin + 90, 7, 'center', 'normal', '#666666');
     }
 
     // Bottom border for header
-    this.addLine(this.margin, this.margin + 85, this.pageWidth - this.margin, this.margin + 85, '#e5e5e5', 1);
+    this.addLine(this.margin, this.margin + 100, this.pageWidth - this.margin, this.margin + 100, '#e5e5e5', 1);
     
-    this.currentY = this.margin + 95;
+    this.currentY = this.margin + 110;
   }
 
   private addCustomerInfo(data: InvoiceData) {
