@@ -99,6 +99,9 @@ export const Header: React.FC = () => {
                 <Link to="/catalogo" className="text-foreground hover:text-primary transition-colors font-medium">
                   Catálogo
                 </Link>
+                <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium">
+                  Leilões
+                </Link>
                 <Link to="/categorias" className="text-foreground hover:text-primary transition-colors font-medium">
                   Categorias
                 </Link>
@@ -186,6 +189,9 @@ export const Header: React.FC = () => {
                 </Link>
                 <Link to="/catalogo" className="text-foreground hover:text-primary transition-colors font-medium py-2">
                   Catálogo
+                </Link>
+                <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                  Leilões
                 </Link>
                 <Link to="/categorias" className="text-foreground hover:text-primary transition-colors font-medium py-2">
                   Categorias
