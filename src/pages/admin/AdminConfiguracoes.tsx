@@ -107,6 +107,8 @@ const AdminConfiguracoes = () => {
   const [backupStatus, setBackupStatus] = useState('idle'); // idle, processing, success, error
   const [updateLogs, setUpdateLogs] = useState([]);
   const [availableVersions, setAvailableVersions] = useState([]);
+  const [phpSystemStatus, setPhpSystemStatus] = useState(null);
+  const [generatingConfig, setGeneratingConfig] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -515,6 +517,144 @@ const AdminConfiguracoes = () => {
       });
     }
   };
+
+  // Funções para sistema PHP
+  const generatePhpConfig = async () => {
+    setGeneratingConfig(true);
+    try {
+      const response = await fetch('/api/config-generator.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'generate_smtp_config',
+          config: {
+            smtp_host: settings.smtp_host,
+            smtp_port: settings.smtp_port,
+            smtp_user: settings.smtp_user,
+            smtp_password: settings.smtp_password,
+            smtp_from_email: settings.smtp_from_email,
+            smtp_from_name: settings.smtp_from_name,
+            smtp_use_tls: settings.smtp_use_tls
+          }
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao gerar configuração PHP');
+      }
+
+      toast({
+        title: "✅ Configuração PHP gerada!",
+        description: "Arquivo de configuração SMTP criado com sucesso."
+      });
+
+      checkPhpSystemStatus();
+
+    } catch (error) {
+      console.error('Erro ao gerar configuração PHP:', error);
+      toast({
+        title: "❌ Erro na configuração PHP",
+        description: error.message || "Não foi possível gerar a configuração PHP.",
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingConfig(false);
+    }
+  };
+
+  const generateHtaccess = async () => {
+    try {
+      const response = await fetch('/api/config-generator.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'generate_htaccess'
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao gerar .htaccess');
+      }
+
+      toast({
+        title: "✅ .htaccess gerado!",
+        description: "Arquivo .htaccess criado com configurações otimizadas."
+      });
+
+    } catch (error) {
+      console.error('Erro ao gerar .htaccess:', error);
+      toast({
+        title: "❌ Erro no .htaccess",
+        description: error.message || "Não foi possível gerar o arquivo .htaccess.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const checkPhpSystemStatus = async () => {
+    try {
+      const response = await fetch('/api/config-generator.php', {
+        method: 'GET'
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setPhpSystemStatus(result.data);
+      }
+
+    } catch (error) {
+      console.error('Erro ao verificar status PHP:', error);
+    }
+  };
+
+  const testPhpEmail = async () => {
+    try {
+      const response = await fetch('/api/send-email.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'welcome',
+          to: settings.contact_email,
+          userName: 'Teste do Sistema'
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Erro ao enviar email de teste');
+      }
+
+      toast({
+        title: "✅ Email de teste enviado!",
+        description: `Email enviado com sucesso para ${settings.contact_email}`
+      });
+
+    } catch (error) {
+      console.error('Erro no teste de email:', error);
+      toast({
+        title: "❌ Erro no teste de email",
+        description: error.message || "Não foi possível enviar o email de teste.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Carregar status PHP na inicialização
+  useEffect(() => {
+    checkPhpSystemStatus();
+  }, []);
 
   return (
     <div className="space-y-6 animate-fade-in">
