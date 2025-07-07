@@ -366,7 +366,7 @@ const AdminLeiloes = () => {
                       </div>
                     </div>
 
-                    <Button variant="outline" size="sm" onClick={() => loadBids(product.id)}>
+                    <Button variant="outline" size="sm" onClick={() => navigate('/admin/leiloes-bids')}>
                       <Eye className="w-4 h-4 mr-1" />
                       Ver Lances
                     </Button>

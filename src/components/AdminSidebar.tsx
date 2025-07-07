@@ -70,6 +70,16 @@ const menuItems = [
     url: '/admin/relatorios-produtos',
     icon: Package,
   },
+  {
+    title: 'Leilões',
+    url: '/admin/leiloes',
+    icon: Gavel,
+  },
+  {
+    title: 'Solicitações',
+    url: '/admin/solicitacoes',
+    icon: FileText,
+  },
 ];
 
 const toolsItems = [
@@ -107,16 +117,6 @@ const toolsItems = [
     title: 'Meta/Facebook',
     url: '/admin/meta',
     icon: Settings,
-  },
-  {
-    title: 'Leilões',
-    url: '/admin/leiloes',
-    icon: Gavel,
-  },
-  {
-    title: 'Solicitações',
-    url: '/admin/solicitacoes',
-    icon: FileText,
   },
   {
     title: 'Configurações',
