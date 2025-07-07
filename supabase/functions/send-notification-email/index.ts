@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { Resend } from 'npm:resend@2.0.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -133,26 +134,55 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (logError) throw logError;
 
-      // TODO: Here you would integrate with SMTP or email service
-      // For now, we'll simulate success/failure
-      const success = Math.random() > 0.1; // 90% success rate simulation
+      // Send email using Resend
+      const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
+      
+      let emailResult;
+      let updateData: any;
+      
+      try {
+        emailResult = await resend.emails.send({
+          from: 'SuperLoja <noreply@superloja.com>',
+          to: [to],
+          subject: title,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #4F46E5;">${title}</h2>
+              <p style="line-height: 1.6; color: #333;">${message.replace(/\n/g, '<br>')}</p>
+              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+              <p style="font-size: 12px; color: #666;">
+                Esta é uma mensagem automática da SuperLoja. Não responda a este email.
+              </p>
+            </div>
+          `,
+        });
 
-      // Update log with result
-      const updateData: any = {
-        status: success ? 'sent' : 'failed',
-        sent_at: success ? new Date().toISOString() : null,
-        provider_response: success 
-          ? { message_id: `msg_${Date.now()}`, status: 'delivered' }
-          : null,
-        error_message: success ? null : 'Simulated error: SMTP configuration not available'
-      };
+        updateData = {
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          provider_response: emailResult,
+          error_message: null
+        };
+
+        console.log('Email sent successfully:', emailResult);
+        
+      } catch (emailError: any) {
+        console.error('Error sending email:', emailError);
+        
+        updateData = {
+          status: 'failed',
+          sent_at: null,
+          provider_response: null,
+          error_message: emailError.message || 'Failed to send email'
+        };
+      }
 
       await supabase
         .from('notification_logs')
         .update(updateData)
         .eq('id', insertedLog.id);
 
-      console.log('Email notification processed:', success ? 'success' : 'failed');
+      console.log('Email notification processed:', updateData.status);
 
     } catch (logError) {
       console.error('Error logging notification:', logError);
