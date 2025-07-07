@@ -27,8 +27,11 @@ import AdminPromocoes from "@/pages/admin/AdminPromocoes";
 import AdminPerfil from "@/pages/admin/AdminPerfil";
 import AdminLogs from "@/pages/admin/AdminLogs";
 import AdminRelatorios from "@/pages/admin/AdminRelatorios";
+import AdminRelatoriosProdutos from "@/pages/admin/AdminRelatoriosProdutos";
 import AdminLayoutEditor from "@/pages/admin/AdminLayoutEditor";
 import AdminPWA from "@/pages/admin/AdminPWA";
+import SolicitarProduto from "@/pages/SolicitarProduto";
+import Contato from "@/pages/Contato";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
@@ -51,6 +54,8 @@ function App() {
               <Route path="/produto/:slug" element={<Produto />} />
               <Route path="/categorias" element={<Categorias />} />
               <Route path="/sobre" element={<Sobre />} />
+              <Route path="/contato" element={<Contato />} />
+              <Route path="/solicitar-produto" element={<SolicitarProduto />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/cliente" element={<Cliente />} />
@@ -69,6 +74,7 @@ function App() {
                 <Route path="configuracoes" element={<AdminConfiguracoes />} />
                 <Route path="promocoes" element={<AdminPromocoes />} />
                 <Route path="relatorios" element={<AdminRelatorios />} />
+                <Route path="relatorios-produtos" element={<AdminRelatoriosProdutos />} />
                 <Route path="layout" element={<AdminLayoutEditor />} />
                 <Route path="pwa" element={<AdminPWA />} />
                 <Route path="logs" element={<AdminLogs />} />

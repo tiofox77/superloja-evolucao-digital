@@ -361,6 +361,51 @@ export type Database = {
         }
         Relationships: []
       }
+      product_requests: {
+        Row: {
+          additional_notes: string | null
+          category: string | null
+          contact_email: string
+          contact_phone: string | null
+          created_at: string
+          description: string
+          estimated_price: number | null
+          id: string
+          images: string[] | null
+          product_name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          additional_notes?: string | null
+          category?: string | null
+          contact_email: string
+          contact_phone?: string | null
+          created_at?: string
+          description: string
+          estimated_price?: number | null
+          id?: string
+          images?: string[] | null
+          product_name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          additional_notes?: string | null
+          category?: string | null
+          contact_email?: string
+          contact_phone?: string | null
+          created_at?: string
+          description?: string
+          estimated_price?: number | null
+          id?: string
+          images?: string[] | null
+          product_name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           active: boolean | null

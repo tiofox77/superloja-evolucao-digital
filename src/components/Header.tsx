@@ -108,6 +108,9 @@ export const Header: React.FC = () => {
                 <Link to="/contato" className="text-foreground hover:text-primary transition-colors font-medium">
                   Contato
                 </Link>
+                <Link to="/solicitar-produto" className="text-foreground hover:text-primary transition-colors font-medium bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full">
+                  Solicitar Produto
+                </Link>
               </nav>
 
               {/* User actions */}

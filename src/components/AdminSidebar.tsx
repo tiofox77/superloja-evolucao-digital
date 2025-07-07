@@ -64,6 +64,11 @@ const menuItems = [
     url: '/admin/relatorios',
     icon: BarChart3,
   },
+  {
+    title: 'Relatórios Produtos',
+    url: '/admin/relatorios-produtos',
+    icon: Package,
+  },
 ];
 
 const toolsItems = [
