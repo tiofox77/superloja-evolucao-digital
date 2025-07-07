@@ -16,7 +16,7 @@ import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { useNotifications } from '@/hooks/useNotifications';
 
 const Checkout = () => {
-  const { items, totalAmount, clearCart } = useCart();
+  const { items, totalAmount, clearCart, setIsOpen } = useCart();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { createOrderNotification } = useNotifications();
@@ -39,6 +39,9 @@ const Checkout = () => {
   });
 
   useEffect(() => {
+    // Fechar carrinho quando entrar no checkout
+    setIsOpen(false);
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);

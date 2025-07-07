@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { useSettings } from '@/contexts/SettingsContext';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
+import { PromotionBanner } from '@/components/PromotionBanner';
 
 export const Header: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -37,12 +38,8 @@ export const Header: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-md border-b border-border shadow-card">
-        {/* Top bar */}
-        <div className="bg-primary text-primary-foreground py-2">
-          <div className="container mx-auto px-4 text-center text-sm">
-            <span className="animate-pulse">🔥 Ofertas Especiais - Até 50% OFF | Frete Grátis acima de R$ 299</span>
-          </div>
-        </div>
+        {/* Top bar com promoção */}
+        <PromotionBanner />
 
         {/* Main header */}
         <div className="container mx-auto px-4 py-4">

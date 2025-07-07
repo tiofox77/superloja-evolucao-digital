@@ -8,12 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { User, MapPin, ShoppingBag, Settings, LogOut, Eye, Package, Phone, FileText } from 'lucide-react';
+import { User, MapPin, ShoppingBag, Settings, LogOut, Eye, Package, Phone, FileText, Download } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
+import { DigitalProductArea } from '@/components/DigitalProductArea';
 
 const Cliente = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -208,7 +209,7 @@ const Cliente = () => {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile" className="flex items-center gap-2">
               <User className="w-4 h-4" />
               Perfil
@@ -216,6 +217,10 @@ const Cliente = () => {
             <TabsTrigger value="orders" className="flex items-center gap-2">
               <ShoppingBag className="w-4 h-4" />
               Pedidos
+            </TabsTrigger>
+            <TabsTrigger value="digital" className="flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              Digital
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
@@ -424,6 +429,20 @@ const Cliente = () => {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="digital">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="w-5 h-5" />
+                  Produtos Digitais & Serviços
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DigitalProductArea orders={orders} />
               </CardContent>
             </Card>
           </TabsContent>
