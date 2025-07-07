@@ -1,22 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Header } from '@/components/Header';
-import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { ShoppingBag, Users, Package, DollarSign, ShoppingCart, BarChart3 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 const Admin = () => {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -26,72 +18,8 @@ const Admin = () => {
   });
 
   useEffect(() => {
-    console.log('Admin useEffect iniciado');
-    
-    const checkAuthAndRole = async (session: any) => {
-      if (!session?.user) {
-        navigate('/auth');
-        setLoading(false);
-        return;
-      }
-
-      // Acesso direto para admin conhecido
-      if (session.user.email === 'carlosfox1782@gmail.com') {
-        console.log('Admin access granted');
-        setIsAdmin(true);
-        setLoading(false); // CRÍTICO: definir loading false ANTES de loadStats
-        
-        // Carregar stats sem bloquear
-        setTimeout(async () => {
-          try {
-            await loadStats();
-            console.log('Stats loaded');
-          } catch (err) {
-            console.log('Stats error:', err);
-          }
-        }, 100);
-        
-        return;
-      }
-
-      // Para outros usuários
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-          
-        if (profile?.role === 'admin') {
-          setIsAdmin(true);
-        } else {
-          navigate('/');
-        }
-      } catch {
-        navigate('/auth');
-      }
-      
-      setLoading(false);
-    };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, !!session);
-        setSession(session);
-        setUser(session?.user ?? null);
-        await checkAuthAndRole(session);
-      }
-    );
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('Sessão inicial obtida:', !!session);
-      setSession(session);
-      setUser(session?.user ?? null);
-      await checkAuthAndRole(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate, toast]);
+    loadStats();
+  }, []);
 
   const loadStats = async () => {
     try {
@@ -109,6 +37,8 @@ const Admin = () => {
     } catch (error) {
       console.error('Stats error:', error);
       setStats({ totalOrders: 0, totalUsers: 0, totalProducts: 0, totalRevenue: 0 });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -120,8 +50,15 @@ const Admin = () => {
     }).format(price);
   };
 
-  if (!isAdmin) {
-    return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando dados...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
