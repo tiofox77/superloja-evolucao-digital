@@ -48,6 +48,7 @@ import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
+import { ScrollToTop } from "@/components/ScrollToTop";
 
 function App() {
   return (
@@ -56,6 +57,7 @@ function App() {
         <LayoutProvider>
           <CartProvider>
         <Router>
+          <ScrollToTop />
           <div className="min-h-screen bg-background pb-16 md:pb-0">
             <AnalyticsTracker />
             <PWAInstallPrompt />
