@@ -114,6 +114,11 @@ const toolsItems = [
     icon: Gavel,
   },
   {
+    title: 'Solicitações',
+    url: '/admin/solicitacoes',
+    icon: FileText,
+  },
+  {
     title: 'Configurações',
     url: '/admin/configuracoes',
     icon: Settings,

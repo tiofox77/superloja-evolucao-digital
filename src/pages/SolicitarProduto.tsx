@@ -240,14 +240,16 @@ const SolicitarProduto = () => {
                       className="hidden"
                       id="image-upload"
                     />
-                    <label htmlFor="image-upload" className="cursor-pointer">
+                    <label htmlFor="image-upload" className="cursor-pointer w-full">
                       <div className="flex flex-col items-center gap-2">
                         <ImageIcon className="h-12 w-12 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">Clique para enviar imagens ou arraste aqui</p>
-                        <Button type="button" variant="outline" size="sm">
-                          <Upload className="h-4 w-4 mr-2" />
-                          Escolher Arquivos
-                        </Button>
+                        <div className="w-full">
+                          <Button type="button" variant="outline" size="sm" className="w-full pointer-events-none">
+                            <Upload className="h-4 w-4 mr-2" />
+                            Escolher Arquivos
+                          </Button>
+                        </div>
                       </div>
                     </label>
                   </div>

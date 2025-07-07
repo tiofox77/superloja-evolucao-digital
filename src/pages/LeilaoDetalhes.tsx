@@ -90,6 +90,7 @@ const LeilaoDetalhes = () => {
   useEffect(() => {
     if (product && user) {
       loadBids(product.id);
+      loadUserProfile();
       const minBid = (product.current_bid || product.starting_bid || 0) + (product.bid_increment || 1);
       setBidForm(prev => ({ 
         ...prev, 
@@ -99,6 +100,27 @@ const LeilaoDetalhes = () => {
       }));
     }
   }, [product, user]);
+
+  const loadUserProfile = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!error && data?.phone) {
+        setBidForm(prev => ({ 
+          ...prev, 
+          bidder_phone: data.phone
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar perfil:', error);
+    }
+  };
 
   const loadProduct = async () => {
     try {
@@ -447,12 +469,18 @@ const LeilaoDetalhes = () => {
                           
                           <div className="space-y-2">
                             <Label htmlFor="bidder_phone">Telefone</Label>
-                            <Input
-                              id="bidder_phone"
-                              value={bidForm.bidder_phone}
-                              onChange={(e) => setBidForm({...bidForm, bidder_phone: e.target.value})}
-                              placeholder="+244 900 000 000"
-                            />
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                                +244
+                              </span>
+                              <Input
+                                id="bidder_phone"
+                                value={bidForm.bidder_phone}
+                                onChange={(e) => setBidForm({...bidForm, bidder_phone: e.target.value})}
+                                placeholder="900 000 000"
+                                className="pl-16"
+                              />
+                            </div>
                           </div>
                           
                           <div className="space-y-2">

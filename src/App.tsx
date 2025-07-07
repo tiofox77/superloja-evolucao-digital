@@ -33,6 +33,8 @@ import AdminPWA from "@/pages/admin/AdminPWA";
 import AdminMeta from "@/pages/admin/AdminMeta";
 import AdminLeiloes from "@/pages/admin/AdminLeiloes";
 import AdminCriarLeilao from "@/pages/admin/AdminCriarLeilao";
+import AdminLeiloesBids from "@/pages/admin/AdminLeiloesBids";
+import AdminSolicitacoes from "@/pages/admin/AdminSolicitacoes";
 import SolicitarProduto from "@/pages/SolicitarProduto";
 import Contato from "@/pages/Contato";
 import Leiloes from "@/pages/Leiloes";
@@ -86,7 +88,9 @@ function App() {
                 <Route path="pwa" element={<AdminPWA />} />
                 <Route path="meta" element={<AdminMeta />} />
                 <Route path="leiloes" element={<AdminLeiloes />} />
+                <Route path="leiloes-bids" element={<AdminLeiloesBids />} />
                 <Route path="criar-leilao" element={<AdminCriarLeilao />} />
+                <Route path="solicitacoes" element={<AdminSolicitacoes />} />
                 <Route path="logs" element={<AdminLogs />} />
               </Route>
               

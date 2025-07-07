@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, ShoppingCart, Menu, X, User, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import NotificationBell from '@/components/NotificationBell';
 import { CartSidebar } from './CartSidebar';
 import { useCart } from '@/contexts/CartContext';
@@ -18,6 +18,7 @@ export const Header: React.FC = () => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const { itemCount, setIsOpen } = useCart();
   const { settings } = useSettings();
+  const location = useLocation();
 
   useEffect(() => {
     // Get initial session
@@ -85,22 +86,52 @@ export const Header: React.FC = () => {
             <div className="flex items-center space-x-4">
             {/* Desktop Menu */}
             <nav className="hidden lg:flex items-center space-x-6">
-              <Link to="/catalogo" className="text-foreground hover:text-primary transition-colors font-medium">
+              <Link 
+                to="/catalogo" 
+                className={`text-foreground hover:text-primary transition-colors font-medium ${
+                  location.pathname === '/catalogo' ? 'text-primary border-b-2 border-primary pb-1' : ''
+                }`}
+              >
                 Catálogo
               </Link>
-              <Link to="/categorias" className="text-foreground hover:text-primary transition-colors font-medium">
+              <Link 
+                to="/categorias" 
+                className={`text-foreground hover:text-primary transition-colors font-medium ${
+                  location.pathname === '/categorias' ? 'text-primary border-b-2 border-primary pb-1' : ''
+                }`}
+              >
                 Categorias
               </Link>
-              <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full">
+              <Link 
+                to="/leiloes" 
+                className={`text-foreground hover:text-primary transition-colors font-medium bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full ${
+                  location.pathname.includes('/leilao') ? 'bg-primary text-primary-foreground' : ''
+                }`}
+              >
                 Leilões
               </Link>
-              <Link to="/solicitar-produto" className="text-foreground hover:text-primary transition-colors font-medium">
+              <Link 
+                to="/solicitar-produto" 
+                className={`text-foreground hover:text-primary transition-colors font-medium ${
+                  location.pathname === '/solicitar-produto' ? 'text-primary border-b-2 border-primary pb-1' : ''
+                }`}
+              >
                 Solicitar
               </Link>
-              <Link to="/sobre" className="text-foreground hover:text-primary transition-colors font-medium">
+              <Link 
+                to="/sobre" 
+                className={`text-foreground hover:text-primary transition-colors font-medium ${
+                  location.pathname === '/sobre' ? 'text-primary border-b-2 border-primary pb-1' : ''
+                }`}
+              >
                 Sobre
               </Link>
-              <Link to="/contato" className="text-foreground hover:text-primary transition-colors font-medium">
+              <Link 
+                to="/contato" 
+                className={`text-foreground hover:text-primary transition-colors font-medium ${
+                  location.pathname === '/contato' ? 'text-primary border-b-2 border-primary pb-1' : ''
+                }`}
+              >
                 Contato
               </Link>
             </nav>
