@@ -27,8 +27,9 @@ interface InvoiceData {
       image_url?: string;
     };
   }>;
-  companyInfo?: {
+  companyInfo: {
     name: string;
+    description: string;
     address: string;
     phone: string;
     email: string;
@@ -107,10 +108,10 @@ export class ModernInvoicePDF {
     this.addRect(this.margin, this.margin, 50, 30, '#f8f9fa');
     
     // Company Info
-    this.addText('SUPERLOJA ANGOLA', this.margin + 60, this.margin + 15, 18, 'left', 'bold');
-    this.addText('Tecnologia & Inovação', this.margin + 60, this.margin + 25, 10);
-    this.addText('Rua dos Coqueiros, 123, Luanda', this.margin + 60, this.margin + 35, 8);
-    this.addText('Tel: +244 923 456 789 | Email: contato@superloja.ao', this.margin + 60, this.margin + 42, 8);
+    this.addText(data.companyInfo.name.toUpperCase(), this.margin + 60, this.margin + 15, 18, 'left', 'bold');
+    this.addText(data.companyInfo.description, this.margin + 60, this.margin + 25, 10);
+    this.addText(data.companyInfo.address, this.margin + 60, this.margin + 35, 8);
+    this.addText(`Tel: ${data.companyInfo.phone} | Email: ${data.companyInfo.email}`, this.margin + 60, this.margin + 42, 8);
 
     // Invoice Info (Right side)
     const rightX = this.pageWidth - this.margin - 60;
@@ -267,8 +268,8 @@ export class ModernInvoicePDF {
     this.addLine(this.margin, footerY - 10, this.pageWidth - this.margin, footerY - 10, '#cccccc');
     
     this.addText('Obrigado pela sua preferência!', this.pageWidth / 2, footerY, 12, 'center', 'bold');
-    this.addText('SuperLoja Angola - A sua loja de tecnologia de confiança', this.pageWidth / 2, footerY + 8, 10, 'center');
-    this.addText('Para dúvidas ou suporte: contato@superloja.ao | +244 923 456 789', this.pageWidth / 2, footerY + 16, 8, 'center');
+    this.addText(`${data.companyInfo.name} - ${data.companyInfo.description}`, this.pageWidth / 2, footerY + 8, 10, 'center');
+    this.addText(`Para dúvidas ou suporte: ${data.companyInfo.email} | ${data.companyInfo.phone}`, this.pageWidth / 2, footerY + 16, 8, 'center');
     
     // Page number
     this.addText(`Página ${this.doc.getCurrentPageInfo().pageNumber}`, this.pageWidth - this.margin, footerY + 20, 8, 'right');
@@ -304,10 +305,10 @@ export class ModernInvoicePDF {
 
     try {
       // Header
-      this.addText('SUPERLOJA ANGOLA', this.pageWidth / 2, this.currentY, 12, 'center', 'bold');
-      this.currentY += 8;
-      this.addText('Recibo de Venda', this.pageWidth / 2, this.currentY, 10, 'center');
-      this.currentY += 12;
+      this.addText(data.companyInfo.name.toUpperCase(), this.pageWidth / 2, this.currentY, 11, 'center', 'bold');
+      this.currentY += 6;
+      this.addText('Recibo de Venda', this.pageWidth / 2, this.currentY, 9, 'center');
+      this.currentY += 10;
 
       // Order info
       this.addText(`Pedido: ${data.order.order_number}`, this.margin, this.currentY, 9);
@@ -393,9 +394,43 @@ export const generateModernInvoicePDF = async (orderId: string, isReceipt: boole
 
     if (itemsError) throw itemsError;
 
+    // Fetch company settings
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('settings')
+      .select('*');
+
+    if (settingsError) throw settingsError;
+
+    // Parse settings
+    const companyInfo = {
+      name: 'SuperLoja',
+      description: 'Tecnologia & Inovação',
+      address: 'Luanda, Angola',
+      phone: '+244 942 705 533',
+      email: 'contato@superloja.com',
+      website: '',
+      logo: null
+    };
+
+    settingsData?.forEach(setting => {
+      const value = setting.value as any;
+      if (setting.key === 'store_info') {
+        companyInfo.name = value.name || companyInfo.name;
+        companyInfo.description = value.description || companyInfo.description;
+        companyInfo.logo = value.logo_url;
+      } else if (setting.key === 'contact_info') {
+        companyInfo.email = value.email || companyInfo.email;
+        companyInfo.phone = value.phone || companyInfo.phone;
+        companyInfo.address = value.address || companyInfo.address;
+      } else if (setting.key === 'business_info') {
+        companyInfo.website = value.website || '';
+      }
+    });
+
     const invoiceData: InvoiceData = {
       order: orderData,
-      items: itemsData || []
+      items: itemsData || [],
+      companyInfo
     };
 
     const pdfGenerator = new ModernInvoicePDF();

@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Download, Printer, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Download, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
 import { generateModernInvoicePDF } from '@/components/ModernInvoicePDF';
+import { useSettings } from '@/contexts/SettingsContext';
 
 interface Order {
   id: string;
@@ -45,6 +46,7 @@ const Fatura = () => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { settings } = useSettings();
 
   useEffect(() => {
     if (orderId) {
@@ -129,36 +131,6 @@ const Fatura = () => {
     );
   };
 
-  const handlePrint = () => {
-    const printContent = document.getElementById('invoice-content');
-    if (printContent) {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Fatura - Pedido #${order?.id.slice(-6)}</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                .invoice-header { text-align: center; margin-bottom: 30px; }
-                .invoice-details { margin-bottom: 20px; }
-                .items-table { width: 100%; border-collapse: collapse; }
-                .items-table th, .items-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                .items-table th { background-color: #f5f5f5; }
-                .total-section { margin-top: 20px; text-align: right; font-weight: bold; }
-                @media print { .no-print { display: none; } }
-              </style>
-            </head>
-            <body>
-              ${printContent.innerHTML}
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-      }
-    }
-  };
 
   if (loading) {
     return (
@@ -216,10 +188,6 @@ const Fatura = () => {
               <Download className="w-4 h-4 mr-2" />
               Recibo PDF
             </Button>
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir
-            </Button>
           </div>
         </div>
 
@@ -227,10 +195,14 @@ const Fatura = () => {
           <Card className="max-w-4xl mx-auto">
             <CardHeader className="text-center border-b">
               <div className="flex items-center justify-center gap-4 mb-4">
-                <SuperLojaAvatar size="lg" interactive={false} />
+                <SuperLojaAvatar 
+                  src={settings.logo_url} 
+                  size="lg" 
+                  interactive={false} 
+                />
                 <div>
-                  <CardTitle className="text-2xl">SuperLoja</CardTitle>
-                  <p className="text-muted-foreground">Tecnologia & Inovação</p>
+                  <CardTitle className="text-2xl">{settings.store_name}</CardTitle>
+                  <p className="text-muted-foreground">{settings.store_description}</p>
                 </div>
               </div>
               <div className="flex justify-between items-center">
@@ -351,8 +323,8 @@ const Fatura = () => {
               <Separator />
               <div className="text-center text-sm text-muted-foreground">
                 <p>Obrigado pela sua compra!</p>
-                <p>SuperLoja - Luanda, Angola</p>
-                <p>Telefone: +244 900 000 000 | Email: contato@superloja.com</p>
+                <p>{settings.store_name} - {settings.address}</p>
+                <p>Telefone: {settings.contact_phone} | Email: {settings.contact_email}</p>
               </div>
             </CardContent>
           </Card>
