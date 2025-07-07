@@ -12,7 +12,8 @@ import {
   FileText,
   Activity,
   User,
-  Layout
+  Layout,
+  Smartphone
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -75,6 +76,11 @@ const toolsItems = [
     title: 'Editor de Layout',
     url: '/admin/layout',
     icon: Layout,
+  },
+  {
+    title: 'PWA',
+    url: '/admin/pwa',
+    icon: Smartphone,
   },
   {
     title: 'Upload de Imagens',

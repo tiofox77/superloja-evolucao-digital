@@ -555,6 +555,90 @@ export type Database = {
         }
         Relationships: []
       }
+      pwa_settings: {
+        Row: {
+          app_shortcuts: Json | null
+          background_color: string
+          categories: string[] | null
+          created_at: string
+          description: string
+          display: string
+          icon_192: string | null
+          icon_512: string | null
+          icon_maskable: string | null
+          id: string
+          install_prompt_delay: number | null
+          install_prompt_enabled: boolean | null
+          lang: string
+          name: string
+          offline_cache_strategy: string | null
+          offline_page_enabled: boolean | null
+          orientation: string
+          push_notifications_enabled: boolean | null
+          scope: string
+          screenshots: Json | null
+          share_target: Json | null
+          short_name: string
+          start_url: string
+          theme_color: string
+          updated_at: string
+        }
+        Insert: {
+          app_shortcuts?: Json | null
+          background_color?: string
+          categories?: string[] | null
+          created_at?: string
+          description?: string
+          display?: string
+          icon_192?: string | null
+          icon_512?: string | null
+          icon_maskable?: string | null
+          id?: string
+          install_prompt_delay?: number | null
+          install_prompt_enabled?: boolean | null
+          lang?: string
+          name?: string
+          offline_cache_strategy?: string | null
+          offline_page_enabled?: boolean | null
+          orientation?: string
+          push_notifications_enabled?: boolean | null
+          scope?: string
+          screenshots?: Json | null
+          share_target?: Json | null
+          short_name?: string
+          start_url?: string
+          theme_color?: string
+          updated_at?: string
+        }
+        Update: {
+          app_shortcuts?: Json | null
+          background_color?: string
+          categories?: string[] | null
+          created_at?: string
+          description?: string
+          display?: string
+          icon_192?: string | null
+          icon_512?: string | null
+          icon_maskable?: string | null
+          id?: string
+          install_prompt_delay?: number | null
+          install_prompt_enabled?: boolean | null
+          lang?: string
+          name?: string
+          offline_cache_strategy?: string | null
+          offline_page_enabled?: boolean | null
+          orientation?: string
+          push_notifications_enabled?: boolean | null
+          scope?: string
+          screenshots?: Json | null
+          share_target?: Json | null
+          short_name?: string
+          start_url?: string
+          theme_color?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reports: {
         Row: {
           created_at: string

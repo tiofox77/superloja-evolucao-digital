@@ -4,6 +4,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { LayoutProvider } from "@/contexts/LayoutContext";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { MobileNavbar } from "@/components/MobileNavbar";
 import Index from "@/pages/Index";
 import Catalogo from "@/pages/Catalogo";
 import Produto from "@/pages/Produto";
@@ -26,6 +28,7 @@ import AdminPerfil from "@/pages/admin/AdminPerfil";
 import AdminLogs from "@/pages/admin/AdminLogs";
 import AdminRelatorios from "@/pages/admin/AdminRelatorios";
 import AdminLayoutEditor from "@/pages/admin/AdminLayoutEditor";
+import AdminPWA from "@/pages/admin/AdminPWA";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
@@ -38,8 +41,9 @@ function App() {
         <LayoutProvider>
           <CartProvider>
         <Router>
-          <div className="min-h-screen bg-background">
+          <div className="min-h-screen bg-background pb-16 md:pb-0">
             <AnalyticsTracker />
+            <PWAInstallPrompt />
             <Suspense fallback={<div>Loading...</div>}>
               <Routes>
               <Route path="/" element={<Index />} />
@@ -66,14 +70,16 @@ function App() {
                 <Route path="promocoes" element={<AdminPromocoes />} />
                 <Route path="relatorios" element={<AdminRelatorios />} />
                 <Route path="layout" element={<AdminLayoutEditor />} />
+                <Route path="pwa" element={<AdminPWA />} />
                 <Route path="logs" element={<AdminLogs />} />
               </Route>
               
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </Suspense>
-        </div>
-        <Toaster />
+            </Suspense>
+            <MobileNavbar />
+          </div>
+          <Toaster />
         </Router>
       </CartProvider>
       </LayoutProvider>
