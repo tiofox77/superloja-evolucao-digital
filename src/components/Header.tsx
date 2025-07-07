@@ -45,25 +45,32 @@ export const Header: React.FC = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             {/* Logo */}
-            <Link to="/" className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
+            <Link to="/" className="flex items-center space-x-4 group">
+              <div className="flex items-center space-x-3 p-2 rounded-xl hover:bg-muted/50 transition-all duration-300">
                 {settings.logo_url ? (
-                  <SuperLojaAvatar 
-                    src={settings.logo_url} 
-                    alt={settings.store_name}
-                    size="md"
-                    className="rounded-lg"
-                  />
+                  <div className="relative">
+                    <SuperLojaAvatar 
+                      src={settings.logo_url} 
+                      alt={settings.store_name}
+                      size="lg"
+                      className="rounded-xl shadow-lg group-hover:shadow-xl transition-all duration-300"
+                    />
+                    <div className="absolute inset-0 rounded-xl ring-2 ring-primary/20 ring-offset-2 ring-offset-background opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </div>
                 ) : (
-                  <div className="w-10 h-10 hero-gradient rounded-lg flex items-center justify-center">
-                    <span className="text-white font-bold text-xl">
+                  <div className="w-12 h-12 hero-gradient rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300">
+                    <span className="text-white font-bold text-2xl">
                       {settings.store_name.charAt(0)}
                     </span>
                   </div>
                 )}
-                <div>
-                  <h1 className="text-xl font-bold text-foreground">{settings.store_name}</h1>
-                  <p className="text-xs text-muted-foreground">{settings.store_description}</p>
+                <div className="space-y-0.5">
+                  <h1 className="text-2xl font-bold bg-hero-gradient bg-clip-text text-transparent">
+                    {settings.store_name}
+                  </h1>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    {settings.store_description}
+                  </p>
                 </div>
               </div>
             </Link>

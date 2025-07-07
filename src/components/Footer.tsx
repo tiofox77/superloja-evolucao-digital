@@ -68,23 +68,32 @@ export const Footer = () => {
         <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8">
           {/* Brand section */}
           <div className="space-y-6">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all duration-300">
               {settings.logo_url ? (
-                <img src={settings.logo_url} alt={settings.store_name} className="h-10 w-auto" />
+                <div className="relative">
+                  <img 
+                    src={settings.logo_url} 
+                    alt={settings.store_name} 
+                    className="h-16 w-auto rounded-lg shadow-lg" 
+                  />
+                  <div className="absolute inset-0 rounded-lg ring-2 ring-primary/20 ring-offset-2 ring-offset-background"></div>
+                </div>
               ) : (
-                <img src={logoImage} alt="SuperLoja" className="h-10 w-auto" />
+                <div className="h-16 w-16 hero-gradient rounded-lg flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-2xl">
+                    {settings.store_name.charAt(0)}
+                  </span>
+                </div>
               )}
-              <div>
-                <h3 className="text-xl font-bold bg-hero-gradient bg-clip-text text-transparent">
+              <div className="space-y-1">
+                <h3 className="text-2xl font-bold bg-hero-gradient bg-clip-text text-transparent">
                   {settings.store_name.toUpperCase()}
                 </h3>
-                <p className="text-xs text-muted-foreground">{settings.store_description}</p>
+                <p className="text-sm text-muted-foreground font-medium">
+                  {settings.store_description}
+                </p>
               </div>
             </div>
-            
-            <p className="text-muted-foreground leading-relaxed">
-              {settings.store_description}
-            </p>
 
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-sm">
@@ -238,9 +247,6 @@ export const Footer = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-muted-foreground text-center md:text-left">
               © 2024 {settings.store_name}. Todos os direitos reservados.
-            </p>
-            <p className="text-sm text-muted-foreground text-center md:text-right">
-              Desenvolvido com ❤️ em Angola
             </p>
           </div>
         </div>
