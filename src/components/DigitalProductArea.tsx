@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Download, FileText, Key, Service, Eye } from 'lucide-react';
+import { Download, FileText, Key, Settings, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -110,7 +110,7 @@ export const DigitalProductArea: React.FC<DigitalProductAreaProps> = ({ orders }
       case 'digital':
         return <Download className="w-5 h-5" />;
       case 'service':
-        return <Service className="w-5 h-5" />;
+        return <Settings className="w-5 h-5" />;
       default:
         return <FileText className="w-5 h-5" />;
     }
@@ -197,7 +197,7 @@ export const DigitalProductArea: React.FC<DigitalProductAreaProps> = ({ orders }
             {product.product_type === 'service' && (
               <div className="p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <Service className="w-4 h-4 text-primary" />
+                  <Settings className="w-4 h-4 text-primary" />
                   <span className="text-sm font-medium">Serviço Contratado</span>
                 </div>
                 <p className="text-sm text-muted-foreground">

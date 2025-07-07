@@ -11,7 +11,8 @@ import {
   Upload,
   FileText,
   Activity,
-  User
+  User,
+  Layout
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -69,6 +70,11 @@ const toolsItems = [
     title: 'Meu Perfil',
     url: '/admin/perfil',
     icon: User,
+  },
+  {
+    title: 'Editor de Layout',
+    url: '/admin/layout',
+    icon: Layout,
   },
   {
     title: 'Upload de Imagens',

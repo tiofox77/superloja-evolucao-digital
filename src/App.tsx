@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { LayoutProvider } from "@/contexts/LayoutContext";
 import Index from "@/pages/Index";
 import Catalogo from "@/pages/Catalogo";
 import Produto from "@/pages/Produto";
@@ -24,6 +25,7 @@ import AdminPromocoes from "@/pages/admin/AdminPromocoes";
 import AdminPerfil from "@/pages/admin/AdminPerfil";
 import AdminLogs from "@/pages/admin/AdminLogs";
 import AdminRelatorios from "@/pages/admin/AdminRelatorios";
+import AdminLayoutEditor from "@/pages/admin/AdminLayoutEditor";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
@@ -33,7 +35,8 @@ function App() {
   return (
     <HelmetProvider>
       <SettingsProvider>
-        <CartProvider>
+        <LayoutProvider>
+          <CartProvider>
         <Router>
           <div className="min-h-screen bg-background">
             <AnalyticsTracker />
@@ -62,6 +65,7 @@ function App() {
                 <Route path="configuracoes" element={<AdminConfiguracoes />} />
                 <Route path="promocoes" element={<AdminPromocoes />} />
                 <Route path="relatorios" element={<AdminRelatorios />} />
+                <Route path="layout" element={<AdminLayoutEditor />} />
                 <Route path="logs" element={<AdminLogs />} />
               </Route>
               
@@ -72,6 +76,7 @@ function App() {
         <Toaster />
         </Router>
       </CartProvider>
+      </LayoutProvider>
       </SettingsProvider>
     </HelmetProvider>
   );

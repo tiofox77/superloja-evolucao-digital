@@ -6,10 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { MapPin, Phone, Mail, Clock, Send } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { MapPin, Phone, Mail, Clock, Send, MessageCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useLayout } from '@/contexts/LayoutContext';
+import { SEOHead } from '@/components/SEOHead';
 
 const Contato = () => {
+  const { getLayoutSetting, loading } = useLayout();
+  const contactSettings = getLayoutSetting('contact');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -50,6 +55,18 @@ const Contato = () => {
     setIsSubmitting(false);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   const contactInfo = [
     {
       icon: MapPin,
@@ -75,6 +92,10 @@ const Contato = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead 
+        title={contactSettings?.title || "Contato - SuperLoja"}
+        description="Entre em contato conosco. Estamos prontos para ajudar você com os melhores produtos tecnológicos."
+      />
       <Header />
       
       <main>
@@ -82,11 +103,10 @@ const Contato = () => {
         <section className="hero-gradient text-white py-20">
           <div className="container mx-auto px-4 text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 animate-fade-in">
-              Entre em Contato
+              {contactSettings?.title || 'Entre em Contato'}
             </h1>
             <p className="text-xl md:text-2xl max-w-3xl mx-auto leading-relaxed animate-fade-in opacity-90">
-              Estamos aqui para ajudar! Fale conosco através dos canais abaixo 
-              ou envie uma mensagem diretamente.
+              {contactSettings?.subtitle || 'Estamos aqui para ajudar! Fale conosco através dos canais abaixo ou envie uma mensagem diretamente.'}
             </p>
           </div>
         </section>
@@ -95,17 +115,52 @@ const Contato = () => {
         <section className="py-16 bg-muted/30">
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {contactInfo.map((item, index) => (
+              {contactSettings?.contact_methods?.map((method: any, index: number) => (
                 <Card key={index} className="text-center animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
                   <CardContent className="p-6">
                     <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <item.icon className="w-6 h-6 text-primary" />
+                      {method.type === 'phone' && <Phone className="w-6 h-6 text-primary" />}
+                      {method.type === 'email' && <Mail className="w-6 h-6 text-primary" />}
+                      {method.type === 'whatsapp' && <MessageCircle className="w-6 h-6 text-primary" />}
+                      {method.type === 'address' && <MapPin className="w-6 h-6 text-primary" />}
                     </div>
-                    <h3 className="font-semibold text-foreground mb-2">{item.title}</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">{item.info}</p>
+                    <h3 className="font-semibold text-foreground mb-2">{method.label}</h3>
+                    <p className="text-sm text-muted-foreground">{method.value}</p>
                   </CardContent>
                 </Card>
               ))}
+              
+              {/* Horários de Funcionamento */}
+              {contactSettings?.business_hours && (
+                <Card className="text-center animate-fade-in">
+                  <CardContent className="p-6">
+                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Clock className="w-6 h-6 text-primary" />
+                    </div>
+                    <h3 className="font-semibold text-foreground mb-2">Horário</h3>
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span>Seg-Sex:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {contactSettings.business_hours.weekdays}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Sábado:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {contactSettings.business_hours.saturday}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Domingo:</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {contactSettings.business_hours.sunday}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </section>
