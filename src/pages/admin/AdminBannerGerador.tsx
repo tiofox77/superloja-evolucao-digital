@@ -43,7 +43,8 @@ const AdminBannerGerador: React.FC = () => {
     textColor: '#ffffff',
     showPrice: true,
     showWebsite: true,
-    template: 'gradient'
+    template: 'gradient',
+    productWhiteBackground: false
   });
 
   // Carregar produtos
@@ -123,21 +124,44 @@ const AdminBannerGerador: React.FC = () => {
   };
 
   const downloadBanner = async () => {
-    if (!bannerRef.current) return;
+    console.log('Download button clicked!');
+    console.log('bannerRef.current:', bannerRef.current);
+    
+    if (!bannerRef.current) {
+      console.log('bannerRef.current is null, returning');
+      toast({ 
+        variant: 'destructive',
+        title: 'Erro', 
+        description: 'Elemento do banner não encontrado.' 
+      });
+      return;
+    }
 
     try {
+      console.log('Starting banner generation...');
       toast({ title: 'Gerando imagem...', description: 'Aguarde alguns segundos.' });
+
+      // Temporariamente remove o transform do preview para captura
+      const originalTransform = bannerRef.current.style.transform;
+      bannerRef.current.style.transform = 'none';
 
       const canvas = await html2canvas(bannerRef.current, {
         width: bannerStyle.width,
         height: bannerStyle.height,
-        scale: 2,
+        scale: 1,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: null
+        backgroundColor: null,
+        logging: true
       });
 
+      // Restaura o transform original
+      bannerRef.current.style.transform = originalTransform;
+
+      console.log('Canvas created successfully');
+      
       canvas.toBlob((blob) => {
+        console.log('Blob created:', blob);
         if (blob) {
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
@@ -148,7 +172,11 @@ const AdminBannerGerador: React.FC = () => {
           document.body.removeChild(link);
           URL.revokeObjectURL(url);
           
+          console.log('Download completed successfully');
           toast({ title: 'Sucesso!', description: 'Banner baixado com sucesso.' });
+        } else {
+          console.log('Failed to create blob');
+          throw new Error('Falha ao criar blob');
         }
       }, 'image/png');
 
@@ -283,6 +311,14 @@ const AdminBannerGerador: React.FC = () => {
                     <Label>Mostrar Website</Label>
                   </div>
 
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      checked={bannerStyle.productWhiteBackground}
+                      onCheckedChange={(checked) => handleStyleChange('productWhiteBackground', checked)}
+                    />
+                    <Label>Fundo Branco no Produto</Label>
+                  </div>
+
                   <div>
                     <Label>Dimensões</Label>
                     <div className="grid grid-cols-2 gap-2">
@@ -341,7 +377,15 @@ const AdminBannerGerador: React.FC = () => {
               }}
             >
               {bannerData.imageUrl && (
-                <div style={{ flex: '0 0 auto', maxWidth: '60%', maxHeight: '40%' }}>
+                <div style={{ 
+                  flex: '0 0 auto', 
+                  maxWidth: '60%', 
+                  maxHeight: '40%',
+                  backgroundColor: bannerStyle.productWhiteBackground ? '#ffffff' : 'transparent',
+                  padding: bannerStyle.productWhiteBackground ? '12px' : '0',
+                  borderRadius: bannerStyle.productWhiteBackground ? '12px' : '8px',
+                  boxShadow: bannerStyle.productWhiteBackground ? '0 8px 24px rgba(0,0,0,0.3)' : '0 8px 24px rgba(0,0,0,0.2)'
+                }}>
                   <img 
                     src={bannerData.imageUrl}
                     alt={bannerData.title}
@@ -349,8 +393,7 @@ const AdminBannerGerador: React.FC = () => {
                       maxWidth: '100%',
                       maxHeight: '100%',
                       objectFit: 'contain',
-                      borderRadius: '8px',
-                      boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+                      borderRadius: '8px'
                     }}
                   />
                 </div>
