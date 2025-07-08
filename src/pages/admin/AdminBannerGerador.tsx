@@ -241,6 +241,54 @@ const AdminBannerGerador: React.FC = () => {
       textColor: '#FFFFFF',
       style: 'lilac_bubbles_pattern',
       description: 'Estilo lilás com padrão de bolinhas'
+    },
+    neon_cyber: {
+      name: 'Cyber Neon',
+      background: '#0A0A0A',
+      textColor: '#00FF88',
+      style: 'neon_cyber_pattern'
+    },
+    holographic: {
+      name: 'Holográfico',
+      background: '#1A1A2E',
+      textColor: '#FFFFFF',
+      style: 'holographic_pattern'
+    },
+    tropical_sunset: {
+      name: 'Tropical Sunset',
+      background: '#FF6B6B',
+      textColor: '#FFFFFF',
+      style: 'tropical_pattern'
+    },
+    minimalist_glass: {
+      name: 'Vidro Minimalista',
+      background: '#F8F9FA',
+      textColor: '#495057',
+      style: 'glass_morphism'
+    },
+    dark_elegance: {
+      name: 'Elegância Escura',
+      background: '#1A1A1A',
+      textColor: '#D4D4D4',
+      style: 'dark_elegance_pattern'
+    },
+    retro_wave: {
+      name: 'Retro Wave',
+      background: '#2D1B69',
+      textColor: '#F72585',
+      style: 'retro_wave_pattern'
+    },
+    geometric_modern: {
+      name: 'Geométrico Moderno',
+      background: '#667EEA',
+      textColor: '#FFFFFF',
+      style: 'geometric_pattern'
+    },
+    marble_luxury: {
+      name: 'Mármore Luxo',
+      background: '#FFFFFF',
+      textColor: '#2C3E50',
+      style: 'marble_pattern'
     }
   };
 
@@ -335,31 +383,37 @@ const AdminBannerGerador: React.FC = () => {
       });
 
       const canvas = await html2canvas(bannerRef.current, {
-        scale: 4, // Escala alta para qualidade máxima
+        width: settings.width,
+        height: settings.height,
+        scale: 2,
         useCORS: true,
         backgroundColor: null,
         logging: false,
         allowTaint: true,
         imageTimeout: 0,
+        foreignObjectRendering: true,
         ignoreElements: (element) => {
-          // Ignora elementos que podem interferir na captura
           return element.classList?.contains('ignore-capture') || false;
         },
         onclone: (clonedDoc) => {
-          // Garante que o elemento clonado mantenha EXATAMENTE o mesmo estilo
           const clonedElement = clonedDoc.querySelector('#banner-element') as HTMLElement;
           if (clonedElement && bannerRef.current) {
-            // Copia todas as propriedades CSS computadas
+            // Força as dimensões exatas
+            clonedElement.style.width = `${settings.width}px`;
+            clonedElement.style.height = `${settings.height}px`;
+            clonedElement.style.transform = 'none';
+            clonedElement.style.scale = '1';
+            clonedElement.style.position = 'relative';
+            clonedElement.style.overflow = 'hidden';
+            clonedElement.style.margin = '0';
+            clonedElement.style.padding = '0';
+            
+            // Copia o background exato
             const originalStyles = window.getComputedStyle(bannerRef.current);
-            clonedElement.style.width = originalStyles.width;
-            clonedElement.style.height = originalStyles.height;
-            clonedElement.style.transform = originalStyles.transform;
             clonedElement.style.background = originalStyles.background;
-            clonedElement.style.backgroundSize = originalStyles.backgroundSize;
-            clonedElement.style.position = originalStyles.position;
-            clonedElement.style.overflow = originalStyles.overflow;
-            clonedElement.style.padding = originalStyles.padding;
-            clonedElement.style.margin = originalStyles.margin;
+            clonedElement.style.backgroundSize = 'cover';
+            clonedElement.style.backgroundPosition = 'center';
+            clonedElement.style.backgroundRepeat = 'no-repeat';
           }
         }
       });
@@ -646,6 +700,68 @@ const AdminBannerGerador: React.FC = () => {
           radial-gradient(circle at 25% 90%, ${adjustColorBrightness(baseColor, -7)}48 0%, transparent 17%),
           radial-gradient(circle at 85% 70%, ${adjustColorBrightness(baseColor, -14)}52 0%, transparent 19%),
           ${baseColor}
+        `;
+
+      case 'neon_cyber_pattern':
+        return `
+          linear-gradient(45deg, ${baseColor} 0%, #0F0F23 25%, ${baseColor} 50%, #001122 75%, ${baseColor} 100%),
+          radial-gradient(circle at 20% 20%, #00FF8850 0%, transparent 40%),
+          radial-gradient(circle at 80% 80%, #FF004450 0%, transparent 30%),
+          conic-gradient(from 0deg at 50% 50%, transparent 0deg, #00FFFF20 60deg, transparent 120deg, #FF006020 180deg, transparent 240deg)
+        `;
+
+      case 'holographic_pattern':
+        return `
+          linear-gradient(135deg, ${baseColor} 0%, #4C1D95 25%, #7C3AED 50%, #3B82F6 75%, ${baseColor} 100%),
+          radial-gradient(ellipse at 30% 30%, #FF00FF40 0%, transparent 50%),
+          radial-gradient(ellipse at 70% 70%, #00FFFF30 0%, transparent 60%),
+          conic-gradient(from 45deg at 50% 50%, transparent 0deg, #FFFFFF10 45deg, transparent 90deg)
+        `;
+
+      case 'tropical_pattern':
+        return `
+          linear-gradient(135deg, ${baseColor} 0%, #FF8A80 25%, #FFD54F 50%, #81C784 75%, ${baseColor} 100%),
+          radial-gradient(circle at 25% 75%, #FFA726aa 0%, transparent 40%),
+          radial-gradient(circle at 75% 25%, #66BB6Aaa 0%, transparent 45%),
+          radial-gradient(ellipse 200px 300px at 10% 90%, #FF7043aa 0%, transparent 60%)
+        `;
+
+      case 'glass_morphism':
+        return `
+          linear-gradient(135deg, ${baseColor}dd 0%, ${adjustColorBrightness(baseColor, 20)}cc 100%),
+          radial-gradient(circle at 30% 30%, #FFFFFF30 0%, transparent 50%),
+          radial-gradient(circle at 70% 70%, #FFFFFF20 0%, transparent 40%),
+          backdrop-filter: blur(10px)
+        `;
+
+      case 'dark_elegance_pattern':
+        return `
+          linear-gradient(45deg, ${baseColor} 0%, #2D2D2D 25%, #404040 50%, #1A1A1A 75%, ${baseColor} 100%),
+          radial-gradient(circle at 20% 80%, #4A90E2aa 0%, transparent 30%),
+          radial-gradient(circle at 80% 20%, #D4A574aa 0%, transparent 35%),
+          linear-gradient(0deg, transparent 40%, #FFFFFF05 50%, transparent 60%)
+        `;
+
+      case 'retro_wave_pattern':
+        return `
+          linear-gradient(135deg, ${baseColor} 0%, #FF006E 25%, #FB5607 50%, #FFBE0B 75%, ${baseColor} 100%),
+          repeating-linear-gradient(90deg, transparent 0px, #FF1744aa 2px, transparent 4px, transparent 20px),
+          radial-gradient(ellipse at center, transparent 30%, ${adjustColorBrightness(baseColor, -20)}80 70%)
+        `;
+
+      case 'geometric_pattern':
+        return `
+          conic-gradient(from 0deg at 25% 25%, ${baseColor} 0deg, ${lightColor} 90deg, ${baseColor} 180deg, ${darkColor} 270deg),
+          conic-gradient(from 90deg at 75% 75%, ${adjustColorBrightness(baseColor, 15)} 0deg, ${baseColor} 90deg, ${lightColor} 180deg, ${baseColor} 270deg),
+          linear-gradient(45deg, transparent 25%, ${baseColor}aa 25%, ${baseColor}aa 75%, transparent 75%)
+        `;
+
+      case 'marble_pattern':
+        return `
+          linear-gradient(135deg, ${baseColor} 0%, #F8F9FA 20%, #E9ECEF 40%, ${baseColor} 60%, #DEE2E6 80%, ${baseColor} 100%),
+          radial-gradient(ellipse 400px 200px at 30% 70%, #6C757Daa 0%, transparent 60%),
+          radial-gradient(ellipse 300px 400px at 70% 30%, #495057aa 0%, transparent 50%),
+          linear-gradient(45deg, transparent 30%, #ADB5BD20 50%, transparent 70%)
         `;
 
       default:
@@ -962,73 +1078,106 @@ const AdminBannerGerador: React.FC = () => {
                 ref={bannerRef}
                 id="banner-element"
                 style={{
-                  width: `${settings.width / 2}px`, // Escala maior para preview mais próximo do final
-                  height: `${settings.height / 2}px`,
+                  width: `${settings.width}px`,
+                  height: `${settings.height}px`,
                   background: generateTemplateBackground(settings.selectedTemplate),
                   backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: `${settings.height * 0.05}px`,
+                  boxSizing: 'border-box',
+                  transform: `scale(${Math.min(600 / settings.width, 400 / settings.height)})`,
+                  transformOrigin: 'center center'
                 }}
-                className="flex flex-col items-center justify-start text-center p-2 rounded-lg shadow-lg transform scale-100 origin-center"
               >
-                {/* Container para imagem e textos - bem no topo */}
-                <div style={{ height: '50%', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', marginTop: '-10%', paddingTop: '8px' }}>
+                {/* Container principal do conteúdo */}
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: `${settings.height * 0.02}px`
+                }}>
+                  
                   {/* Imagem do Produto */}
                   {productData.imageUrl && (
-                    <div className="flex items-center justify-center" style={{ marginBottom: '2%' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      marginBottom: `${settings.height * 0.01}px`
+                    }}>
                       <div 
                         style={{
                           backgroundColor: settings.produtoFundoBranco ? '#ffffff' : 'transparent',
-                          padding: settings.produtoFundoBranco ? '4px 6px' : '0',
-                          borderRadius: settings.produtoFundoBranco ? '8px' : '0',
+                          padding: settings.produtoFundoBranco ? `${settings.width * 0.01}px` : '0',
+                          borderRadius: settings.produtoFundoBranco ? `${settings.width * 0.008}px` : '0',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: settings.produtoFundoBranco ? '0 4px 12px rgba(0,0,0,0.15)' : 'none'
+                          boxShadow: settings.produtoFundoBranco ? `0 ${settings.height * 0.006}px ${settings.height * 0.015}px rgba(0,0,0,0.15)` : 'none'
                         }}
                       >
                         <img 
                           src={productData.imageUrl} 
                           alt={productData.title}
                           style={{ 
-                            maxHeight: bannerMode === 'square' 
-                              ? (settings.produtoFundoBranco ? '100px' : '120px')
-                              : (settings.produtoFundoBranco ? '140px' : '160px'),
-                            maxWidth: bannerMode === 'square' 
-                              ? (settings.produtoFundoBranco ? '100px' : '120px')
-                              : (settings.produtoFundoBranco ? '140px' : '160px'),
-                            objectFit: 'contain'
+                            maxHeight: `${settings.height * 0.25}px`,
+                            maxWidth: `${settings.width * 0.25}px`,
+                            objectFit: 'contain',
+                            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))'
                           }}
-                          className="drop-shadow-lg"
                         />
                       </div>
                     </div>
                   )}
                   
-                  {/* Conteúdo */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1%', alignItems: 'center' }}>
+                  {/* Container de textos */}
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    gap: `${settings.height * 0.008}px`,
+                    maxWidth: '90%'
+                  }}>
+                    
                     {/* Título */}
-                    <h2 
+                    <h1 
                       style={{ 
                         color: settings.customTextColor,
-                        fontSize: `${Math.max(4, Math.min(14, 350 / productData.title.length))}px`,
+                        fontSize: `${Math.max(settings.height * 0.04, Math.min(settings.height * 0.08, settings.width * 0.05))}px`,
+                        fontWeight: 'bold',
                         margin: 0,
-                        lineHeight: 1.2
+                        lineHeight: 1.2,
+                        textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                        wordWrap: 'break-word',
+                        hyphens: 'auto'
                       }}
-                      className="font-bold"
                     >
                       {productData.title}
-                    </h2>
+                    </h1>
                     
                     {/* Descrição */}
                     {productData.description && (
                       <p 
                         style={{ 
                           color: settings.customTextColor,
-                          fontSize: `${Math.max(5, Math.min(14, 350 / productData.description.length))}px`,
+                          fontSize: `${Math.max(settings.height * 0.025, Math.min(settings.height * 0.04, settings.width * 0.03))}px`,
                           margin: 0,
-                          lineHeight: 1.1,
-                          opacity: 0.9
+                          lineHeight: 1.3,
+                          opacity: 0.9,
+                          textShadow: '1px 1px 2px rgba(0,0,0,0.2)',
+                          wordWrap: 'break-word',
+                          hyphens: 'auto'
                         }}
                       >
                         {productData.description}
@@ -1037,17 +1186,26 @@ const AdminBannerGerador: React.FC = () => {
                     
                     {/* Preço */}
                     {settings.priceEnabled && productData.price && (
-                      <p 
+                      <div 
                         style={{ 
-                          color: settings.customTextColor,
-                          fontSize: '10px',
-                          margin: 0,
-                          lineHeight: 1.1,
-                          fontWeight: 'bold'
+                          backgroundColor: 'rgba(0,0,0,0.1)',
+                          padding: `${settings.height * 0.008}px ${settings.width * 0.02}px`,
+                          borderRadius: `${settings.width * 0.01}px`,
+                          marginTop: `${settings.height * 0.01}px`
                         }}
                       >
-                        AOA {Number(productData.price).toLocaleString('pt-AO')}
-                      </p>
+                        <p 
+                          style={{ 
+                            color: settings.customTextColor,
+                            fontSize: `${Math.max(settings.height * 0.03, Math.min(settings.height * 0.05, settings.width * 0.035))}px`,
+                            fontWeight: 'bold',
+                            margin: 0,
+                            textShadow: '2px 2px 4px rgba(0,0,0,0.4)'
+                          }}
+                        >
+                          AOA {Number(productData.price).toLocaleString('pt-AO')}
+                        </p>
+                      </div>
                     )}
                     
                     {/* URL */}
@@ -1055,10 +1213,11 @@ const AdminBannerGerador: React.FC = () => {
                       <p 
                         style={{ 
                           color: settings.customTextColor,
-                          fontSize: '8px',
+                          fontSize: `${Math.max(settings.height * 0.02, Math.min(settings.height * 0.03, settings.width * 0.02))}px`,
                           margin: 0,
-                          lineHeight: 1.1,
-                          opacity: 0.8
+                          opacity: 0.8,
+                          textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                          marginTop: `${settings.height * 0.01}px`
                         }}
                       >
                         {productData.productUrl}
@@ -1067,8 +1226,6 @@ const AdminBannerGerador: React.FC = () => {
 
                   </div>
                 </div>
-
-
               </div>
             </div>
           </div>
