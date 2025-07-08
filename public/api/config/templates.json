@@ -1,0 +1,24 @@
+{
+    "email_templates": {
+        "welcome": {
+            "subject": "Bem-vindo \u00e0 SuperLoja!",
+            "body": "<h3>Ol\u00e1 {userName}!<\/h3>\n<p>Sua conta na SuperLoja foi criada com sucesso! Agora voc\u00ea pode aproveitar todas as nossas ofertas.<\/p>",
+            "enabled": true
+        },
+        "order_created": {
+            "subject": "Pedido #{orderNumber} Confirmadoa",
+            "body": "<h3>Obrigado pela sua compra, {userName}!<\/h3>\n<p>Seu pedido <strong>#{orderNumber}<\/strong> foi criado com sucesso!<\/p>\n<p>Valor total: <strong>{orderTotal} AOA<\/strong><\/p>",
+            "enabled": true
+        },
+        "status_changed": {
+            "subject": "Atualiza\u00e7\u00e3o do Pedido #{orderNumber}",
+            "body": "<h3>Ol\u00e1 {userName}!<\/h3>\n<p>Seu pedido <strong>#{orderNumber}<\/strong> foi atualizado para: {newStatus}<\/p>",
+            "enabled": true
+        },
+        "contact_form": {
+            "subject": "Confirma\u00e7\u00e3o de Contacto",
+            "body": "<h3>Ol\u00e1 {userName}!<\/h3>\n<p>Recebemos sua mensagem enviada atrav\u00e9s do formul\u00e1rio de contacto.<\/p>",
+            "enabled": true
+        }
+    }
+}
