@@ -47,6 +47,7 @@ import PoliticaPrivacidade from "@/pages/PoliticaPrivacidade";
 import PoliticaDevolucao from "@/pages/PoliticaDevolucao";
 import Leiloes from "@/pages/Leiloes";
 import LeilaoDetalhes from "@/pages/LeilaoDetalhes";
+import SaudeBemEstar from "@/pages/SaudeBemEstar";
 import NotFound from "@/pages/NotFound";
 import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
@@ -72,6 +73,7 @@ function App() {
               <Route path="/catalogo" element={<Catalogo />} />
               <Route path="/produto/:slug" element={<Produto />} />
               <Route path="/categorias" element={<Categorias />} />
+              <Route path="/saude-bem-estar" element={<SaudeBemEstar />} />
               <Route path="/sobre" element={<Sobre />} />
               <Route path="/contato" element={<Contato />} />
               <Route path="/faq" element={<FAQ />} />

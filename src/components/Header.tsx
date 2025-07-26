@@ -103,6 +103,14 @@ export const Header: React.FC = () => {
                 Categorias
               </Link>
               <Link 
+                to="/saude-bem-estar" 
+                className={`text-foreground hover:text-primary transition-colors font-medium bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 px-3 py-1 rounded-full ${
+                  location.pathname === '/saude-bem-estar' ? 'bg-primary text-primary-foreground' : ''
+                }`}
+              >
+                Saúde e Bem Estar
+              </Link>
+              <Link 
                 to="/leiloes" 
                 className={`text-foreground hover:text-primary transition-colors font-medium bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full ${
                   location.pathname.includes('/leilao') ? 'bg-primary text-primary-foreground' : ''
@@ -209,6 +217,9 @@ export const Header: React.FC = () => {
                   </Link>
                   <Link to="/categorias" className="text-foreground hover:text-primary transition-colors font-medium py-2">
                     Categorias
+                  </Link>
+                  <Link to="/saude-bem-estar" className="text-foreground hover:text-primary transition-colors font-medium py-2">
+                    Saúde e Bem Estar
                   </Link>
                   <Link to="/leiloes" className="text-foreground hover:text-primary transition-colors font-medium py-2">
                     Leilões
