@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -19,20 +20,38 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSave, on
     name: '',
     slug: '',
     description: '',
-    image_url: ''
+    image_url: '',
+    parent_id: null as string | null,
+    icon: ''
   });
+  const [parentCategories, setParentCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Carregar categorias pai disponíveis
+    const loadParentCategories = async () => {
+      const { data } = await supabase
+        .from('categories')
+        .select('id, name')
+        .is('parent_id', null)
+        .order('name');
+      
+      setParentCategories(data || []);
+    };
+
+    loadParentCategories();
+
     if (category) {
       setFormData({
         name: category.name || '',
         slug: category.slug || '',
         description: category.description || '',
-        image_url: category.image_url || ''
+        image_url: category.image_url || '',
+        parent_id: category.parent_id || null,
+        icon: category.icon || ''
       });
     }
   }, [category]);
@@ -163,6 +182,56 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSave, on
                 required
               />
             </div>
+          </div>
+
+          {/* Categoria Pai */}
+          <div>
+            <Label htmlFor="parent_id">Categoria Pai (opcional)</Label>
+            <Select value={formData.parent_id || 'none'} onValueChange={(value) => 
+              setFormData({...formData, parent_id: value === 'none' ? null : value})
+            }>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma categoria pai" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border border-border shadow-lg z-50">
+                <SelectItem value="none">Nenhuma (categoria principal)</SelectItem>
+                {parentCategories
+                  .filter(cat => !category || cat.id !== category.id) // Evita self-reference
+                  .map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Deixe vazio para criar uma categoria principal
+            </p>
+          </div>
+
+          {/* Ícone */}
+          <div>
+            <Label htmlFor="icon">Ícone (opcional)</Label>
+            <Select value={formData.icon} onValueChange={(value) => 
+              setFormData({...formData, icon: value})
+            }>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um ícone" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border border-border shadow-lg z-50">
+                <SelectItem value="">Nenhum ícone</SelectItem>
+                <SelectItem value="heart">❤️ Coração</SelectItem>
+                <SelectItem value="user">👤 Usuário</SelectItem>
+                <SelectItem value="home">🏠 Casa</SelectItem>
+                <SelectItem value="sparkles">✨ Brilho</SelectItem>
+                <SelectItem value="leaf">🍃 Folha</SelectItem>
+                <SelectItem value="package">📦 Pacote</SelectItem>
+                <SelectItem value="phone">📱 Telefone</SelectItem>
+                <SelectItem value="laptop">💻 Laptop</SelectItem>
+                <SelectItem value="headphones">🎧 Fones</SelectItem>
+                <SelectItem value="gamepad">🎮 Jogos</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
