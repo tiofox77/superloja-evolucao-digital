@@ -15,6 +15,16 @@ interface SendEmailNotificationProps {
   orderTotal?: number;
   newStatus?: string;
   orderDetails?: any;
+  force_real?: boolean;
+  items?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    image?: string;
+  }>;
+  orderPhone?: string;
+  orderAddress?: string;
 }
 
 export const useNotifications = () => {
@@ -47,58 +57,80 @@ export const useNotifications = () => {
   };
 
   const sendEmailNotification = async (props: SendEmailNotificationProps) => {
+    const { to, type, userName } = props;
+    
+    // Verificar se temos um endereço de email válido
+    if (!to) {
+      console.warn('Endereço de email não fornecido');
+      return { success: false, error: 'Endereço de email obrigatório' };
+    }
+
+    // Verificar se o endereço de email é válido
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      console.warn('Endereço de email inválido:', to);
+      return { success: false, error: 'Endereço de email inválido' };
+    }
+
     try {
-      // Get template configuration
-      const { data: templateSettings } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'notification_templates')
-        .single();
-
-      let shouldSend = true;
-      if (templateSettings?.value) {
-        const templates = templateSettings.value as any;
-        if (templates?.email_templates?.[props.type]) {
-          shouldSend = templates.email_templates[props.type].enabled;
-        }
-      }
-
-      if (!shouldSend) {
-        console.log(`Email template for ${props.type} is disabled`);
-        return { success: true, skipped: true };
-      }
-
-      // Tentar primeiro o endpoint PHP local
-      try {
-        const response = await fetch('http://localhost/superlojareact/public/api/send-email.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(props)
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            console.log('Email enviado com sucesso via PHP local');
-            return { success: true };
-          }
-        }
-      } catch (phpError) {
-        console.warn('Erro ao usar endpoint PHP local, tentando Supabase:', phpError);
-      }
-
-      // Fallback para o Supabase Functions
-      console.log('Usando fallback Supabase Functions para email');
-      const { error } = await supabase.functions.invoke('send-notification-email', {
-        body: props
-      });
-
-      if (error) throw error;
+      // USAR EXATAMENTE A MESMA LÓGICA QUE FUNCIONA NO TESTE DE EMAIL DAS CONFIGURAÇÕES
       
-      return { success: true };
+      // Usar URL relativa baseada no ambiente (igual ao teste de email)
+      const baseUrl = window.location.hostname === 'localhost' ? 
+        'http://localhost/superlojareact/public/api' :
+        '/api';
+        
+      console.log(`Enviando email tipo=${type} para=${to} usando endpoint: ${baseUrl}/send-email.php`);
+        
+      const response = await fetch(`${baseUrl}/send-email.php`, {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: type,
+          to: to,
+          userName: userName,
+          // Incluir campos adicionais se fornecidos
+          ...(props.orderNumber && { orderNumber: props.orderNumber }),
+          ...(props.orderTotal && { orderTotal: props.orderTotal }),
+          ...(props.newStatus && { newStatus: props.newStatus }),
+          ...(props.items && { items: props.items }),
+          ...(props.orderPhone && { orderPhone: props.orderPhone }),
+          ...(props.orderAddress && { orderAddress: props.orderAddress }),
+          force_real: props.force_real || true  // Usar o valor fornecido ou forçar real
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`Email ${type} enviado com sucesso para ${to}`);
+        return { success: true };
+      } else {
+        console.error('Erro no envio do email:', result.error || result.message);
+        return { success: false, error: result.error || result.message };
+      }
+      
     } catch (error: any) {
       console.error('Erro ao enviar email:', error);
-      return { success: false, error: error.message };
+      
+      // Fallback para o Supabase Functions apenas se o endpoint PHP falhar completamente
+      try {
+        console.log('Tentando fallback Supabase Functions para email');
+        const { error: supabaseError } = await supabase.functions.invoke('send-notification-email', {
+          body: props
+        });
+
+        if (supabaseError) throw supabaseError;
+        
+        return { success: true };
+      } catch (fallbackError: any) {
+        console.error('Erro também no fallback Supabase:', fallbackError);
+        return { success: false, error: fallbackError.message };
+      }
     }
   };
 
@@ -194,6 +226,16 @@ export const useNotifications = () => {
     orderNumber: string;
     orderTotal: number;
     userPhone?: string;
+    force_real?: boolean;
+    items?: Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity: number;
+      image?: string;
+    }>;
+    orderPhone?: string;
+    orderAddress?: string;
   }) => {
     // Get user ID from email
     const { data: profile } = await supabase
@@ -218,7 +260,11 @@ export const useNotifications = () => {
       to: orderData.userEmail,
       userName: orderData.userName,
       orderNumber: orderData.orderNumber,
-      orderTotal: orderData.orderTotal
+      orderTotal: orderData.orderTotal,
+      force_real: orderData.force_real, // Passa o parâmetro force_real se fornecido
+      items: orderData.items, // Dados dos itens para gerar PDF
+      orderPhone: orderData.orderPhone, // Telefone do cliente
+      orderAddress: orderData.orderAddress // Endereço do cliente
     });
 
     // Send SMS notification if phone available
@@ -238,7 +284,7 @@ export const useNotifications = () => {
     }
   };
 
-  const createWelcomeNotification = async (userEmail: string, userName: string, userPhone?: string) => {
+  const createWelcomeNotification = async (userEmail: string, userName: string, userPhone?: string, force_real?: boolean) => {
     // Get user ID from email
     const { data: profile } = await supabase
       .from('profiles')
@@ -260,7 +306,8 @@ export const useNotifications = () => {
     await sendEmailNotification({
       type: 'welcome',
       to: userEmail,
-      userName
+      userName,
+      force_real // Passa o parâmetro force_real se fornecido
     });
 
     // Send SMS notification if phone available

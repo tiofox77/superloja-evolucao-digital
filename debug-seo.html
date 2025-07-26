@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug SEO - SuperLoja</title>
+</head>
+<body>
+    <h1>SEO Debug Tool</h1>
+    <div id="results"></div>
+    
+    <script>
+        // Função para verificar SEO na página atual
+        function debugSEO() {
+            const results = document.getElementById('results');
+            
+            // Verificar tags meta
+            const metaTags = document.querySelectorAll('meta');
+            const ogTags = document.querySelectorAll('meta[property^="og:"]');
+            const twitterTags = document.querySelectorAll('meta[name^="twitter:"]');
+            const title = document.querySelector('title');
+            const canonical = document.querySelector('link[rel="canonical"]');
+            const favicon = document.querySelector('link[rel="icon"]');
+            
+            let html = '<h2>SEO Analysis</h2>';
+            
+            // Título
+            html += '<h3>Title Tag</h3>';
+            html += `<p><strong>Title:</strong> ${title ? title.textContent : 'Not found'}</p>`;
+            
+            // Meta description
+            const description = document.querySelector('meta[name="description"]');
+            html += '<h3>Meta Description</h3>';
+            html += `<p><strong>Description:</strong> ${description ? description.getAttribute('content') : 'Not found'}</p>`;
+            
+            // Meta keywords
+            const keywords = document.querySelector('meta[name="keywords"]');
+            html += '<h3>Meta Keywords</h3>';
+            html += `<p><strong>Keywords:</strong> ${keywords ? keywords.getAttribute('content') : 'Not found'}</p>`;
+            
+            // Canonical URL
+            html += '<h3>Canonical URL</h3>';
+            html += `<p><strong>Canonical:</strong> ${canonical ? canonical.getAttribute('href') : 'Not found'}</p>`;
+            
+            // Favicon
+            html += '<h3>Favicon</h3>';
+            html += `<p><strong>Favicon:</strong> ${favicon ? favicon.getAttribute('href') : 'Not found'}</p>`;
+            
+            // Open Graph Tags
+            html += '<h3>Open Graph Tags</h3>';
+            if (ogTags.length > 0) {
+                ogTags.forEach(tag => {
+                    html += `<p><strong>${tag.getAttribute('property')}:</strong> ${tag.getAttribute('content')}</p>`;
+                });
+            } else {
+                html += '<p>No Open Graph tags found</p>';
+            }
+            
+            // Twitter Tags
+            html += '<h3>Twitter Tags</h3>';
+            if (twitterTags.length > 0) {
+                twitterTags.forEach(tag => {
+                    html += `<p><strong>${tag.getAttribute('name')}:</strong> ${tag.getAttribute('content')}</p>`;
+                });
+            } else {
+                html += '<p>No Twitter tags found</p>';
+            }
+            
+            // Schema.org structured data
+            html += '<h3>Structured Data (Schema.org)</h3>';
+            const schemaScripts = document.querySelectorAll('script[type="application/ld+json"]');
+            if (schemaScripts.length > 0) {
+                schemaScripts.forEach((script, index) => {
+                    html += `<h4>Schema ${index + 1}:</h4>`;
+                    html += `<pre>${script.textContent}</pre>`;
+                });
+            } else {
+                html += '<p>No structured data found</p>';
+            }
+            
+            results.innerHTML = html;
+        }
+        
+        // Função para testar URLs
+        function testURL(url) {
+            const iframe = document.createElement('iframe');
+            iframe.src = url;
+            iframe.style.width = '100%';
+            iframe.style.height = '400px';
+            iframe.style.border = '1px solid #ccc';
+            iframe.style.marginTop = '20px';
+            
+            iframe.onload = function() {
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    const title = iframeDoc.querySelector('title');
+                    const description = iframeDoc.querySelector('meta[name="description"]');
+                    
+                    console.log('URL:', url);
+                    console.log('Title:', title ? title.textContent : 'Not found');
+                    console.log('Description:', description ? description.getAttribute('content') : 'Not found');
+                } catch (e) {
+                    console.log('Cross-origin restriction for:', url);
+                }
+            };
+            
+            document.body.appendChild(iframe);
+        }
+        
+        // Aguardar carregamento da página
+        setTimeout(debugSEO, 2000);
+        
+        // Adicionar botões para testar URLs
+        document.body.innerHTML += `
+            <hr>
+            <h2>Test URLs</h2>
+            <button onclick="window.open('http://localhost:8080', '_blank')">Test Home Page</button>
+            <button onclick="window.open('http://localhost:8080/produto/adaptador-de-cabo-carregador', '_blank')">Test Product Page</button>
+            <button onclick="debugSEO()">Refresh SEO Analysis</button>
+        `;
+    </script>
+</body>
+</html>

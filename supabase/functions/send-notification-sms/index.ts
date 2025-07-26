@@ -136,6 +136,13 @@ const handler = async (req: Request): Promise<Response> => {
             // Send SMS via Twilio
             const twilioAuth = btoa(`${smsConfig.twilio_account_sid}:${smsConfig.twilio_auth_token}`);
             
+            // Usar sender_id se disponível, senão usar número de telefone
+            const fromValue = smsConfig.twilio_sender_id && smsConfig.twilio_sender_id.trim() !== '' 
+                ? smsConfig.twilio_sender_id 
+                : smsConfig.twilio_phone_number;
+            
+            console.log('Enviando SMS com From:', fromValue);
+
             const response = await fetch(
               `https://api.twilio.com/2010-04-01/Accounts/${smsConfig.twilio_account_sid}/Messages.json`,
               {
@@ -145,7 +152,7 @@ const handler = async (req: Request): Promise<Response> => {
                   'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: new URLSearchParams({
-                  From: smsConfig.twilio_phone_number,
+                  From: fromValue,
                   To: to,
                   Body: message,
                 }),

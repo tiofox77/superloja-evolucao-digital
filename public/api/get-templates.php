@@ -2,11 +2,22 @@
 // get-templates.php - Script para fornecer templates de email do ficheiro JSON local
 
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, Cache-Control, Pragma');
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/vendor/autoload.php';
+// Handle preflight request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// Verificar se é GET ou POST
+if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['error' => 'Método não permitido']);
+    exit();
+}
 
 /**
  * Log de acções relacionadas com os templates
@@ -29,6 +40,14 @@ function logTemplate($message, $type = 'info') {
  */
 function getTemplates() {
     $configFile = __DIR__ . '/config/templates.json';
+    $configDir = dirname($configFile);
+    
+    // Criar diretório config se não existir
+    if (!is_dir($configDir)) {
+        if (!mkdir($configDir, 0755, true)) {
+            throw new Exception("Erro ao criar diretório de configuração");
+        }
+    }
     
     if (!file_exists($configFile)) {
         // Se não existir, criar ficheiro de templates padrão
@@ -57,13 +76,21 @@ function getTemplates() {
             ]
         ];
         
-        file_put_contents($configFile, json_encode($defaultTemplates, JSON_PRETTY_PRINT));
+        $result = file_put_contents($configFile, json_encode($defaultTemplates, JSON_PRETTY_PRINT));
+        if ($result === false) {
+            throw new Exception("Erro ao criar ficheiro de templates padrão");
+        }
         logTemplate("Criado ficheiro de templates padrão", "info");
     }
     
-    $templates = json_decode(file_get_contents($configFile), true);
-    if (!$templates) {
+    $content = file_get_contents($configFile);
+    if ($content === false) {
         throw new Exception("Erro ao ler ficheiro de templates");
+    }
+    
+    $templates = json_decode($content, true);
+    if (!$templates) {
+        throw new Exception("Erro ao decodificar JSON do ficheiro de templates");
     }
     
     return $templates;
@@ -74,22 +101,40 @@ function getTemplates() {
  */
 function updateTemplates($newTemplates) {
     $configFile = __DIR__ . '/config/templates.json';
+    $configDir = dirname($configFile);
+    
+    // Criar diretório config se não existir
+    if (!is_dir($configDir)) {
+        if (!mkdir($configDir, 0755, true)) {
+            throw new Exception("Erro ao criar diretório de configuração");
+        }
+    }
+    
+    // Validar se os dados são válidos
+    if (!is_array($newTemplates)) {
+        throw new Exception("Dados de templates inválidos");
+    }
+    
     $result = file_put_contents($configFile, json_encode($newTemplates, JSON_PRETTY_PRINT));
     
     if ($result === false) {
-        throw new Exception("Erro ao guardar templates");
+        throw new Exception("Erro ao guardar templates no ficheiro");
     }
     
     return true;
 }
 
 try {
+    // Log da requisição
+    logTemplate("Requisição recebida: " . $_SERVER['REQUEST_METHOD'] . " de " . $_SERVER['HTTP_HOST'], "info");
+    
     // Verificar se é um pedido para actualizar ou para obter templates
     $method = $_SERVER['REQUEST_METHOD'];
     
     if ($method === 'GET') {
         // Retornar templates actuais
         $templates = getTemplates();
+        logTemplate("Templates enviados com sucesso", "info");
         echo json_encode([
             'success' => true,
             'templates' => $templates
@@ -110,7 +155,7 @@ try {
             'message' => 'Templates actualizados com sucesso'
         ]);
     } else {
-        throw new Exception("Método não suportado");
+        throw new Exception("Método não suportado: " . $method);
     }
 } catch (Exception $e) {
     logTemplate("Erro: " . $e->getMessage(), "error");
@@ -118,6 +163,7 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage()
+        'message' => $e->getMessage(),
+        'error' => $e->getMessage()
     ]);
 }

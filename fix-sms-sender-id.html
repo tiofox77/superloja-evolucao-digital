@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Corrigir SMS Sender ID</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Corrigir SMS Sender ID</h1>
+    <div id="result"></div>
+    <button onclick="fixSenderID()">Corrigir Sender ID</button>
+    
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://cqhqvgfvfpawvnpgvjhj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxaHF2Z2Z2ZnBhd3ZucGd2amhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQyNzgxMjYsImV4cCI6MjA0OTg1NDEyNn0.qSKKJdmzZXP5P-tMXzCOLvE1KsU8LqVzjGkE8sU_r1A';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function fixSenderID() {
+            try {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = 'Verificando configurações atuais...';
+                
+                // Buscar configurações SMS atuais
+                const { data: currentSettings, error: fetchError } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .eq('key', 'sms_settings')
+                    .single();
+                
+                if (fetchError) {
+                    resultDiv.innerHTML = `<p style="color: red;">Erro ao buscar configurações: ${fetchError.message}</p>`;
+                    return;
+                }
+                
+                // Verificar se o sender_id está definido
+                let currentConfig = currentSettings.value || {};
+                
+                resultDiv.innerHTML += `
+                    <h3>Configurações atuais:</h3>
+                    <pre>${JSON.stringify(currentConfig, null, 2)}</pre>
+                `;
+                
+                // Forçar definição do sender_id
+                const newConfig = {
+                    ...currentConfig,
+                    twilio_sender_id: 'SuperLoja' // Força o valor
+                };
+                
+                resultDiv.innerHTML += '<p>Atualizando configurações...</p>';
+                
+                // Atualizar configurações
+                const { error: updateError } = await supabase
+                    .from('settings')
+                    .update({ value: newConfig })
+                    .eq('key', 'sms_settings');
+                
+                if (updateError) {
+                    resultDiv.innerHTML += `<p style="color: red;">Erro ao atualizar: ${updateError.message}</p>`;
+                    return;
+                }
+                
+                resultDiv.innerHTML += `
+                    <div style="background-color: #d4edda; padding: 15px; border: 1px solid #c3e6cb; border-radius: 5px; margin: 10px 0;">
+                        <h4>✅ Configurações atualizadas!</h4>
+                        <p>O campo <code>twilio_sender_id</code> foi definido para: <strong>SuperLoja</strong></p>
+                    </div>
+                    
+                    <h3>Novas configurações:</h3>
+                    <pre>${JSON.stringify(newConfig, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<p style="color: red;">Erro: ${error.message}</p>`;
+            }
+        }
+        
+        // Verificar configurações atuais ao carregar
+        async function checkCurrentSettings() {
+            try {
+                const { data: smsSettings, error } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .eq('key', 'sms_settings')
+                    .single();
+                
+                if (error) {
+                    document.getElementById('result').innerHTML = `<p style="color: red;">Erro: ${error.message}</p>`;
+                    return;
+                }
+                
+                const senderId = smsSettings.value?.twilio_sender_id;
+                
+                document.getElementById('result').innerHTML = `
+                    <h3>Status atual:</h3>
+                    <p><strong>twilio_sender_id:</strong> ${senderId || 'NÃO DEFINIDO'}</p>
+                    
+                    ${!senderId ? `
+                        <div style="background-color: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 10px 0;">
+                            <h4>⚠️ Problema identificado:</h4>
+                            <p>O campo <code>twilio_sender_id</code> está vazio. Clique no botão para corrigir.</p>
+                        </div>
+                    ` : `
+                        <div style="background-color: #d4edda; padding: 15px; border: 1px solid #c3e6cb; border-radius: 5px; margin: 10px 0;">
+                            <h4>✅ Configuração OK:</h4>
+                            <p>O campo <code>twilio_sender_id</code> está configurado corretamente.</p>
+                        </div>
+                    `}
+                `;
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<p style="color: red;">Erro: ${error.message}</p>`;
+            }
+        }
+        
+        // Executar verificação ao carregar
+        checkCurrentSettings();
+    </script>
+</body>
+</html>

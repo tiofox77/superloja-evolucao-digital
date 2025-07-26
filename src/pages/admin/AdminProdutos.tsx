@@ -4,14 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Edit, Trash2, Eye, Star, Grid2X2, List, Filter, Power, PowerOff } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Star, Grid2X2, List, Filter, Power, PowerOff, FileDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from '@/components/ProductForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
+import { useNavigate } from 'react-router-dom';
 
 const AdminProdutos = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -187,13 +189,23 @@ const AdminProdutos = () => {
           </h1>
           <p className="text-muted-foreground">Gerencie o catálogo de produtos</p>
         </div>
-        <Button 
-          onClick={() => setShowForm(true)}
-          className="hero-gradient hover:scale-105 transition-transform"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Produto
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/admin/catalogo-produtos')}
+            className="hover:scale-105 transition-transform"
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            Gerar Catálogo PDF
+          </Button>
+          <Button 
+            onClick={() => setShowForm(true)}
+            className="hero-gradient hover:scale-105 transition-transform"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Produto
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { supabase } from '@/integrations/supabase/client';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useLocation } from 'react-router-dom';
+import { SEOAnalytics } from './SEOAnalytics';
 
 interface SEOHeadProps {
-  pageType?: 'global' | 'product' | 'category' | 'custom';
+  pageType?: 'global' | 'product' | 'category' | 'admin' | 'custom';
   pageSlug?: string;
   title?: string;
   description?: string;
@@ -12,7 +13,129 @@ interface SEOHeadProps {
   ogImage?: string;
   canonicalUrl?: string;
   schemaMarkup?: any;
+  productData?: any;
+  categoryData?: any;
 }
+
+// Dados SEO dinâmicos para diferentes tipos de página
+const getDynamicSEOData = (pageType: string, slug?: string, productData?: any, categoryData?: any, location?: any, settings?: any) => {
+  const baseUrl = window.location.origin;
+  const currentPath = location?.pathname || '/';
+  
+  // Usar configurações dinâmicas do admin ou fallback para valores padrão
+  const storeName = settings?.store_name || 'SuperLoja';
+  const storeDescription = settings?.store_description || 'A melhor loja de eletrônicos de Angola';
+  const logoUrl = settings?.logo_url || `${baseUrl}/src/assets/superloja-logo.png`;
+  
+  const defaultSEO = {
+    title: `${storeName} - ${storeDescription}`,
+    description: `Descubra os melhores produtos tecnológicos com ofertas imperdíveis. Smartphones, computadores, acessórios e muito mais na ${storeName}!`,
+    keywords: `eletrônicos Angola, tecnologia Luanda, smartphones, computadores, loja online Angola, ${storeName}`,
+    ogImage: logoUrl,
+    canonical: `${baseUrl}${currentPath}`,
+    robots: 'index,follow',
+    siteName: storeName,
+    favicon: settings?.favicon_url || `${baseUrl}/favicon.ico`
+  };
+
+  switch (pageType) {
+    case 'product':
+      const productName = productData?.name || (slug ? slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Produto');
+      const productPrice = productData?.price ? `por apenas ${productData.price} AOA` : 'com o melhor preço';
+      
+      return {
+        ...defaultSEO,
+        title: `${productName} - ${storeName}`,
+        description: `Compre ${productName} na ${storeName} ${productPrice}. Produto de qualidade com garantia. Entrega rápida em Angola.`,
+        keywords: `${productName.toLowerCase()}, Angola, eletrônicos, ${storeName}, tecnologia, ${productData?.category || 'produtos'}, comprar online`,
+        ogImage: productData?.image || defaultSEO.ogImage,
+        canonical: `${baseUrl}/produto/${slug}`,
+        schema: {
+          '@context': 'https://schema.org',
+          '@type': 'Product',
+          name: productName,
+          description: `Compre ${productName} na ${storeName} ${productPrice}. Produto de qualidade com garantia.`,
+          image: productData?.image || defaultSEO.ogImage,
+          brand: {
+            '@type': 'Brand',
+            name: storeName
+          },
+          offers: {
+            '@type': 'Offer',
+            price: productData?.price || '0',
+            priceCurrency: 'AOA',
+            availability: 'https://schema.org/InStock',
+            seller: {
+              '@type': 'Organization',
+              name: storeName
+            }
+          }
+        }
+      };
+
+    case 'category':
+      const categoryName = categoryData?.name || (slug ? slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Categoria');
+      
+      return {
+        ...defaultSEO,
+        title: `${categoryName} - ${storeName}`,
+        description: `Explore nossa seleção de ${categoryName.toLowerCase()} com os melhores preços de Angola. Produtos de qualidade na ${storeName}!`,
+        keywords: `${categoryName.toLowerCase()}, Angola, eletrônicos, ${storeName}, tecnologia, produtos, loja online`,
+        canonical: `${baseUrl}/categoria/${slug}`,
+        schema: {
+          '@context': 'https://schema.org',
+          '@type': 'CollectionPage',
+          name: `${categoryName} - ${storeName}`,
+          description: `Explore nossa seleção de ${categoryName.toLowerCase()} com os melhores preços de Angola.`,
+          url: `${baseUrl}/categoria/${slug}`
+        }
+      };
+
+    case 'admin':
+      return {
+        ...defaultSEO,
+        title: `Administração - ${storeName}`,
+        description: `Painel administrativo da ${storeName} para gerenciar produtos, pedidos e configurações.`,
+        keywords: `admin, administração, painel, gerenciar, ${storeName}, Angola`,
+        canonical: `${baseUrl}/admin`,
+        robots: 'noindex,nofollow' // Páginas admin não devem ser indexadas
+      };
+
+    default:
+      // Páginas específicas baseadas no path
+      if (currentPath.includes('/catalogo')) {
+        return {
+          ...defaultSEO,
+          title: `Catálogo de Produtos - ${storeName}`,
+          description: `Explore nosso catálogo completo de produtos tecnológicos com os melhores preços de Angola. Smartphones, computadores, acessórios e muito mais na ${storeName}!`,
+          keywords: `catálogo, produtos, eletrônicos, Angola, ${storeName}, tecnologia, smartphones, computadores`,
+          canonical: `${baseUrl}/catalogo`
+        };
+      }
+      
+      if (currentPath.includes('/leiloes')) {
+        return {
+          ...defaultSEO,
+          title: `Leilões - ${storeName}`,
+          description: `Participe dos nossos leilões e ganhe produtos tecnológicos com preços incríveis! Leilões diários na ${storeName}.`,
+          keywords: `leilões, produtos, ofertas, Angola, ${storeName}, tecnologia, promoções`,
+          canonical: `${baseUrl}/leiloes`
+        };
+      }
+      
+      if (currentPath.includes('/contato')) {
+        return {
+          ...defaultSEO,
+          title: `Contato - ${storeName}`,
+          description: `Entre em contato conosco! Atendimento especializado, suporte técnico e informações sobre produtos na ${storeName}.`,
+          keywords: `contato, atendimento, suporte, Angola, ${storeName}, ajuda, informações`,
+          canonical: `${baseUrl}/contato`
+        };
+      }
+      
+      return defaultSEO;
+  }
+};
 
 export const SEOHead: React.FC<SEOHeadProps> = ({
   pageType = 'global',
@@ -22,102 +145,122 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   keywords,
   ogImage,
   canonicalUrl,
-  schemaMarkup
+  schemaMarkup,
+  productData,
+  categoryData
 }) => {
   const { settings } = useSettings();
-  const [seoData, setSeoData] = useState<any>(null);
+  const location = useLocation();
+  const [dynamicFavicon, setDynamicFavicon] = useState<string | null>(null);
 
+  // Buscar favicon dinâmico das configurações
   useEffect(() => {
-    const fetchSEOData = async () => {
+    const fetchDynamicFavicon = async () => {
       try {
-        const { data } = await supabase
-          .from('seo_settings')
-          .select('*')
-          .eq('page_type', pageType)
-          .eq('page_slug', pageSlug || '')
-          .single();
-        
-        if (data) {
-          setSeoData(data);
+        if (settings?.favicon_url) {
+          setDynamicFavicon(settings.favicon_url);
         }
       } catch (error) {
-        console.error('Erro ao carregar dados SEO:', error);
+        console.error('Erro ao carregar favicon dinâmico:', error);
       }
     };
 
-    if (pageType !== 'global') {
-      fetchSEOData();
-    }
-  }, [pageType, pageSlug]);
+    fetchDynamicFavicon();
+  }, [settings?.favicon_url]);
 
-  // Usar dados SEO do banco ou props como fallback
-  const finalTitle = seoData?.title || title || `${settings.store_name} - ${settings.store_description}`;
-  const finalDescription = seoData?.description || description || settings.store_description;
-  const finalKeywords = seoData?.keywords || keywords || 'eletrônicos, tecnologia, smartphones, Angola';
+  // Obter dados SEO dinâmicos baseados no tipo de página e configurações
+  const seoData = getDynamicSEOData(pageType, pageSlug, productData, categoryData, location, settings);
   
-  // Criar URL completa para imagens
-  const getFullImageUrl = (imageUrl: string | undefined) => {
-    if (!imageUrl) return `${window.location.origin}/src/assets/superloja-logo.png`;
-    if (imageUrl.startsWith('http')) return imageUrl;
-    if (imageUrl.startsWith('/')) return `${window.location.origin}${imageUrl}`;
-    return `${window.location.origin}/${imageUrl}`;
-  };
+  // Usar dados SEO estáticos ou props como fallback
+  const finalTitle = title || seoData.title;
+  const finalDescription = description || seoData.description;
+  const finalKeywords = keywords || seoData.keywords;
+  const finalOgImage = ogImage || seoData.ogImage;
+  const finalCanonicalUrl = canonicalUrl || seoData.canonical;
+  const finalRobots = seoData.robots || 'index,follow';
   
-  const finalOgImage = getFullImageUrl(seoData?.og_image || ogImage || settings.logo_url);
-  const finalCanonicalUrl = seoData?.canonical_url || canonicalUrl || window.location.href;
+  // Favicon dinâmico com fallback para arquivo estático
+  const faviconUrl = dynamicFavicon || settings?.favicon_url || '/favicon.ico';
+  
+  // Atualizar favicon dinamicamente no DOM
+  useEffect(() => {
+    const updateFavicon = () => {
+      // Remover favicons existentes
+      const existingFavicons = document.querySelectorAll('link[rel*="icon"]');
+      existingFavicons.forEach(link => link.remove());
+      
+      // Adicionar novos favicons
+      const iconLink = document.createElement('link');
+      iconLink.rel = 'icon';
+      iconLink.type = 'image/x-icon';
+      iconLink.href = faviconUrl;
+      document.head.appendChild(iconLink);
+      
+      const shortcutLink = document.createElement('link');
+      shortcutLink.rel = 'shortcut icon';
+      shortcutLink.href = faviconUrl;
+      document.head.appendChild(shortcutLink);
+      
+      const appleLink = document.createElement('link');
+      appleLink.rel = 'apple-touch-icon';
+      appleLink.href = faviconUrl;
+      document.head.appendChild(appleLink);
+    };
+    
+    updateFavicon();
+  }, [faviconUrl]);
 
-  const structuredData = seoData?.schema_markup || schemaMarkup || {
+  // Schema.org estruturado
+  const structuredData = schemaMarkup || {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": settings.store_name,
-    "description": settings.store_description,
+    "name": settings?.store_name || 'SuperLoja',
+    "description": settings?.store_description || 'A melhor loja de eletrônicos de Angola',
     "url": window.location.origin,
-    "logo": settings.logo_url || '/src/assets/superloja-logo.png',
+    "logo": settings?.logo_url || '/src/assets/superloja-logo.png',
     "contactPoint": {
       "@type": "ContactPoint",
-      "telephone": settings.contact_phone,
       "contactType": "customer service",
-      "email": settings.contact_email
-    },
-    "address": {
-      "@type": "PostalAddress",
-      "addressLocality": settings.address
+      "availableLanguage": "pt"
     }
   };
 
   return (
-    <Helmet>
+    <>
+      <Helmet>
       {/* Basic Meta Tags */}
       <title>{finalTitle}</title>
       <meta name="description" content={finalDescription} />
       <meta name="keywords" content={finalKeywords} />
-      <meta name="robots" content={seoData?.robots || 'index,follow'} />
+      <meta name="robots" content={finalRobots} />
+      <meta name="googlebot" content={finalRobots} />
       <link rel="canonical" href={finalCanonicalUrl} />
       
+      {/* Favicon */}
+      <link rel="icon" type="image/x-icon" href={faviconUrl} />
+      <link rel="shortcut icon" href={faviconUrl} />
+      <link rel="apple-touch-icon" href={faviconUrl} />
+      
       {/* Open Graph Tags */}
-      <meta property="og:title" content={seoData?.og_title || finalTitle} />
-      <meta property="og:description" content={seoData?.og_description || finalDescription} />
+      <meta property="og:title" content={finalTitle} />
+      <meta property="og:description" content={finalDescription} />
       <meta property="og:image" content={finalOgImage} />
       <meta property="og:url" content={finalCanonicalUrl} />
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content={settings.store_name} />
+      <meta property="og:site_name" content={settings?.store_name || 'SuperLoja'} />
       
       {/* Twitter Cards */}
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={seoData?.twitter_title || finalTitle} />
-      <meta name="twitter:description" content={seoData?.twitter_description || finalDescription} />
-      <meta name="twitter:image" content={seoData?.twitter_image || finalOgImage} />
+      <meta name="twitter:title" content={finalTitle} />
+      <meta name="twitter:description" content={finalDescription} />
+      <meta name="twitter:image" content={finalOgImage} />
       
       {/* Schema.org Structured Data */}
       <script type="application/ld+json">
         {JSON.stringify(structuredData)}
       </script>
-      
-      {/* Additional Meta Tags */}
-      <meta name="author" content={settings.store_name} />
-      <meta name="language" content="pt-AO" />
-      <meta name="geo.region" content="AO" />
-      <meta name="geo.placename" content="Angola" />
-    </Helmet>
+      </Helmet>
+      <SEOAnalytics pageTitle={finalTitle} pageType={pageType} />
+    </>
   );
 };

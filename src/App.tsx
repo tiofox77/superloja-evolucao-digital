@@ -37,6 +37,8 @@ import AdminLeiloesBids from "@/pages/admin/AdminLeiloesBids";
 import AdminSolicitacoes from "@/pages/admin/AdminSolicitacoes";
 import AdminPaginasEstaticas from "@/pages/admin/AdminPaginasEstaticas";
 import AdminBannerGerador from "@/pages/admin/AdminBannerGerador";
+import AdminCatalogoProdutos from "@/pages/admin/AdminCatalogoProdutos";
+import { CatalogPage } from "@/pages/CatalogPage";
 import SolicitarProduto from "@/pages/SolicitarProduto";
 import Contato from "@/pages/Contato";
 import FAQ from "@/pages/FAQ";
@@ -50,6 +52,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { HelmetProvider } from 'react-helmet-async';
 import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { SEOHead } from "@/components/SEOHead";
 
 function App() {
   return (
@@ -60,6 +63,7 @@ function App() {
         <Router>
           <ScrollToTop />
           <div className="min-h-screen bg-background pb-16 md:pb-0">
+            <SEOHead />
             <AnalyticsTracker />
             <PWAInstallPrompt />
             <Suspense fallback={<div>Loading...</div>}>
@@ -106,6 +110,8 @@ function App() {
                 <Route path="paginas-estaticas" element={<AdminPaginasEstaticas />} />
                 <Route path="logs" element={<AdminLogs />} />
                 <Route path="banner-gerador" element={<AdminBannerGerador />} />
+                <Route path="catalogo-produtos" element={<AdminCatalogoProdutos />} />
+                <Route path="catalogo-gerado" element={<CatalogPage />} />
               </Route>
               
               <Route path="*" element={<NotFound />} />

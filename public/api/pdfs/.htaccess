@@ -1,0 +1,28 @@
+# Proteção do diretório de PDFs
+# Apenas acesso autorizado
+
+# Permitir apenas arquivos PDF
+<Files ~ "\.pdf$">
+    Order allow,deny
+    Allow from all
+</Files>
+
+# Negar acesso a outros tipos de arquivo
+<Files ~ "^.*$">
+    Order deny,allow
+    Deny from all
+</Files>
+
+# Permitir apenas PDFs
+<Files ~ "\.pdf$">
+    Order allow,deny
+    Allow from all
+</Files>
+
+# Desabilitar listagem de diretório
+Options -Indexes
+
+# Configurar cabeçalhos de segurança
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "DENY"
+Header always set X-XSS-Protection "1; mode=block"

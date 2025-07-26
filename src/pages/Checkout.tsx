@@ -187,12 +187,23 @@ const Checkout = () => {
 
       // Enviar notificações
       try {
+        // Enviar com force_real true em ambiente de produção
         await createOrderNotification({
           userEmail: formData.email,
           userName: formData.name,
           orderNumber: order.order_number.toString(),
           orderTotal: totalAmount,
-          userPhone: formData.phone ? `+244${formData.phone}` : undefined
+          userPhone: formData.phone ? `+244${formData.phone}` : undefined,
+          force_real: window.location.hostname !== 'localhost', // Força envio real em produção
+          items: items.map(item => ({
+            id: item.product_id,
+            name: item.product.name,
+            price: item.product.price,
+            quantity: item.quantity,
+            image: item.product.image_url
+          })),
+          orderPhone: formData.phone ? `+244${formData.phone}` : undefined,
+          orderAddress: `${formData.address}, ${formData.city}, ${formData.province}, ${formData.country}`.trim().replace(/^,\s*|,\s*$/, '')
         });
       } catch (notificationError) {
         console.error('Erro ao enviar notificações:', notificationError);

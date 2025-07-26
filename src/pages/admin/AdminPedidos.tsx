@@ -195,7 +195,9 @@ const AdminPedidos = () => {
             to: orderData.customer_email,
             userName: orderData.customer_name || 'Cliente',
             orderNumber: orderData.order_number?.toString(),
-            newStatus: newStatus
+            newStatus: newStatus,
+            // Força envio real em produção (mas respeita simulação em desenvolvimento)
+            force_real: window.location.hostname !== 'localhost'
           });
 
           // Se tiver telefone, enviar SMS também

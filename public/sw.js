@@ -14,6 +14,12 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Excluir APIs PHP do cache
+  if (event.request.url.includes('/api/') || event.request.url.includes('.php')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -21,7 +27,6 @@ self.addEventListener('fetch', (event) => {
           return response;
         }
         return fetch(event.request);
-      }
-    )
+      })
   );
 });

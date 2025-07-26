@@ -5,7 +5,8 @@
     "smtp_password": "Softec@ngola!",
     "smtp_from_email": "superloja@superloja.vip",
     "smtp_from_name": "SuperLoja",
+    "smtp_use_ssl": true,
     "smtp_use_tls": false,
-    "created_at": "2025-07-07 19:43:37",
-    "updated_at": "2025-07-07 19:43:37"
+    "created_at": "2025-07-17 11:03:51",
+    "updated_at": "2025-07-17 11:03:51"
 }

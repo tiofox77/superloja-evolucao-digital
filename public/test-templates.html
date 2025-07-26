@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste API Templates</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .button { background: #007cba; color: white; padding: 10px 20px; border: none; cursor: pointer; margin: 10px 0; }
+        .result { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+    </style>
+</head>
+<body>
+    <h1>Teste API Templates</h1>
+    
+    <button class="button" onclick="testGet()">Testar GET</button>
+    <button class="button" onclick="testPost()">Testar POST</button>
+    <button class="button" onclick="clearResults()">Limpar Resultados</button>
+    
+    <div id="results"></div>
+
+    <script>
+        function addResult(title, content, isError = false) {
+            const div = document.createElement('div');
+            div.className = 'result ' + (isError ? 'error' : 'success');
+            div.innerHTML = `<h3>${title}</h3><pre>${content}</pre>`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testGet() {
+            try {
+                const response = await fetch('/superlojareact/public/api/get-templates.php', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                addResult('GET Test - Success', JSON.stringify(data, null, 2), false);
+            } catch (error) {
+                addResult('GET Test - Error', error.message, true);
+            }
+        }
+
+        async function testPost() {
+            try {
+                const testData = {
+                    templates: {
+                        email_templates: {
+                            welcome: {
+                                subject: 'Teste via JavaScript',
+                                body: 'Conteúdo de teste via JavaScript',
+                                enabled: true
+                            }
+                        }
+                    }
+                };
+
+                const response = await fetch('/superlojareact/public/api/get-templates.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const data = await response.json();
+                addResult('POST Test - Success', JSON.stringify(data, null, 2), false);
+            } catch (error) {
+                addResult('POST Test - Error', error.message, true);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -15,7 +15,9 @@ import {
   Layout,
   Smartphone,
   Gavel,
-  Image
+  Image,
+  BookOpen,
+  FileDown
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -45,6 +47,11 @@ const menuItems = [
     title: 'Produtos',
     url: '/admin/produtos',
     icon: Package,
+  },
+  {
+    title: 'Catálogo PDF',
+    url: '/admin/catalogo-produtos',
+    icon: FileDown,
   },
   {
     title: 'Categorias',

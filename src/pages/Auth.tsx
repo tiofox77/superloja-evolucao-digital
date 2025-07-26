@@ -147,7 +147,8 @@ const Auth = () => {
         await createWelcomeNotification(
           signupData.email, 
           signupData.fullName,
-          signupData.phone ? `+244${signupData.phone}` : undefined
+          signupData.phone ? `+244${signupData.phone}` : undefined,
+          window.location.hostname !== 'localhost' // Força envio real em produção
         );
       } catch (notificationError) {
         console.error('Erro ao enviar notificação de boas-vindas:', notificationError);

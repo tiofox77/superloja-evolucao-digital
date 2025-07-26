@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste SMS com Sender ID</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Teste SMS com Sender ID</h1>
+    
+    <form id="smsForm">
+        <div>
+            <label>Número de telefone (com +244):</label><br>
+            <input type="text" id="phoneNumber" value="+244923456789" style="width: 300px; padding: 8px; margin: 5px 0;">
+        </div>
+        
+        <div>
+            <label>Mensagem:</label><br>
+            <textarea id="message" rows="4" style="width: 300px; padding: 8px; margin: 5px 0;">Teste SMS da SuperLoja! Esta é uma mensagem de teste para verificar o nome do remetente.</textarea>
+        </div>
+        
+        <button type="submit" style="padding: 10px 20px; background-color: #4F46E5; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            Enviar SMS Teste
+        </button>
+    </form>
+    
+    <div id="result" style="margin-top: 20px;"></div>
+    
+    <script>
+        const supabaseUrl = 'https://cqhqvgfvfpawvnpgvjhj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxaHF2Z2Z2ZnBhd3ZucGd2amhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQyNzgxMjYsImV4cCI6MjA0OTg1NDEyNn0.qSKKJdmzZXP5P-tMXzCOLvE1KsU8LqVzjGkE8sU_r1A';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        document.getElementById('smsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            const message = document.getElementById('message').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!phoneNumber || !message) {
+                resultDiv.innerHTML = '<p style="color: red;">Preencha todos os campos!</p>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<p>Enviando SMS...</p>';
+            
+            try {
+                // Chamada para a Edge Function
+                const { data, error } = await supabase.functions.invoke('send-notification-sms', {
+                    body: {
+                        type: 'order_created',
+                        to: phoneNumber,
+                        userName: 'Usuário Teste',
+                        orderNumber: 'TEST-' + Date.now(),
+                        orderTotal: 25000,
+                        customMessage: message
+                    }
+                });
+                
+                if (error) {
+                    resultDiv.innerHTML = `
+                        <div style="background-color: #f8d7da; padding: 15px; border: 1px solid #f5c6cb; border-radius: 5px;">
+                            <h4>❌ Erro ao enviar SMS:</h4>
+                            <p>${error.message}</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div style="background-color: #d4edda; padding: 15px; border: 1px solid #c3e6cb; border-radius: 5px;">
+                            <h4>✅ SMS enviado com sucesso!</h4>
+                            <p>Verifique seu telefone para ver se o remetente aparece como "SuperLoja"</p>
+                            <p><strong>Número:</strong> ${phoneNumber}</p>
+                            <p><strong>Resposta:</strong> ${JSON.stringify(data, null, 2)}</p>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div style="background-color: #f8d7da; padding: 15px; border: 1px solid #f5c6cb; border-radius: 5px;">
+                        <h4>❌ Erro:</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+        
+        // Verificar configurações ao carregar
+        async function checkConfig() {
+            try {
+                const { data: smsSettings, error } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .eq('key', 'sms_settings')
+                    .single();
+                
+                if (error) {
+                    console.error('Erro ao buscar configurações:', error);
+                    return;
+                }
+                
+                const configDiv = document.createElement('div');
+                configDiv.style.cssText = 'background-color: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 5px; margin-bottom: 20px;';
+                configDiv.innerHTML = `
+                    <h3>Configurações SMS atuais:</h3>
+                    <ul>
+                        <li><strong>Sender ID:</strong> ${smsSettings.value?.twilio_sender_id || 'NÃO DEFINIDO'}</li>
+                        <li><strong>Telefone:</strong> ${smsSettings.value?.twilio_phone_number || 'NÃO DEFINIDO'}</li>
+                        <li><strong>Habilitado:</strong> ${smsSettings.value?.sms_notifications_enabled ? 'Sim' : 'Não'}</li>
+                    </ul>
+                `;
+                
+                document.body.insertBefore(configDiv, document.getElementById('smsForm'));
+                
+            } catch (error) {
+                console.error('Erro ao verificar configurações:', error);
+            }
+        }
+        
+        checkConfig();
+    </script>
+</body>
+</html>

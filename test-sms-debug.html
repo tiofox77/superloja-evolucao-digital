@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste SMS Debug</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Teste SMS Debug</h1>
+    <div id="result"></div>
+    
+    <script>
+        // Configuração do Supabase
+        const supabaseUrl = 'https://cqhqvgfvfpawvnpgvjhj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxaHF2Z2Z2ZnBhd3ZucGd2amhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQyNzgxMjYsImV4cCI6MjA0OTg1NDEyNn0.qSKKJdmzZXP5P-tMXzCOLvE1KsU8LqVzjGkE8sU_r1A';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function testSmsSettings() {
+            try {
+                const resultDiv = document.getElementById('result');
+                
+                // Buscar configurações SMS
+                const { data: smsSettings, error } = await supabase
+                    .from('settings')
+                    .select('*')
+                    .eq('key', 'sms_settings')
+                    .single();
+                
+                if (error) {
+                    resultDiv.innerHTML = `<p style="color: red;">Erro: ${error.message}</p>`;
+                    return;
+                }
+                
+                resultDiv.innerHTML = `
+                    <h2>Configurações SMS atuais:</h2>
+                    <pre>${JSON.stringify(smsSettings, null, 2)}</pre>
+                    
+                    <h3>Campos SMS:</h3>
+                    <ul>
+                        <li><strong>twilio_account_sid:</strong> ${smsSettings.value.twilio_account_sid || 'NÃO DEFINIDO'}</li>
+                        <li><strong>twilio_phone_number:</strong> ${smsSettings.value.twilio_phone_number || 'NÃO DEFINIDO'}</li>
+                        <li><strong>twilio_sender_id:</strong> ${smsSettings.value.twilio_sender_id || 'NÃO DEFINIDO'}</li>
+                        <li><strong>sms_notifications_enabled:</strong> ${smsSettings.value.sms_notifications_enabled ? 'true' : 'false'}</li>
+                    </ul>
+                    
+                    <h3>Valor "From" que seria usado:</h3>
+                    <p style="background-color: #f0f8ff; padding: 10px; border: 1px solid #cce7ff; border-radius: 5px;">
+                        <strong>${smsSettings.value.twilio_sender_id || smsSettings.value.twilio_phone_number || 'NÃO DEFINIDO'}</strong>
+                    </p>
+                    
+                    ${!smsSettings.value.twilio_sender_id ? `
+                        <div style="background-color: #fff3cd; padding: 15px; border: 1px solid #ffeaa7; border-radius: 5px; margin: 10px 0;">
+                            <h4>⚠️ Aviso:</h4>
+                            <p>O campo <code>twilio_sender_id</code> está vazio ou nulo. Por isso, o sistema está usando o número de telefone da Twilio.</p>
+                        </div>
+                    ` : `
+                        <div style="background-color: #d4edda; padding: 15px; border: 1px solid #c3e6cb; border-radius: 5px; margin: 10px 0;">
+                            <h4>✅ Configuração OK:</h4>
+                            <p>O campo <code>twilio_sender_id</code> está configurado corretamente.</p>
+                        </div>
+                    `}
+                `;
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<p style="color: red;">Erro: ${error.message}</p>`;
+            }
+        }
+        
+        // Executar teste ao carregar a página
+        testSmsSettings();
+    </script>
+</body>
+</html>

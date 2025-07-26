@@ -5,6 +5,7 @@ interface Settings {
   store_name: string;
   store_description: string;
   logo_url: string | null;
+  favicon_url: string | null;
   contact_email: string;
   contact_phone: string;
   address: string;
@@ -24,6 +25,7 @@ const defaultSettings: Settings = {
   store_name: 'SuperLoja',
   store_description: 'A melhor loja de eletrônicos de Angola',
   logo_url: null,
+  favicon_url: null,
   contact_email: 'contato@superloja.com',
   contact_phone: '+244 942 705 533',
   address: 'Luanda, Angola',
@@ -60,6 +62,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           settingsMap.store_name = value.name || defaultSettings.store_name;
           settingsMap.store_description = value.description || defaultSettings.store_description;
           settingsMap.logo_url = value.logo_url;
+          settingsMap.favicon_url = value.favicon_url;
         } else if (setting.key === 'contact_info') {
           settingsMap.contact_email = value.email || defaultSettings.contact_email;
           settingsMap.contact_phone = value.phone || defaultSettings.contact_phone;

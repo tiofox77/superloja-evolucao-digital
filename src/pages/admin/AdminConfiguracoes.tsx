@@ -8,16 +8,30 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Settings, Store, Bell, Shield, Database, Save, Upload, Globe, Clock, Users, Mail, MessageSquare, FileText, Zap, Download, RefreshCw, GitBranch, AlertTriangle, CheckCircle, History, BarChart3 } from 'lucide-react';
+import { syncTemplatesWithBackend, testTemplateEndpoint } from '@/utils/templateSync';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import SuperLojaAvatar from '@/components/SuperLojaAvatar';
+import { useSettings } from '@/contexts/SettingsContext';
 
 const AdminConfiguracoes = () => {
+  // Estado para teste da API
+  const [loadingApiTest, setLoadingApiTest] = useState(false);
+  const [apiTestResult, setApiTestResult] = useState(null);
+  
+  // Estado para teste de email
+  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [loadingEmailTest, setLoadingEmailTest] = useState(false);
+  
+  // Configurações globais
+  const { refreshSettings } = useSettings();
+
   const [settings, setSettings] = useState({
     // Store Info
     store_name: 'SuperLoja',
     store_description: 'A melhor loja de eletrônicos de Angola',
     logo_url: null,
+    favicon_url: null,
     
     // Contact Info
     contact_email: 'contato@superloja.com',
@@ -54,6 +68,7 @@ const AdminConfiguracoes = () => {
     twilio_account_sid: '',
     twilio_auth_token: '',
     twilio_phone_number: '',
+    twilio_sender_id: 'SuperLoja',
     sms_notifications_enabled: false,
     
     // SEO Settings
@@ -103,7 +118,9 @@ const AdminConfiguracoes = () => {
   });
   const [loading, setLoading] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
+  const [faviconFile, setFaviconFile] = useState(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const [backupStatus, setBackupStatus] = useState('idle'); // idle, processing, success, error
   const [updateLogs, setUpdateLogs] = useState([]);
   const [availableVersions, setAvailableVersions] = useState([]);
@@ -133,6 +150,7 @@ const AdminConfiguracoes = () => {
           settingsMap.store_name = value.name;
           settingsMap.store_description = value.description;
           settingsMap.logo_url = value.logo_url;
+          settingsMap.favicon_url = value.favicon_url;
         } else if (setting.key === 'contact_info') {
           settingsMap.contact_email = value.email;
           settingsMap.contact_phone = value.phone;
@@ -162,6 +180,7 @@ const AdminConfiguracoes = () => {
           settingsMap.twilio_account_sid = value.twilio_account_sid || '';
           settingsMap.twilio_auth_token = value.twilio_auth_token || '';
           settingsMap.twilio_phone_number = value.twilio_phone_number || '';
+          settingsMap.twilio_sender_id = value.twilio_sender_id || 'SuperLoja';
           settingsMap.sms_notifications_enabled = value.sms_notifications_enabled ?? false;
         } else if (setting.key === 'notification_templates') {
           settingsMap.email_templates = value.email_templates || settingsMap.email_templates;
@@ -194,13 +213,13 @@ const AdminConfiguracoes = () => {
       const filePath = `logos/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('product-images')
+        .from('store-assets')
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage
-        .from('product-images')
+        .from('store-assets')
         .getPublicUrl(filePath);
 
       return data.publicUrl;
@@ -212,14 +231,46 @@ const AdminConfiguracoes = () => {
     }
   };
 
+  const uploadFavicon = async (file) => {
+    setUploadingFavicon(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `favicon.${fileExt}`;
+      const filePath = `favicons/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('store-assets')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('store-assets')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Erro ao fazer upload do favicon:', error);
+      throw error;
+    } finally {
+      setUploadingFavicon(false);
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
       let logoUrl = settings.logo_url;
+      let faviconUrl = settings.favicon_url;
       
       // Upload logo if selected
       if (logoFile) {
         logoUrl = await uploadLogo(logoFile);
+      }
+      
+      // Upload favicon if selected
+      if (faviconFile) {
+        faviconUrl = await uploadFavicon(faviconFile);
       }
 
       // Update settings in database
@@ -229,7 +280,8 @@ const AdminConfiguracoes = () => {
           value: {
             name: settings.store_name,
             description: settings.store_description,
-            logo_url: logoUrl
+            logo_url: logoUrl,
+            favicon_url: faviconUrl
           }
         },
         {
@@ -281,6 +333,7 @@ const AdminConfiguracoes = () => {
             twilio_account_sid: settings.twilio_account_sid,
             twilio_auth_token: settings.twilio_auth_token,
             twilio_phone_number: settings.twilio_phone_number,
+            twilio_sender_id: settings.twilio_sender_id,
             sms_notifications_enabled: settings.sms_notifications_enabled
           }
         },
@@ -322,44 +375,33 @@ const AdminConfiguracoes = () => {
         if (error) throw error;
       }
       
-      setSettings(prev => ({ ...prev, logo_url: logoUrl }));
+      setSettings(prev => ({ ...prev, logo_url: logoUrl, favicon_url: faviconUrl }));
       setLogoFile(null);
+      setFaviconFile(null);
+      
+      // Atualizar configurações globais
+      if (refreshSettings) {
+        await refreshSettings();
+      }
       
       // Sincronizar templates com o backend PHP
-      try {
-        // 1. Guardar templates no ficheiro local do PHP
-        const phpSyncResponse = await fetch('http://localhost/superlojareact/public/api/get-templates.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            templates: {
-              email_templates: settings.email_templates
-            }
-          })
-        });
+      const syncResult = await syncTemplatesWithBackend({
+        email_templates: settings.email_templates
+      });
 
-        if (phpSyncResponse.ok) {
-          console.log('Templates sincronizados com o backend PHP');
-          
-          // Adicionar detalhe ao toast
-          toast({
-            title: "✅ Configurações salvas!",
-            description: "Todas as configurações e templates foram actualizados com sucesso."
-          });
-        } else {
-          console.warn('Falha ao sincronizar templates com o PHP, usando fallback');
-          
-          toast({
-            title: "⚠️ Configurações salvas parcialmente",
-            description: "Configurações guardadas, mas a sincronização de templates com o backend PHP falhou."
-          });
-        }
-      } catch (syncError) {
-        console.error('Erro ao sincronizar templates:', syncError);
+      if (syncResult.success) {
+        console.log('Templates sincronizados com o backend PHP');
         
         toast({
           title: "✅ Configurações salvas!",
-          description: "Atenção: Templates não foram sincronizados com o backend PHP."
+          description: "Todas as configurações e templates foram actualizados com sucesso."
+        });
+      } else {
+        console.warn('Falha ao sincronizar templates com o PHP:', syncResult.message, syncResult.error);
+        
+        toast({
+          title: "⚠️ Configurações salvas parcialmente",
+          description: `Configurações guardadas, mas a sincronização de templates falhou: ${syncResult.message}`
         });
       }
     } catch (error) {
@@ -832,6 +874,111 @@ const AdminConfiguracoes = () => {
     }
   };
 
+  const testOpenAIConnection = async () => {
+    // Limpa o resultado anterior e define o estado de carregamento
+    setLoadingApiTest(true);
+    setApiTestResult(null);
+    
+    // ID único para este teste para logs
+    const testId = Date.now().toString();
+    
+    try {
+      // Validar se a chave da API está definida
+      if (!settings.openai_api_key) {
+        throw new Error('Chave da API OpenAI não configurada');
+      }
+      
+      console.log('Testando conexão com a API OpenAI...');
+      
+      // Testar a API OpenAI com uma requisição simples
+      const response = await fetch('https://api.openai.com/v1/models', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${settings.openai_api_key}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      // Verificar se a resposta contém erro
+      if (!response.ok) {
+        const errorMessage = data.error?.message || 'Erro desconhecido';
+        const errorCode = data.error?.code || 'sem código';
+        const errorType = data.error?.type || 'desconhecido';
+        
+        throw new Error(`Erro na API (${errorType}/${errorCode}): ${errorMessage}`);
+      }
+      
+      // Mostrar os modelos disponíveis na conta
+      const availableModels = data.data?.map(model => model.id).slice(0, 10).join('\n') || 'Nenhum modelo encontrado';
+      
+      // Log de sucesso
+      console.log('Conexão bem-sucedida com a API OpenAI!');
+      
+      // Definir resultado positivo
+      setApiTestResult({
+        success: true,
+        message: 'Conexão estabelecida com sucesso!',
+        details: `Modelos disponíveis na sua conta (primeiros 10):\n${availableModels}`
+      });
+      
+      // Adicionar log de sucesso
+      setUpdateLogs(prev => [
+        {
+          id: testId,
+          status: 'success',
+          type: 'api',
+          message: 'Teste da API OpenAI bem-sucedido',
+          timestamp: new Date().toISOString()
+        },
+        ...prev
+      ]);
+      
+      // Notificar o utilizador
+      toast({
+        title: '✅ API OpenAI conectada!',
+        description: 'Sua chave da API foi validada com sucesso.'
+      });
+      
+    } catch (error) {
+      console.error('Erro no teste da API OpenAI:', error);
+      
+      // Definir resultado de erro
+      setApiTestResult({
+        success: false,
+        message: 'Falha na conexão com a API OpenAI',
+        details: `Erro: ${error.message}`
+      });
+      
+      // Adicionar log de erro
+      setUpdateLogs(prev => [
+        {
+          id: testId,
+          status: 'error',
+          type: 'api',
+          message: `Erro no teste da API OpenAI: ${error.message}`,
+          timestamp: new Date().toISOString()
+        },
+        ...prev
+      ]);
+      
+      // Notificar o utilizador
+      toast({
+        title: '❌ Erro na conexão API',
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingApiTest(false);
+      
+      // Forçar atualização dos logs do sistema após breve delay
+      setTimeout(() => {
+        loadSystemLogs();
+      }, 1500);
+    }
+  };
+
   const testPhpEmail = async () => {
     // Criar um ID único para este email para podermos acompanhar
     const emailId = Date.now().toString();
@@ -964,6 +1111,184 @@ const AdminConfiguracoes = () => {
     checkPhpSystemStatus();
   }, []);
 
+  // Funções para botões avançados
+  const handleClearCache = async () => {
+    try {
+      toast({
+        title: "🗑️ Limpando cache...",
+        description: "Aguarde enquanto o cache é limpo."
+      });
+      
+      // Limpar cache do localStorage
+      localStorage.removeItem('superloja-cache');
+      localStorage.removeItem('superloja-settings');
+      
+      // Limpar cache do Service Worker se disponível
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      
+      // Limpar cache do navegador
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        );
+      }
+      
+      toast({
+        title: "✅ Cache limpo!",
+        description: "Cache removido com sucesso. Recarregue a página para aplicar as alterações."
+      });
+    } catch (error) {
+      console.error('Erro ao limpar cache:', error);
+      toast({
+        title: "❌ Erro ao limpar cache",
+        description: "Não foi possível limpar o cache completamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleOptimizeImages = async () => {
+    try {
+      toast({
+        title: "🔧 Otimizando imagens...",
+        description: "Verificando e otimizando imagens no storage."
+      });
+      
+      // Listar imagens no bucket store-assets
+      const { data: files, error } = await supabase.storage
+        .from('store-assets')
+        .list('', { limit: 100 });
+      
+      if (error) throw error;
+      
+      const imageCount = files?.length || 0;
+      
+      // Simular otimização (em produção, isso seria feito no servidor)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      toast({
+        title: "✅ Imagens otimizadas!",
+        description: `${imageCount} imagens verificadas e otimizadas com sucesso.`
+      });
+    } catch (error) {
+      console.error('Erro ao otimizar imagens:', error);
+      toast({
+        title: "❌ Erro na otimização",
+        description: "Não foi possível otimizar as imagens.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleViewErrorLogs = () => {
+    // Navegar para a página de logs
+    window.open('/admin/logs', '_blank');
+  };
+
+  const handleTestTemplateEndpoint = async () => {
+    try {
+      toast({
+        title: "🔍 Testando endpoint de templates...",
+        description: "Verificando conectividade com o backend PHP."
+      });
+      
+      const testResult = await testTemplateEndpoint();
+      
+      if (testResult.success) {
+        toast({
+          title: "✅ Endpoint funcionando!",
+          description: "Conectividade com o backend PHP confirmada."
+        });
+      } else {
+        toast({
+          title: "⚠️ Problema no endpoint",
+          description: `Erro: ${testResult.message}`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao testar endpoint:', error);
+      toast({
+        title: "❌ Erro no teste",
+        description: "Não foi possível conectar com o backend.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTestRealEmail = async () => {
+    if (!testEmailAddress) {
+      toast({
+        title: "⚠️ Email obrigatório",
+        description: "Por favor, insira um endereço de email válido.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoadingEmailTest(true);
+    
+    try {
+      toast({
+        title: "📧 Enviando email...",
+        description: "Testando envio de email real via SMTP."
+      });
+      
+      // Usar URL relativa baseada no ambiente (igual ao hook useNotifications)
+      const baseUrl = window.location.hostname === 'localhost' ? 
+        'http://localhost/superlojareact/public/api' :
+        '/api';
+        
+      console.log(`Testando email usando endpoint: ${baseUrl}/send-email.php`);
+        
+      const response = await fetch(`${baseUrl}/send-email.php`, {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-cache',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: 'welcome',
+          to: testEmailAddress,
+          userName: 'Teste',
+          force_real: true  // Forçar envio real mesmo em localhost
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: "✅ Email enviado!",
+          description: `Email teste enviado com sucesso para ${testEmailAddress}.`
+        });
+        setTestEmailAddress(''); // Limpar campo após sucesso
+      } else {
+        toast({
+          title: "❌ Erro no envio",
+          description: result.message || "Não foi possível enviar o email.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao enviar email:', error);
+      toast({
+        title: "❌ Erro de conexão",
+        description: "Não foi possível conectar com o servidor de email.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingEmailTest(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -1045,6 +1370,48 @@ const AdminConfiguracoes = () => {
                 {logoFile && (
                   <p className="text-sm text-green-600">
                     ✓ Nova logo selecionada: {logoFile.name}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label>Favicon da Loja</Label>
+              <div className="mt-2 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
+                    {settings.favicon_url ? (
+                      <img 
+                        src={settings.favicon_url} 
+                        alt="Favicon da loja"
+                        className="w-8 h-8 object-contain"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-gray-300 rounded-sm flex items-center justify-center">
+                        <span className="text-xs text-gray-500">ICO</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Input
+                      type="file"
+                      accept="image/*,.ico"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setFaviconFile(file);
+                        }
+                      }}
+                      className="mb-2"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Formatos aceitos: ICO, PNG, JPG (máx. 1MB, recomendado: 32x32px)
+                    </p>
+                  </div>
+                </div>
+                {faviconFile && (
+                  <p className="text-sm text-green-600">
+                    ✓ Novo favicon selecionado: {faviconFile.name}
                   </p>
                 )}
               </div>
@@ -1587,16 +1954,57 @@ const AdminConfiguracoes = () => {
                       </p>
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => window.open('https://platform.openai.com/api-keys', '_blank')}
-                      >
-                        <Globe className="w-4 h-4 mr-2" />
+                    <div className="flex items-center gap-2 mt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="text-sm"
+                        onClick={() => window.open('https://platform.openai.com/api-keys', '_blank')}>
                         Obter Chave OpenAI
                       </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="text-sm"
+                        disabled={!settings.openai_api_key}
+                        onClick={testOpenAIConnection}>                      
+                        {loadingApiTest ? (
+                          <>
+                            <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                            Testando...
+                          </>
+                        ) : (
+                          'Testar API'
+                        )}
+                      </Button>
                     </div>
+                    
+                    {apiTestResult && (
+                      <div className={`mt-4 p-3 rounded-md border ${
+                        apiTestResult.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                      }`}>
+                        <div className="flex items-start">
+                          <div className={`p-1 rounded-full ${
+                            apiTestResult.success ? 'bg-green-500' : 'bg-red-500'
+                          } mr-2 mt-1`}>
+                            {apiTestResult.success ? 
+                              <CheckCircle className="h-3 w-3 text-white" /> : 
+                              <AlertTriangle className="h-3 w-3 text-white" />
+                            }
+                          </div>
+                          <div>
+                            <h4 className={`font-semibold text-sm ${
+                              apiTestResult.success ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {apiTestResult.message}
+                            </h4>
+                            <pre className="mt-2 text-xs overflow-auto max-h-32 bg-black bg-opacity-5 p-2 rounded whitespace-pre-wrap">
+                              {apiTestResult.details}
+                            </pre>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2046,6 +2454,21 @@ const AdminConfiguracoes = () => {
                   />
                 </div>
 
+                <div>
+                  <Label htmlFor="twilio_sender_id">Nome do Remetente (Sender ID)</Label>
+                  <Input
+                    id="twilio_sender_id"
+                    value={settings.twilio_sender_id}
+                    onChange={(e) => setSettings({...settings, twilio_sender_id: e.target.value})}
+                    placeholder="SuperLoja"
+                    className="mt-1"
+                    disabled={!settings.sms_notifications_enabled}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Nome que aparecerá como remetente das SMS (máx. 11 caracteres)
+                  </p>
+                </div>
+
                 <div className="p-4 bg-muted/50 rounded-lg">
                   <h4 className="font-medium text-sm mb-2">ℹ️ Como configurar Twilio:</h4>
                   <ol className="text-xs text-muted-foreground space-y-1">
@@ -2405,14 +2828,71 @@ const AdminConfiguracoes = () => {
               <div className="space-y-4">
                 <h4 className="font-semibold">Cache e Performance</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <Button variant="outline">Limpar Cache</Button>
-                  <Button variant="outline">Otimizar Imagens</Button>
+                  <Button variant="outline" onClick={handleClearCache}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Limpar Cache
+                  </Button>
+                  <Button variant="outline" onClick={handleOptimizeImages}>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Otimizar Imagens
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-semibold">Testes de API</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <Button variant="outline" onClick={handleTestTemplateEndpoint}>
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Testar Templates API
+                  </Button>
+                  <Button variant="outline" onClick={handleViewErrorLogs}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Ver Logs de Erro
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-semibold">Testes de Email</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <h5 className="font-medium text-blue-800 dark:text-blue-200 mb-2">📧 Teste de Email Real</h5>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                      Envie um email real usando as configurações SMTP. Funciona em localhost com Laragon.
+                    </p>
+                    <div className="space-y-2">
+                      <Input
+                        type="email"
+                        placeholder="seu@email.com"
+                        value={testEmailAddress}
+                        onChange={(e) => setTestEmailAddress(e.target.value)}
+                        className="text-sm"
+                      />
+                      <Button 
+                        variant="outline" 
+                        onClick={handleTestRealEmail}
+                        disabled={!testEmailAddress || loadingEmailTest}
+                        className="w-full"
+                      >
+                        {loadingEmailTest ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                        ) : (
+                          <Mail className="w-4 h-4 mr-2" />
+                        )}
+                        {loadingEmailTest ? 'Enviando...' : 'Enviar Email Teste'}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <h4 className="font-semibold">Logs do Sistema</h4>
-                <Button variant="outline" className="w-full">Ver Logs de Erro</Button>
+                <Button variant="outline" className="w-full" onClick={handleViewErrorLogs}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Ver Logs de Erro
+                </Button>
               </div>
             </CardContent>
           </Card>

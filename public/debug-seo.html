@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug SEO - SuperLoja</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h2 {
+            color: #2563eb;
+            margin-top: 0;
+        }
+        .url-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .button {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background: #1d4ed8;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #2563eb;
+        }
+        .results pre {
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .error {
+            color: #dc2626;
+            background: #fef2f2;
+            border-left-color: #dc2626;
+        }
+        .success {
+            color: #16a34a;
+            background: #f0fdf4;
+            border-left-color: #16a34a;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug SEO - SuperLoja</h1>
+        
+        <div class="test-section">
+            <h2>1. Testar Meta Tags</h2>
+            <input type="text" class="url-input" id="metaUrl" placeholder="http://localhost:8080/produto/exemplo" value="http://localhost:8080/">
+            <button class="button" onclick="testMetaTags()">Testar Meta Tags</button>
+            <div id="metaResults" class="results" style="display: none;">
+                <pre id="metaOutput"></pre>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="test-section">
+                <h2>2. Sitemap</h2>
+                <button class="button" onclick="testSitemap()">Verificar Sitemap</button>
+                <div id="sitemapResults" class="results" style="display: none;">
+                    <pre id="sitemapOutput"></pre>
+                </div>
+            </div>
+
+            <div class="test-section">
+                <h2>3. Robots.txt</h2>
+                <button class="button" onclick="testRobots()">Verificar Robots.txt</button>
+                <div id="robotsResults" class="results" style="display: none;">
+                    <pre id="robotsOutput"></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Simulação de Bot</h2>
+            <input type="text" class="url-input" id="botUrl" placeholder="http://localhost:8080/produto/exemplo" value="http://localhost:8080/">
+            <button class="button" onclick="simulateBot()">Simular Bot do Google</button>
+            <div id="botResults" class="results" style="display: none;">
+                <pre id="botOutput"></pre>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. Validação Schema.org</h2>
+            <input type="text" class="url-input" id="schemaUrl" placeholder="http://localhost:8080/produto/exemplo" value="http://localhost:8080/">
+            <button class="button" onclick="validateSchema()">Validar Schema</button>
+            <div id="schemaResults" class="results" style="display: none;">
+                <pre id="schemaOutput"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function testMetaTags() {
+            const url = document.getElementById('metaUrl').value;
+            const results = document.getElementById('metaResults');
+            const output = document.getElementById('metaOutput');
+            
+            results.style.display = 'block';
+            output.textContent = 'Carregando...';
+            
+            try {
+                const response = await fetch(`/api/generate-meta-tags.php?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+                
+                results.className = 'results success';
+                output.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                results.className = 'results error';
+                output.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        async function testSitemap() {
+            const results = document.getElementById('sitemapResults');
+            const output = document.getElementById('sitemapOutput');
+            
+            results.style.display = 'block';
+            output.textContent = 'Carregando...';
+            
+            try {
+                const response = await fetch('/api/generate-sitemap.php');
+                const text = await response.text();
+                
+                results.className = 'results success';
+                output.textContent = text;
+            } catch (error) {
+                results.className = 'results error';
+                output.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        async function testRobots() {
+            const results = document.getElementById('robotsResults');
+            const output = document.getElementById('robotsOutput');
+            
+            results.style.display = 'block';
+            output.textContent = 'Carregando...';
+            
+            try {
+                const response = await fetch('/robots.txt');
+                const text = await response.text();
+                
+                results.className = 'results success';
+                output.textContent = text;
+            } catch (error) {
+                results.className = 'results error';
+                output.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        async function simulateBot() {
+            const url = document.getElementById('botUrl').value;
+            const results = document.getElementById('botResults');
+            const output = document.getElementById('botOutput');
+            
+            results.style.display = 'block';
+            output.textContent = 'Simulando...';
+            
+            try {
+                // Simular requisição de bot
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+                    }
+                });
+                const html = await response.text();
+                
+                // Extrair meta tags do HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                const metaTags = {
+                    title: doc.querySelector('title')?.textContent || 'Não encontrado',
+                    description: doc.querySelector('meta[name="description"]')?.getAttribute('content') || 'Não encontrado',
+                    keywords: doc.querySelector('meta[name="keywords"]')?.getAttribute('content') || 'Não encontrado',
+                    ogTitle: doc.querySelector('meta[property="og:title"]')?.getAttribute('content') || 'Não encontrado',
+                    ogDescription: doc.querySelector('meta[property="og:description"]')?.getAttribute('content') || 'Não encontrado',
+                    ogImage: doc.querySelector('meta[property="og:image"]')?.getAttribute('content') || 'Não encontrado',
+                    structuredData: []
+                };
+                
+                // Extrair dados estruturados
+                const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
+                scripts.forEach(script => {
+                    try {
+                        const data = JSON.parse(script.textContent);
+                        metaTags.structuredData.push(data);
+                    } catch (e) {
+                        // Ignorar scripts malformados
+                    }
+                });
+                
+                results.className = 'results success';
+                output.textContent = JSON.stringify(metaTags, null, 2);
+            } catch (error) {
+                results.className = 'results error';
+                output.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        async function validateSchema() {
+            const url = document.getElementById('schemaUrl').value;
+            const results = document.getElementById('schemaResults');
+            const output = document.getElementById('schemaOutput');
+            
+            results.style.display = 'block';
+            output.textContent = 'Validando...';
+            
+            try {
+                const response = await fetch(`/api/generate-meta-tags.php?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+                
+                if (data.schema) {
+                    const validation = {
+                        valid: true,
+                        schema: data.schema,
+                        validation: 'Schema válido encontrado',
+                        recommendations: []
+                    };
+                    
+                    // Validações básicas
+                    if (!data.schema['@context']) {
+                        validation.valid = false;
+                        validation.recommendations.push('Adicionar @context');
+                    }
+                    
+                    if (!data.schema['@type']) {
+                        validation.valid = false;
+                        validation.recommendations.push('Adicionar @type');
+                    }
+                    
+                    if (data.schema['@type'] === 'Product') {
+                        if (!data.schema.name) validation.recommendations.push('Adicionar nome do produto');
+                        if (!data.schema.description) validation.recommendations.push('Adicionar descrição do produto');
+                        if (!data.schema.image) validation.recommendations.push('Adicionar imagem do produto');
+                        if (!data.schema.offers) validation.recommendations.push('Adicionar informações de preço');
+                    }
+                    
+                    results.className = validation.valid ? 'results success' : 'results error';
+                    output.textContent = JSON.stringify(validation, null, 2);
+                } else {
+                    results.className = 'results error';
+                    output.textContent = 'Nenhum schema estruturado encontrado para esta URL';
+                }
+            } catch (error) {
+                results.className = 'results error';
+                output.textContent = `Erro: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

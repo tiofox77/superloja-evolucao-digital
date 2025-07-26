@@ -103,14 +103,21 @@ const AdminLogs = () => {
     setTestingEmail(true);
     
     try {
-      // Usar o endpoint PHP diretamente, como na página de configurações
-      const response = await fetch('http://localhost/superlojareact/public/api/send-email.php', {
+      // Usar o endpoint PHP diretamente, com URL relativa baseada no ambiente
+      const baseUrl = window.location.hostname === 'localhost' ? 
+        'http://localhost/superlojareact/public/api' :
+        '/api';
+        
+      const response = await fetch(`${baseUrl}/send-email.php`, {
         method: 'POST',
+        mode: 'cors',
+        cache: 'no-cache',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'welcome',
           to: testEmail,
-          userName: 'Teste do Sistema'
+          userName: 'Teste do Sistema',
+          force_real: true // Força envio real para testar o sistema de email
         })
       });
 

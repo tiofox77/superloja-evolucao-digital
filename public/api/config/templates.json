@@ -1,24 +1,19 @@
 {
     "email_templates": {
         "welcome": {
-            "subject": "Bem-vindo \u00e0 SuperLoja!",
-            "body": "<h3>Ol\u00e1 {userName}!<\/h3>\n<p>Sua conta na SuperLoja foi criada com sucesso! Agora voc\u00ea pode aproveitar todas as nossas ofertas.<\/p>",
-            "enabled": true
+            "body": "Ol\u00e1 {userName}! Sua conta foi criada com sucesso. Aproveite nossas ofertas especiais!",
+            "enabled": true,
+            "subject": "Bem-vindo \u00e0 SuperLoja!"
         },
         "order_created": {
-            "subject": "Pedido #{orderNumber} Confirmadoa",
-            "body": "<h3>Obrigado pela sua compra, {userName}!<\/h3>\n<p>Seu pedido <strong>#{orderNumber}<\/strong> foi criado com sucesso!<\/p>\n<p>Valor total: <strong>{orderTotal} AOA<\/strong><\/p>",
-            "enabled": true
+            "body": "Seu pedido #{orderNumber} foi criado com sucesso! Total: {orderTotal}. Acompanhe o status em nossa plataforma.",
+            "enabled": true,
+            "subject": "Pedido Confirmado #{orderNumber}"
         },
         "status_changed": {
-            "subject": "Atualiza\u00e7\u00e3o do Pedido #{orderNumber}",
-            "body": "<h3>Ol\u00e1 {userName}!<\/h3>\n<p>Seu pedido <strong>#{orderNumber}<\/strong> foi atualizado para: {newStatus}<\/p>",
-            "enabled": true
-        },
-        "contact_form": {
-            "subject": "Confirma\u00e7\u00e3o de Contacto",
-            "body": "<h3>Ol\u00e1 {userName}!<\/h3>\n<p>Recebemos sua mensagem enviada atrav\u00e9s do formul\u00e1rio de contacto.<\/p>",
-            "enabled": true
+            "body": "Seu pedido #{orderNumber} teve o status alterado para: {newStatus}. Fique atento \u00e0s atualiza\u00e7\u00f5es!",
+            "enabled": true,
+            "subject": "Status do Pedido Atualizado"
         }
     }
 }

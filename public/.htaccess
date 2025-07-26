@@ -48,17 +48,22 @@ RewriteBase /
     SetHandler application/x-httpd-php
 </FilesMatch>
 
-# Verificar se o caminho começa com /api/
-RewriteCond %{REQUEST_URI} ^/api/ [NC]
-# E é um ficheiro PHP
-RewriteCond %{REQUEST_URI} \.php$ [NC]
-# Então não aplicar a regra abaixo (pular para o próximo conjunto)
+# Permitir acesso a arquivos estáticos (CSS, JS, imagens, etc.)
+RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule .* - [L]
 
-# Handle Angular and React requests para os outros casos
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /index.html [L]
+# Permitir acesso a diretórios
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule .* - [L]
+
+# Processar APIs PHP - permitir acesso à pasta /api/
+RewriteCond %{REQUEST_URI} ^/api/ [NC]
+RewriteRule .* - [L]
+
+# Redirecionar todas as outras requisições para index.html (React Router)
+# Excluir arquivos com extensões específicas
+RewriteCond %{REQUEST_URI} !\.(css|js|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|map|json|xml|txt|pdf|zip|rar|mp4|mp3|avi|mov|wmv|flv|swf)$ [NC]
+RewriteRule ^(.*)$ /index.html [L,QSA]
 
 # Block access to sensitive files
 <FilesMatch "\.(env|htaccess|htpasswd)$">

@@ -1,8 +1,13 @@
+# SuperLoja - Robots.txt
+# Permite indexação completa para buscadores principais
+
 User-agent: Googlebot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Bingbot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +17,28 @@ Allow: /
 
 User-agent: *
 Allow: /
+Crawl-delay: 2
+
+# Bloquear diretórios administrativos
+Disallow: /admin/
+Disallow: /src/
+Disallow: /node_modules/
+Disallow: /.git/
+Disallow: /debug-seo.html
+
+# Permitir endpoints SEO específicos
+Allow: /api/generate-sitemap.php
+Allow: /api/generate-sitemap-simple.php
+Allow: /api/generate-meta-tags.php
+Allow: /api/generate-meta-tags-simple.php
+Allow: /api/test-seo.php
+Allow: /api/bot-detection.php
+
+# Bloquear outros arquivos da API
+Disallow: /api/
+
+# Sitemap
+Sitemap: http://localhost:8080/api/generate-sitemap.php
+
+# Host
+Host: http://localhost:8080
