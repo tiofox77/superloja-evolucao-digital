@@ -212,14 +212,14 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onSave, on
           {/* Ícone */}
           <div>
             <Label htmlFor="icon">Ícone (opcional)</Label>
-            <Select value={formData.icon} onValueChange={(value) => 
-              setFormData({...formData, icon: value})
+            <Select value={formData.icon || 'none'} onValueChange={(value) => 
+              setFormData({...formData, icon: value === 'none' ? '' : value})
             }>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um ícone" />
               </SelectTrigger>
               <SelectContent className="bg-background border border-border shadow-lg z-50">
-                <SelectItem value="">Nenhum ícone</SelectItem>
+                <SelectItem value="none">Nenhum ícone</SelectItem>
                 <SelectItem value="heart">❤️ Coração</SelectItem>
                 <SelectItem value="user">👤 Usuário</SelectItem>
                 <SelectItem value="home">🏠 Casa</SelectItem>
