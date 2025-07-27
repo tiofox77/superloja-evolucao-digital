@@ -5,6 +5,12 @@ import { ArrowRight, Zap, Truck, Shield, Headphones, Smartphone, Laptop, Headset
 import { useState, useEffect } from "react";
 import { Scene3D } from "./3D/Scene3D";
 import heroImage from "@/assets/hero-electronics.jpg";
+import heroTWSAudio from "@/assets/hero-tws-audio.jpg";
+import heroGamingPC from "@/assets/hero-gaming-pc.jpg";
+import heroPowerbank from "@/assets/hero-powerbank.jpg";
+import heroHealthWellness from "@/assets/hero-health-wellness.jpg";
+import heroSkincareBeauty from "@/assets/hero-skincare-beauty.jpg";
+import heroSmartCleaning from "@/assets/hero-smart-cleaning.jpg";
 
 const heroSlides = [
   {
@@ -18,7 +24,8 @@ const heroSlides = [
     gradient: "from-violet-600 via-purple-600 to-blue-600",
     textGradient: "from-cyan-300 to-violet-300",
     bgPattern: "radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3), transparent 50%)",
-    category: "tech"
+    category: "tech",
+    image: heroImage
   },
   {
     id: 2,
@@ -31,7 +38,8 @@ const heroSlides = [
     gradient: "from-orange-500 via-pink-500 to-red-500",
     textGradient: "from-yellow-300 to-orange-300",
     bgPattern: "radial-gradient(circle at 30% 30%, rgba(251, 146, 60, 0.3), transparent 50%), radial-gradient(circle at 70% 70%, rgba(239, 68, 68, 0.3), transparent 50%)",
-    category: "audio"
+    category: "audio",
+    image: heroTWSAudio
   },
   {
     id: 3,
@@ -44,7 +52,8 @@ const heroSlides = [
     gradient: "from-emerald-600 via-teal-600 to-cyan-600",
     textGradient: "from-emerald-300 to-cyan-300",
     bgPattern: "radial-gradient(circle at 40% 20%, rgba(16, 185, 129, 0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.3), transparent 50%)",
-    category: "gaming"
+    category: "gaming",
+    image: heroGamingPC
   },
   {
     id: 4,
@@ -57,7 +66,8 @@ const heroSlides = [
     gradient: "from-amber-500 via-yellow-500 to-lime-500",
     textGradient: "from-amber-300 to-lime-300",
     bgPattern: "radial-gradient(circle at 60% 40%, rgba(245, 158, 11, 0.3), transparent 50%), radial-gradient(circle at 20% 80%, rgba(132, 204, 22, 0.3), transparent 50%)",
-    category: "power"
+    category: "power",
+    image: heroPowerbank
   },
   {
     id: 5,
@@ -70,7 +80,8 @@ const heroSlides = [
     gradient: "from-pink-500 via-rose-500 to-red-500",
     textGradient: "from-pink-300 to-rose-300",
     bgPattern: "radial-gradient(circle at 50% 20%, rgba(236, 72, 153, 0.3), transparent 50%), radial-gradient(circle at 30% 80%, rgba(244, 63, 94, 0.3), transparent 50%)",
-    category: "health"
+    category: "health",
+    image: heroHealthWellness
   },
   {
     id: 6,
@@ -83,7 +94,8 @@ const heroSlides = [
     gradient: "from-purple-500 via-fuchsia-500 to-pink-500",
     textGradient: "from-purple-300 to-pink-300",
     bgPattern: "radial-gradient(circle at 40% 60%, rgba(168, 85, 247, 0.3), transparent 50%), radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.3), transparent 50%)",
-    category: "beauty"
+    category: "beauty",
+    image: heroSkincareBeauty
   },
   {
     id: 7,
@@ -96,7 +108,8 @@ const heroSlides = [
     gradient: "from-blue-500 via-sky-500 to-cyan-500",
     textGradient: "from-blue-300 to-cyan-300",
     bgPattern: "radial-gradient(circle at 20% 40%, rgba(59, 130, 246, 0.3), transparent 50%), radial-gradient(circle at 80% 60%, rgba(6, 182, 212, 0.3), transparent 50%)",
-    category: "clean"
+    category: "clean",
+    image: heroSmartCleaning
   }
 ];
 
@@ -282,8 +295,8 @@ export const Hero = () => {
                         }}
                       >
                         <img 
-                          src={heroImage}
-                          alt="Produtos tecnológicos modernos"
+                          src={slide.image}
+                          alt={`${slide.title} - ${slide.description}`}
                           className="w-full h-auto object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
