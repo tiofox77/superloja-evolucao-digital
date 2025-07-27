@@ -204,6 +204,7 @@ const AdminProdutos = () => {
       ];
       
       const fieldNames = [
+        'id',
         'title',
         'description',
         'availability',
@@ -219,6 +220,7 @@ const AdminProdutos = () => {
         headers,
         fieldNames,
         ...facebookData.map(product => [
+          product.id,
           product.title,
           product.description,
           product.availability,
