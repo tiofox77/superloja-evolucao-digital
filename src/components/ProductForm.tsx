@@ -35,6 +35,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
     price: product?.price || '',
     original_price: product?.original_price || '',
     category_id: product?.category_id || '',
+    subcategory_id: product?.subcategory_id || '',
     stock_quantity: product?.stock_quantity || 0,
     in_stock: product?.in_stock ?? true,
     featured: product?.featured ?? false,
@@ -43,7 +44,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
     seo_title: product?.seo_title || '',
     seo_description: product?.seo_description || '',
     seo_keywords: product?.seo_keywords || '',
-    // Novos campos
     product_type: product?.product_type || 'physical',
     is_digital: product?.is_digital ?? false,
     digital_file_url: product?.digital_file_url || '',
@@ -91,7 +91,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         .from('product-images')
         .getPublicUrl(fileName);
 
-      // Se é a primeira imagem, definir como imagem principal
       if (!formData.image_url) {
         setFormData(prev => ({
           ...prev,
@@ -124,7 +123,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
     setFormData(prev => {
       const newImages = prev.images.filter(img => img !== imageUrl);
       
-      // Se removeu a imagem principal, definir a primeira das restantes como principal
       if (prev.image_url === imageUrl) {
         return {
           ...prev,
@@ -161,7 +159,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         seo_title: formData.seo_title || null,
         seo_description: formData.seo_description || null,
         seo_keywords: formData.seo_keywords || null,
-        // Novos campos avançados
         product_type: formData.product_type,
         is_digital: formData.is_digital,
         digital_file_url: formData.digital_file_url || null,
@@ -176,7 +173,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
 
       let result;
       if (product?.id) {
-        // Atualizar produto existente
         result = await supabase
           .from('products')
           .update(productData)
@@ -184,7 +180,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
           .select()
           .single();
       } else {
-        // Criar novo produto
         result = await supabase
           .from('products')
           .insert(productData)
@@ -193,31 +188,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
       }
 
       if (result.error) throw result.error;
-
-      // Se for um novo produto, gerar SEO automaticamente
-      if (!product?.id) {
-        try {
-          const categoryName = categories.find(cat => cat.id === formData.category_id)?.name;
-          
-          await supabase.functions.invoke('generate-product-seo', {
-            body: {
-              productId: result.data.id,
-              productName: formData.name,
-              productDescription: formData.description,
-              categoryName,
-              price: parseFloat(formData.price)
-            }
-          });
-          
-          toast({
-            title: "SEO gerado automaticamente!",
-            description: "Títulos e descrições SEO foram criados para este produto.",
-          });
-        } catch (seoError) {
-          console.error('Erro ao gerar SEO:', seoError);
-          // Não bloquear o salvamento se SEO falhar
-        }
-      }
 
       toast({
         title: product?.id ? "Produto atualizado!" : "Produto criado!",
@@ -264,7 +234,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
           productDescription: formData.description,
           categoryName,
           price: formData.price ? parseFloat(formData.price) : 0,
-          generateOnly: true // Flag para só gerar, não salvar
+          generateOnly: true
         }
       });
 
@@ -332,7 +302,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">
           {product?.id ? 'Editar Produto' : 'Novo Produto'}
@@ -342,168 +312,366 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         </Button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          {/* Coluna Principal - Informações do Produto */}
-          <div className="xl:col-span-2 space-y-8">
-            
-            {/* 1. Informações Básicas */}
-            <Card className="hover-scale">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="w-5 h-5" />
-                  1. Informações Básicas
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Nome, descrição e categoria do produto
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Nome do Produto *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    required
-                    className="mt-1"
-                    placeholder="Ex: iPhone 15 Pro Max"
-                  />
-                </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <Tabs defaultValue="basic" className="w-full">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="basic" className="flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Básico
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="flex items-center gap-2">
+              <Star className="w-4 h-4" />
+              Categorias
+            </TabsTrigger>
+            <TabsTrigger value="pricing" className="flex items-center gap-2">
+              <Star className="w-4 h-4" />
+              Preços
+            </TabsTrigger>
+            <TabsTrigger value="variants" className="flex items-center gap-2">
+              <Palette className="w-4 h-4" />
+              Variantes
+            </TabsTrigger>
+            <TabsTrigger value="media" className="flex items-center gap-2">
+              <Images className="w-4 h-4" />
+              Mídia
+            </TabsTrigger>
+            <TabsTrigger value="seo" className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              SEO
+            </TabsTrigger>
+          </TabsList>
 
-                <div>
-                  <Label htmlFor="description">Descrição do Produto</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    rows={4}
-                    className="mt-1"
-                    placeholder="Descreva os benefícios, características e especificações do produto..."
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    💡 Uma descrição completa melhora o SEO e converte mais vendas
-                  </p>
-                </div>
+          {/* Tab 1: Informações Básicas */}
+          <TabsContent value="basic" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Informações Básicas */}
+              <Card className="hover-scale">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="w-5 h-5 text-blue-600" />
+                    Informações do Produto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Nome do Produto *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      required
+                      className="mt-1"
+                      placeholder="Ex: iPhone 15 Pro Max 256GB"
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="category">Categoria *</Label>
-                  <Select value={formData.category_id} onValueChange={(value) => setFormData({...formData, category_id: value})}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
+                  <div>
+                    <Label htmlFor="description">Descrição Completa</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      rows={6}
+                      className="mt-1"
+                      placeholder="Descreva detalhadamente o produto, suas características, benefícios e especificações técnicas..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      💡 Uma descrição rica melhora o SEO e aumenta as conversões
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Tipo de Produto */}
+              <Card className="hover-scale border-l-4 border-l-orange-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-orange-600">
+                    <Package className="w-5 h-5" />
+                    Tipo de Produto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label>Tipo do Produto *</Label>
+                    <Select 
+                      value={formData.product_type} 
+                      onValueChange={(value) => {
+                        setFormData({
+                          ...formData, 
+                          product_type: value,
+                          is_digital: value === 'digital'
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50">
+                        <SelectItem value="physical">
+                          📦 Produto Físico - Precisa ser enviado
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+                        <SelectItem value="digital">
+                          💾 Produto Digital - Download/Licença
+                        </SelectItem>
+                        <SelectItem value="service">
+                          🛠️ Serviço - Consultoria/Trabalho
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* 2. Tipo de Produto */}
-            <Card className="hover-scale border-l-4 border-l-orange-500">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-600">
-                  <Package className="w-5 h-5" />
-                  2. Tipo de Produto
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Configure se é produto físico, digital ou serviço
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Tipo do Produto *</Label>
-                  <Select 
-                    value={formData.product_type} 
-                    onValueChange={(value) => {
-                      setFormData({
-                        ...formData, 
-                        product_type: value,
-                        is_digital: value === 'digital'
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Selecione o tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="physical">
-                        📦 Produto Físico - Precisa ser enviado
-                      </SelectItem>
-                      <SelectItem value="digital">
-                        💾 Produto Digital - Download/Licença
-                      </SelectItem>
-                      <SelectItem value="service">
-                        🛠️ Serviço - Consultoria/Trabalho
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  {/* Configurações para Produto Digital */}
+                  {(formData.product_type === 'digital' || formData.is_digital) && (
+                    <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <h4 className="font-semibold text-purple-800 dark:text-purple-200">
+                          Configurações de Produto Digital
+                        </h4>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="digital_file_url">URL do Arquivo Digital</Label>
+                        <Input
+                          id="digital_file_url"
+                          value={formData.digital_file_url}
+                          onChange={(e) => setFormData({...formData, digital_file_url: e.target.value})}
+                          placeholder="https://exemplo.com/arquivo.zip"
+                          className="mt-1"
+                        />
+                      </div>
 
-                {/* Configurações para Produto Digital */}
-                {(formData.product_type === 'digital' || formData.is_digital) && (
-                  <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                      <h4 className="font-semibold text-purple-800 dark:text-purple-200">
-                        Configurações de Produto Digital
-                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="license_key">Chave de Licença</Label>
+                          <Input
+                            id="license_key"
+                            value={formData.license_key}
+                            onChange={(e) => setFormData({...formData, license_key: e.target.value})}
+                            placeholder="XXXX-XXXX-XXXX-XXXX"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="download_limit">Limite de Downloads</Label>
+                          <Input
+                            id="download_limit"
+                            type="number"
+                            min="0"
+                            value={formData.download_limit}
+                            onChange={(e) => setFormData({...formData, download_limit: parseInt(e.target.value) || 0})}
+                            placeholder="0 = ilimitado"
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Propriedades Físicas (apenas para produtos físicos) */}
+            {formData.product_type === 'physical' && (
+              <Card className="hover-scale border-l-4 border-l-purple-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-purple-600">
+                    <Ruler className="w-5 h-5" />
+                    Propriedades Físicas
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Peso, dimensões e material para cálculo de frete
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <Label htmlFor="digital_file_url">URL do Arquivo Digital</Label>
+                      <Label htmlFor="weight">⚖️ Peso (kg)</Label>
                       <Input
-                        id="digital_file_url"
-                        value={formData.digital_file_url}
-                        onChange={(e) => setFormData({...formData, digital_file_url: e.target.value})}
-                        placeholder="https://exemplo.com/arquivo.zip"
+                        id="weight"
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={formData.weight}
+                        onChange={(e) => setFormData({...formData, weight: e.target.value})}
+                        placeholder="0.500"
                         className="mt-1"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Link direto para download (ZIP, PDF, EXE, etc.)
-                      </p>
                     </div>
+                    <div>
+                      <Label htmlFor="material">🏗️ Material</Label>
+                      <Input
+                        id="material"
+                        value={formData.material}
+                        onChange={(e) => setFormData({...formData, material: e.target.value})}
+                        placeholder="Algodão, Plástico, Metal..."
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="dimensions">📐 Dimensões</Label>
+                      <Input
+                        id="dimensions"
+                        value={formData.dimensions}
+                        onChange={(e) => setFormData({...formData, dimensions: e.target.value})}
+                        placeholder="20x15x5 cm"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="license_key">Chave de Licença</Label>
-                        <Input
-                          id="license_key"
-                          value={formData.license_key}
-                          onChange={(e) => setFormData({...formData, license_key: e.target.value})}
-                          placeholder="XXXX-XXXX-XXXX-XXXX"
-                          className="mt-1"
-                        />
+          {/* Tab 2: Categorias e Subcategorias */}
+          <TabsContent value="categories" className="space-y-6">
+            <Card className="hover-scale border-l-4 border-l-indigo-500">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-indigo-600">
+                  <Star className="w-5 h-5" />
+                  Categorização do Produto
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Organize o produto em categorias e subcategorias para melhor navegação
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Categoria Principal */}
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="category" className="text-base font-semibold">
+                      📂 Categoria Principal *
+                    </Label>
+                    <Select 
+                      value={formData.category_id} 
+                      onValueChange={(value) => setFormData({...formData, category_id: value, subcategory_id: ''})}
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Selecione a categoria principal" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50 max-h-60 overflow-y-auto">
+                        {categories.filter(cat => !cat.parent_id).map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            <div className="flex items-center gap-2">
+                              {category.icon && <span className="text-lg">{category.icon}</span>}
+                              <span>{category.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Subcategorias */}
+                  {formData.category_id && (
+                    <div className="space-y-3">
+                      <Label className="text-base font-semibold flex items-center gap-2">
+                        🏷️ Subcategoria
+                      </Label>
+                      
+                      {(() => {
+                        const subcategories = categories.filter(cat => cat.parent_id === formData.category_id);
+                        
+                        if (subcategories.length === 0) {
+                          return (
+                            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200">
+                              <p className="text-sm text-amber-800 dark:text-amber-200">
+                                ℹ️ Esta categoria não possui subcategorias ainda.
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {subcategories.map((subcategory) => (
+                              <Card 
+                                key={subcategory.id}
+                                className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
+                                  formData.subcategory_id === subcategory.id 
+                                    ? 'ring-2 ring-primary bg-primary/5' 
+                                    : 'hover:shadow-md'
+                                }`}
+                                onClick={() => setFormData({...formData, subcategory_id: subcategory.id})}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="flex items-center gap-3">
+                                    {subcategory.icon && (
+                                      <span className="text-2xl">{subcategory.icon}</span>
+                                    )}
+                                    <div className="flex-1">
+                                      <h4 className="font-medium text-sm">{subcategory.name}</h4>
+                                      {subcategory.description && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {subcategory.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                    {formData.subcategory_id === subcategory.id && (
+                                      <div className="w-3 h-3 bg-primary rounded-full"></div>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      
+                      {formData.subcategory_id && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFormData({...formData, subcategory_id: ''})}
+                          className="mt-2"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          Remover Subcategoria
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Preview da Categorização */}
+                {formData.category_id && (
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
+                    <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+                          {categories.find(cat => cat.id === formData.category_id)?.name}
+                        </Badge>
+                        
+                        {formData.subcategory_id && (
+                          <>
+                            <span className="text-muted-foreground">›</span>
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
+                              {categories.find(cat => cat.id === formData.subcategory_id)?.name}
+                            </Badge>
+                          </>
+                        )}
                       </div>
-                      <div>
-                        <Label htmlFor="download_limit">Limite de Downloads</Label>
-                        <Input
-                          id="download_limit"
-                          type="number"
-                          min="0"
-                          value={formData.download_limit}
-                          onChange={(e) => setFormData({...formData, download_limit: parseInt(e.target.value) || 0})}
-                          placeholder="0 = ilimitado"
-                          className="mt-1"
-                        />
-                      </div>
+                      
+                      <p className="text-sm text-green-700 dark:text-green-300 mt-2">
+                        ✅ O produto será exibido na navegação conforme a categorização acima
+                      </p>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* 3. Preços e Estoque */}
+          {/* Tab 3: Preços e Estoque */}
+          <TabsContent value="pricing" className="space-y-6">
             <Card className="hover-scale border-l-4 border-l-green-500">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-green-600">
                   <Star className="w-5 h-5" />
-                  3. Preços e Estoque
+                  Preços e Estoque
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Configure preços, desconto e controle de estoque
@@ -594,13 +762,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* 4. Variantes do Produto */}
+          {/* Tab 4: Variantes */}
+          <TabsContent value="variants" className="space-y-6">
             <Card className="hover-scale border-l-4 border-l-blue-500">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-blue-600">
                   <Palette className="w-5 h-5" />
-                  4. Variantes do Produto
+                  Variantes do Produto
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Cores, tamanhos e outras variações disponíveis
@@ -690,71 +860,15 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* 5. Propriedades Físicas (apenas para produtos físicos) */}
-            {formData.product_type === 'physical' && (
-              <Card className="hover-scale border-l-4 border-l-purple-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-purple-600">
-                    <Ruler className="w-5 h-5" />
-                    5. Propriedades Físicas
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Peso, dimensões e material para cálculo de frete
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="weight">⚖️ Peso (kg)</Label>
-                      <Input
-                        id="weight"
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        value={formData.weight}
-                        onChange={(e) => setFormData({...formData, weight: e.target.value})}
-                        placeholder="0.500"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="material">🏗️ Material</Label>
-                      <Input
-                        id="material"
-                        value={formData.material}
-                        onChange={(e) => setFormData({...formData, material: e.target.value})}
-                        placeholder="Algodão, Plástico, Metal..."
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="dimensions">📐 Dimensões</Label>
-                      <Input
-                        id="dimensions"
-                        value={formData.dimensions}
-                        onChange={(e) => setFormData({...formData, dimensions: e.target.value})}
-                        placeholder="20x15x5 cm"
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    ℹ️ Essas informações são importantes para cálculo de frete e logística
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Coluna Lateral - Imagens e SEO */}
-          <div className="space-y-8">
-            {/* 6. Imagens do Produto */}
+          {/* Tab 5: Mídia */}
+          <TabsContent value="media" className="space-y-6">
             <Card className="hover-scale border-l-4 border-l-teal-500">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-teal-600">
                   <Images className="w-5 h-5" />
-                  6. Imagens do Produto
+                  Imagens do Produto
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Upload manual ou geração com IA
@@ -904,7 +1018,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                             className="absolute bottom-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                             onClick={() => setMainImage(imageUrl)}
                           >
-                            ⭐
+                            Principal
                           </Button>
                         </div>
                       ))}
@@ -913,354 +1027,181 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* 7. SEO e Marketing */}
+          {/* Tab 6: SEO */}
+          <TabsContent value="seo" className="space-y-6">
             <Card className="hover-scale border-l-4 border-l-pink-500">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-pink-600">
                   <Sparkles className="w-5 h-5" />
-                  7. SEO e Marketing
+                  Otimização SEO
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Otimização para mecanismos de busca
+                  Configure títulos, descrições e palavras-chave para melhor posicionamento
                 </p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Botão para Gerar SEO */}
-                <div className="text-center">
-                  <Button 
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Gerar SEO Automaticamente</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Use IA para criar títulos e descrições otimizados
+                    </p>
+                  </div>
+                  <Button
                     type="button"
-                    variant="outline" 
                     onClick={generateSEOSuggestions}
-                    disabled={generatingSEO || !formData.name || !formData.description}
-                    className="w-full bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 border-pink-200"
+                    disabled={generatingSEO || !formData.name}
+                    variant="outline"
                   >
                     {generatingSEO ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Gerando SEO com IA...
+                        Gerando...
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 mr-2" />
-                        ✨ Gerar SEO Automático
+                        Gerar SEO
                       </>
                     )}
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    💡 Preencha nome e descrição primeiro
-                  </p>
                 </div>
 
-                {/* SEO Suggestions */}
                 {seoSuggestions && (
-                  <div className="space-y-3 animate-fade-in">
-                    <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-3 rounded-lg border border-pink-200">
-                      <h4 className="font-semibold text-pink-800 text-sm mb-2">✨ Título SEO</h4>
-                      <div className="bg-white p-2 rounded border text-xs mb-2">
-                        {seoSuggestions.seo_title}
-                      </div>
-                      <Button 
-                        type="button"
-                        size="sm" 
-                        variant="outline"
-                        className="w-full text-xs"
-                        onClick={() => applySEOSuggestion('seo_title', seoSuggestions.seo_title)}
-                      >
-                        Aplicar Título
-                      </Button>
-                    </div>
-
-                    <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-3 rounded-lg border border-pink-200">
-                      <h4 className="font-semibold text-pink-800 text-sm mb-2">📝 Descrição SEO</h4>
-                      <div className="bg-white p-2 rounded border text-xs mb-2">
-                        {seoSuggestions.seo_description}
-                      </div>
-                      <Button 
-                        type="button"
-                        size="sm" 
-                        variant="outline"
-                        className="w-full text-xs"
-                        onClick={() => applySEOSuggestion('seo_description', seoSuggestions.seo_description)}
-                      >
-                        Aplicar Descrição
-                      </Button>
-                    </div>
-
-                    <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-3 rounded-lg border border-pink-200">
-                      <h4 className="font-semibold text-pink-800 text-sm mb-2">🔑 Palavras-chave</h4>
-                      <div className="bg-white p-2 rounded border text-xs mb-2">
-                        {seoSuggestions.seo_keywords}
-                      </div>
-                      <Button 
-                        type="button"
-                        size="sm" 
-                        variant="outline"
-                        className="w-full text-xs"
-                        onClick={() => applySEOSuggestion('seo_keywords', seoSuggestions.seo_keywords)}
-                      >
-                        Aplicar Palavras-chave
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* SEO Status */}
-                {(formData.seo_title || formData.seo_description || formData.seo_keywords) && (
-                  <div className="space-y-3 pt-3 border-t">
-                    <h4 className="font-semibold text-sm flex items-center gap-2">
-                      ✅ SEO Configurado
+                  <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-200">
+                      🤖 Sugestões de SEO Geradas
                     </h4>
                     
-                    {formData.seo_title && (
-                      <div className="bg-green-50 p-2 rounded text-xs">
-                        <strong>Título:</strong> {formData.seo_title}
+                    {seoSuggestions.title && (
+                      <div className="space-y-2">
+                        <Label>Título SEO Sugerido</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={seoSuggestions.title}
+                            readOnly
+                            className="flex-1 bg-white"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => applySEOSuggestion('seo_title', seoSuggestions.title)}
+                          >
+                            Aplicar
+                          </Button>
+                        </div>
                       </div>
                     )}
 
-                    {formData.seo_description && (
-                      <div className="bg-green-50 p-2 rounded text-xs">
-                        <strong>Descrição:</strong> {formData.seo_description}
+                    {seoSuggestions.description && (
+                      <div className="space-y-2">
+                        <Label>Descrição SEO Sugerida</Label>
+                        <div className="flex gap-2">
+                          <Textarea
+                            value={seoSuggestions.description}
+                            readOnly
+                            className="flex-1 bg-white"
+                            rows={3}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => applySEOSuggestion('seo_description', seoSuggestions.description)}
+                          >
+                            Aplicar
+                          </Button>
+                        </div>
                       </div>
                     )}
 
-                    {formData.seo_keywords && (
-                      <div className="bg-green-50 p-2 rounded text-xs">
-                        <strong>Palavras-chave:</strong> {formData.seo_keywords}
+                    {seoSuggestions.keywords && (
+                      <div className="space-y-2">
+                        <Label>Palavras-chave Sugeridas</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={seoSuggestions.keywords}
+                            readOnly
+                            className="flex-1 bg-white"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => applySEOSuggestion('seo_keywords', seoSuggestions.keywords)}
+                          >
+                            Aplicar
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Aviso SEO Automático para novos produtos */}
-                {!product?.id && (
-                  <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200">
-                    <div className="flex items-start gap-2">
-                      <Star className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div className="text-xs">
-                        <p className="font-medium text-blue-800 dark:text-blue-200">
-                          SEO Automático Ativo
-                        </p>
-                        <p className="text-blue-700 dark:text-blue-300 mt-1">
-                          Ao salvar, será gerado SEO automaticamente se não configurado manualmente.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Configurações Avançadas */}
-        <div className="space-y-6">
-          <Tabs defaultValue="physical" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="physical">Físico</TabsTrigger>
-              <TabsTrigger value="digital">Digital</TabsTrigger>
-              <TabsTrigger value="type">Tipo</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="physical" className="space-y-4">
-              <Card className="hover-scale border-l-4 border-l-blue-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-600">
-                    <Ruler className="w-5 h-5" />
-                    Propriedades Físicas
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Configure peso, dimensões e material do produto
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="weight">Peso (kg)</Label>
-                      <Input
-                        id="weight"
-                        type="number"
-                        step="0.001"
-                        value={formData.weight}
-                        onChange={(e) => setFormData({...formData, weight: e.target.value})}
-                        placeholder="0.500"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="material">Material</Label>
-                      <Input
-                        id="material"
-                        value={formData.material}
-                        onChange={(e) => setFormData({...formData, material: e.target.value})}
-                        placeholder="Ex: Algodão, Plástico, Metal..."
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-
+                <div className="space-y-4">
                   <div>
-                    <Label htmlFor="dimensions">Dimensões</Label>
+                    <Label htmlFor="seo_title">Título SEO</Label>
                     <Input
-                      id="dimensions"
-                      value={formData.dimensions}
-                      onChange={(e) => setFormData({...formData, dimensions: e.target.value})}
-                      placeholder="Ex: 20x15x5 cm"
+                      id="seo_title"
+                      value={formData.seo_title}
+                      onChange={(e) => setFormData({...formData, seo_title: e.target.value})}
                       className="mt-1"
+                      placeholder="Título otimizado para buscadores (50-60 caracteres)"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Formato sugerido: comprimento x largura x altura
+                      {formData.seo_title.length}/60 caracteres
                     </p>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
-            <TabsContent value="digital" className="space-y-4">
-              <Card className="hover-scale border-l-4 border-l-purple-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-purple-600">
-                    <Package className="w-5 h-5" />
-                    Produto Digital
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Configure downloads, licenças e arquivos digitais
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="is_digital"
-                      checked={formData.is_digital}
-                      onCheckedChange={(checked) => setFormData({...formData, is_digital: checked})}
-                    />
-                    <Label htmlFor="is_digital" className="font-medium">Este é um produto digital</Label>
-                  </div>
-
-                  {formData.is_digital && (
-                    <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200">
-                      <div>
-                        <Label htmlFor="digital_file_url">URL do Arquivo Digital</Label>
-                        <Input
-                          id="digital_file_url"
-                          value={formData.digital_file_url}
-                          onChange={(e) => setFormData({...formData, digital_file_url: e.target.value})}
-                          placeholder="https://exemplo.com/arquivo.zip"
-                          className="mt-1"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Link para download do arquivo (zip, pdf, exe, etc.)
-                        </p>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="license_key">Chave de Licença</Label>
-                        <Input
-                          id="license_key"
-                          value={formData.license_key}
-                          onChange={(e) => setFormData({...formData, license_key: e.target.value})}
-                          placeholder="XXXX-XXXX-XXXX-XXXX"
-                          className="mt-1"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Chave de ativação para software/licenças
-                        </p>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="download_limit">Limite de Downloads</Label>
-                        <Input
-                          id="download_limit"
-                          type="number"
-                          value={formData.download_limit}
-                          onChange={(e) => setFormData({...formData, download_limit: parseInt(e.target.value) || 0})}
-                          placeholder="3"
-                          className="mt-1"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Quantas vezes o cliente pode baixar (0 = ilimitado)
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="type" className="space-y-4">
-              <Card className="hover-scale border-l-4 border-l-orange-500">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-orange-600">
-                    <Package className="w-5 h-5" />
-                    Tipo de Produto
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Defina se é produto físico, digital ou serviço
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
                   <div>
-                    <Label>Tipo do Produto</Label>
-                    <Select 
-                      value={formData.product_type} 
-                      onValueChange={(value) => setFormData({...formData, product_type: value})}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="physical">
-                          📦 Produto Físico
-                        </SelectItem>
-                        <SelectItem value="digital">
-                          💾 Produto Digital
-                        </SelectItem>
-                        <SelectItem value="service">
-                          🛠️ Serviço
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="seo_description">Descrição SEO</Label>
+                    <Textarea
+                      id="seo_description"
+                      value={formData.seo_description}
+                      onChange={(e) => setFormData({...formData, seo_description: e.target.value})}
+                      rows={3}
+                      className="mt-1"
+                      placeholder="Descrição que aparecerá nos resultados de busca (150-160 caracteres)"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formData.seo_description.length}/160 caracteres
+                    </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                    <div className={`p-4 rounded-lg border-2 ${formData.product_type === 'physical' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-                      <h4 className="font-semibold text-blue-600">📦 Físico</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Produto que precisa ser enviado fisicamente
-                      </p>
-                    </div>
-                    <div className={`p-4 rounded-lg border-2 ${formData.product_type === 'digital' ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
-                      <h4 className="font-semibold text-purple-600">💾 Digital</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Download, software, ebook, curso online
-                      </p>
-                    </div>
-                    <div className={`p-4 rounded-lg border-2 ${formData.product_type === 'service' ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
-                      <h4 className="font-semibold text-green-600">🛠️ Serviço</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Consultoria, manutenção, instalação
-                      </p>
-                    </div>
+                  <div>
+                    <Label htmlFor="seo_keywords">Palavras-chave</Label>
+                    <Input
+                      id="seo_keywords"
+                      value={formData.seo_keywords}
+                      onChange={(e) => setFormData({...formData, seo_keywords: e.target.value})}
+                      className="mt-1"
+                      placeholder="palavra1, palavra2, palavra3..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Separe as palavras-chave com vírgulas
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Botões de Ação */}
-        <div className="flex justify-end space-x-4">
+        <div className="flex items-center justify-between pt-6 border-t">
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading} className="min-w-32">
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Salvando...
               </>
             ) : (
-              product?.id ? 'Atualizar Produto' : 'Criar Produto'
+              <>
+                {product?.id ? 'Atualizar Produto' : 'Criar Produto'}
+              </>
             )}
           </Button>
         </div>
