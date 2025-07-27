@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Edit, Trash2, Eye, Star, Grid2X2, List, Filter, Power, PowerOff, FileDown } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Star, Grid2X2, List, Filter, Power, PowerOff, FileDown, Facebook } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProductForm } from '@/components/ProductForm';
@@ -172,6 +173,87 @@ const AdminProdutos = () => {
     setSearchTerm('');
   };
 
+  const exportToFacebookCatalog = () => {
+    try {
+      // Preparar dados no formato do Facebook Catalog
+      const facebookData = filteredProducts.map(product => ({
+        id: product.id,
+        title: product.name,
+        description: product.description || '',
+        availability: product.in_stock ? 'in stock' : 'out of stock',
+        condition: 'new',
+        price: `${product.price} AOA`,
+        link: `${window.location.origin}/produto/${product.slug || product.id}`,
+        image_link: product.image_url || '',
+        brand: 'SuperLoja'
+      }));
+
+      // Criar workbook
+      const wb = XLSX.utils.book_new();
+      
+      // Adicionar cabeçalhos obrigatórios
+      const headers = [
+        'Obrigatório #',
+        'Obrigatório #',
+        'Obrigatório #',
+        'Obrigatório #',
+        'Obrigatório #',
+        'Obrigatório #',
+        'Obrigatório #',
+        'Obrigatório #'
+      ];
+      
+      const fieldNames = [
+        'title',
+        'description',
+        'availability',
+        'condition',
+        'price',
+        'link',
+        'image_link',
+        'brand'
+      ];
+
+      // Criar dados para a planilha
+      const worksheetData = [
+        headers,
+        fieldNames,
+        ...facebookData.map(product => [
+          product.title,
+          product.description,
+          product.availability,
+          product.condition,
+          product.price,
+          product.link,
+          product.image_link,
+          product.brand
+        ])
+      ];
+
+      // Criar worksheet
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Catálogo Facebook');
+
+      // Exportar arquivo
+      const fileName = `catalogo-facebook-${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      toast({
+        title: "Exportação concluída!",
+        description: `Arquivo ${fileName} foi baixado com ${facebookData.length} produtos.`
+      });
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível exportar o catálogo.",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -197,6 +279,14 @@ const AdminProdutos = () => {
           >
             <FileDown className="w-4 h-4 mr-2" />
             Gerar Catálogo PDF
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={exportToFacebookCatalog}
+            className="hover:scale-105 transition-transform border-blue-200 text-blue-600 hover:bg-blue-50"
+          >
+            <Facebook className="w-4 h-4 mr-2" />
+            Exportar Facebook XLS
           </Button>
           <Button 
             onClick={() => setShowForm(true)}
