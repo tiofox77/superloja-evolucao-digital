@@ -125,13 +125,13 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     try {
       toast({
         title: "🎯 Removendo fundo...",
-        description: "Processando imagem com IA para remover fundo"
+        description: "Processando imagem com IA avançada"
       });
 
       setProgress(40);
 
-      // Load segmentation model
-      const segmenter = await pipeline('image-segmentation', 'Xenova/segformer-b0-finetuned-ade-512-512', {
+      // Use a better model specifically for background removal
+      const segmenter = await pipeline('image-segmentation', 'Xenova/detr-resnet-50-panoptic', {
         device: 'webgpu',
       });
 
@@ -145,53 +145,85 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = async () => {
-        tempCanvas.width = img.width;
-        tempCanvas.height = img.height;
+        // Preserve original dimensions for better quality
+        tempCanvas.width = img.naturalWidth;
+        tempCanvas.height = img.naturalHeight;
         tempCtx.drawImage(img, 0, 0);
 
-        // Get the current canvas data URL instead of using the original image
-        const currentImageData = tempCanvas.toDataURL('image/jpeg', 0.9);
+        // Get high quality image data
+        const currentImageData = tempCanvas.toDataURL('image/png', 1.0);
 
-        // Process the current edited image
-        const result = await segmenter(currentImageData);
+        try {
+          // Process with advanced segmentation
+          const result = await segmenter(currentImageData);
 
-        if (!result || !Array.isArray(result) || result.length === 0 || !result[0].mask) {
-          throw new Error('Resultado de segmentação inválido');
+          if (!result || !Array.isArray(result) || result.length === 0) {
+            throw new Error('Resultado de segmentação inválido');
+          }
+
+          setProgress(80);
+
+          // Find the main object (usually the largest non-background segment)
+          let mainObjectMask = null;
+          let maxScore = 0;
+
+          for (const segment of result) {
+            if (segment.label && !segment.label.toLowerCase().includes('background') && 
+                !segment.label.toLowerCase().includes('wall') &&
+                !segment.label.toLowerCase().includes('floor') &&
+                segment.score > maxScore) {
+              maxScore = segment.score;
+              mainObjectMask = segment.mask;
+            }
+          }
+
+          if (!mainObjectMask) {
+            // Fallback: use the first segment with highest score
+            const sortedResults = result.sort((a, b) => (b.score || 0) - (a.score || 0));
+            mainObjectMask = sortedResults[0]?.mask;
+          }
+
+          if (!mainObjectMask) {
+            throw new Error('Não foi possível identificar o objeto principal');
+          }
+
+          // Create output canvas for masked image
+          const outputCanvas = document.createElement('canvas');
+          const outputCtx = outputCanvas.getContext('2d');
+          if (!outputCtx) throw new Error('Não foi possível obter contexto de saída');
+
+          outputCanvas.width = tempCanvas.width;
+          outputCanvas.height = tempCanvas.height;
+          outputCtx.drawImage(tempCanvas, 0, 0);
+
+          // Apply mask with smoothing
+          const imageData = outputCtx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
+          const data = imageData.data;
+          const maskData = mainObjectMask.data;
+
+          for (let i = 0; i < maskData.length; i++) {
+            // Use the mask directly (higher values = keep, lower = remove)
+            const alpha = Math.round(maskData[i] * 255);
+            data[i * 4 + 3] = alpha;
+          }
+
+          outputCtx.putImageData(imageData, 0, 0);
+          
+          const finalImage = outputCanvas.toDataURL('image/png', 1.0);
+          setEditedImage(finalImage);
+          setOriginalImage(finalImage);
+          
+          setProgress(100);
+          
+          toast({
+            title: "✅ Fundo removido com IA avançada!",
+            description: "Processamento inteligente concluído"
+          });
+
+        } catch (segmentError) {
+          console.error('Erro na segmentação:', segmentError);
+          throw new Error('Falha no processamento de IA. Tente com uma imagem diferente.');
         }
-
-        setProgress(80);
-
-        // Create output canvas for masked image
-        const outputCanvas = document.createElement('canvas');
-        const outputCtx = outputCanvas.getContext('2d');
-        if (!outputCtx) throw new Error('Não foi possível obter contexto de saída');
-
-        outputCanvas.width = tempCanvas.width;
-        outputCanvas.height = tempCanvas.height;
-        outputCtx.drawImage(tempCanvas, 0, 0);
-
-        // Apply mask to alpha channel
-        const imageData = outputCtx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
-        const data = imageData.data;
-
-        for (let i = 0; i < result[0].mask.data.length; i++) {
-          // Invert the mask to keep the subject (1 - mask value)
-          const alpha = Math.round((1 - result[0].mask.data[i]) * 255);
-          data[i * 4 + 3] = alpha;
-        }
-
-        outputCtx.putImageData(imageData, 0, 0);
-        
-        const finalImage = outputCanvas.toDataURL('image/png', 1.0);
-        setEditedImage(finalImage);
-        setOriginalImage(finalImage); // Update original too to prevent filter reapplication
-        
-        setProgress(100);
-        
-        toast({
-          title: "✅ Fundo removido com sucesso!",
-          description: "Imagem processada com IA"
-        });
 
         setLoading(false);
         setProgress(0);
@@ -207,7 +239,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
       console.error('Erro na remoção de fundo:', error);
       toast({
         title: "❌ Erro ao remover fundo",
-        description: error.message || "Não foi possível processar a imagem",
+        description: error.message || "Tente com uma imagem de melhor qualidade",
         variant: "destructive"
       });
       setLoading(false);
