@@ -59,8 +59,8 @@ export const AdminAnalytics: React.FC = () => {
       const { data: events, error: eventsError } = await supabase
         .from('analytics_events')
         .select('*')
-        .gte('created_at', fromDate)
-        .lte('created_at', toDate);
+        .gte('timestamp', fromDate)
+        .lte('timestamp', toDate);
 
       if (eventsError) throw eventsError;
 
@@ -167,7 +167,7 @@ export const AdminAnalytics: React.FC = () => {
     });
     
     events.filter(e => e.event_type === 'page_view').forEach(e => {
-      const date = format(new Date(e.created_at), 'yyyy-MM-dd');
+      const date = format(new Date(e.timestamp), 'yyyy-MM-dd');
       dayPageViewMap.set(date, (dayPageViewMap.get(date) || 0) + 1);
     });
 
