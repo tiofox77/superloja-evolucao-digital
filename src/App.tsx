@@ -38,6 +38,7 @@ import AdminSolicitacoes from "@/pages/admin/AdminSolicitacoes";
 import AdminPaginasEstaticas from "@/pages/admin/AdminPaginasEstaticas";
 import AdminBannerGerador from "@/pages/admin/AdminBannerGerador";
 import AdminCatalogoProdutos from "@/pages/admin/AdminCatalogoProdutos";
+import { AdminAnalytics } from "@/pages/admin/AdminAnalytics";
 import { CatalogPage } from "@/pages/CatalogPage";
 import SolicitarProduto from "@/pages/SolicitarProduto";
 import Contato from "@/pages/Contato";
@@ -113,6 +114,7 @@ function App() {
                 <Route path="logs" element={<AdminLogs />} />
                 <Route path="banner-gerador" element={<AdminBannerGerador />} />
                 <Route path="catalogo-produtos" element={<AdminCatalogoProdutos />} />
+                <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="catalogo-gerado" element={<CatalogPage />} />
               </Route>
               

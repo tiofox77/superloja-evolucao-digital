@@ -109,9 +109,9 @@ const getLocationData = async () => {
   console.info('Usando localização padrão (Angola) - APIs indisponíveis');
   return {
     country: 'Angola',
-    region: 'Luanda',
+    region: 'Luanda', 
     city: 'Luanda',
-    ip_address: 'unknown'
+    ip_address: null // null instead of 'unknown' to avoid DB error
   };
 };
 

@@ -9,20 +9,26 @@ export const AnalyticsTracker: React.FC = () => {
   const { cookieData } = useCookieAnalytics();
 
   useEffect(() => {
-    // Rastrear mudança de página
-    trackPageView({
-      page_url: window.location.href,
-      page_title: document.title,
-      referrer: document.referrer
-    });
+    // Evitar rastreamento duplicado ao usar cookieData como dependência
+    const timer = setTimeout(() => {
+      trackPageView({
+        page_url: window.location.href,
+        page_title: document.title,
+        referrer: document.referrer
+      });
 
-    // Rastrear navegação entre páginas
-    trackEvent('page_navigation', {
-      from: document.referrer,
-      to: window.location.href,
-      pathname: location.pathname
-    });
-  }, [location, trackPageView, trackEvent]);
+      // Rastrear navegação apenas se não for a primeira visita
+      if (document.referrer && document.referrer !== window.location.href) {
+        trackEvent('page_navigation', {
+          from: document.referrer,
+          to: window.location.href,
+          pathname: location.pathname
+        });
+      }
+    }, 100); // Delay pequeno para evitar duplicação
+
+    return () => clearTimeout(timer);
+  }, [location.pathname]); // Usar apenas pathname para evitar loops
 
   // Rastrear scroll
   useEffect(() => {

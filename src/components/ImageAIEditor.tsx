@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { pipeline, env } from '@huggingface/transformers';
+import { supabase } from '@/integrations/supabase/client';
 
 // Configure transformers.js
 env.allowLocalModels = false;
@@ -43,6 +44,8 @@ const ImageAIEditor: React.FC<ImageAIEditorProps> = ({ productName, onImageSelec
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [processProgress, setProcessProgress] = useState(0);
   const [aiModels, setAiModels] = useState<any>({});
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -127,51 +130,86 @@ const ImageAIEditor: React.FC<ImageAIEditorProps> = ({ productName, onImageSelec
   };
 
   const generateImageWithAI = async () => {
-    setLoading(true);
+    if (!searchQuery.trim()) {
+      toast({
+        title: "❌ Campo obrigatório",
+        description: "Por favor, digite uma descrição para gerar a imagem.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGenerating(true);
     setProcessProgress(20);
     
     try {
       toast({
         title: "🎨 Gerando imagem com IA...",
-        description: "Criando imagem personalizada usando modelos avançados"
+        description: "Criando imagem personalizada usando OpenAI DALL-E"
       });
       
       setProcessProgress(40);
-      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      setProcessProgress(70);
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const { data: settings } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'seo_settings')
+        .single();
+
+      const apiKey = (settings?.value as any)?.openai_api_key;
+      if (!apiKey) {
+        throw new Error('Chave da API OpenAI não configurada. Configure nas configurações do sistema.');
+      }
+
+      setProcessProgress(60);
+
+      const response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'dall-e-3',
+          prompt: searchQuery,
+          n: 1,
+          size: '1024x1024',
+          quality: 'standard',
+          response_format: 'b64_json'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `Erro HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
       
-      // Simulate AI generation with enhanced parameters
-      const aiImageId = Math.floor(Math.random() * 500000) + 2100000000;
-      const aiResult = {
-        id: `ai_${aiImageId}`,
-        url: `https://images.unsplash.com/photo-${aiImageId}?w=400&h=400&fit=crop&q=90&auto=format&style=product`,
-        title: `${searchQuery} - AI Generated`,
-        source: 'AI Generated',
-        relevance: 100,
-        quality: 98,
-        searchTerm: searchQuery,
-        tags: ['ai-generated', 'high-quality', 'custom'],
-        isAiGenerated: true
-      };
+      setProcessProgress(90);
       
-      setSuggestions([aiResult, ...suggestions]);
+      if (data.data && data.data[0] && data.data[0].b64_json) {
+        const imageUrl = `data:image/png;base64,${data.data[0].b64_json}`;
+        setGeneratedImage(imageUrl);
+        
+        toast({
+          title: "✅ Imagem gerada com sucesso!",
+          description: "Sua imagem foi criada usando IA. Você pode agora aplicar edições."
+        });
+      } else {
+        throw new Error('Nenhum dado de imagem recebido da API');
+      }
+      
       setProcessProgress(100);
       
-      toast({
-        title: "✨ Imagem IA criada!",
-        description: "Imagem de alta qualidade gerada especificamente para seu produto"
-      });
-      
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "❌ Erro na geração",
-        description: "Não foi possível gerar a imagem no momento.",
+        description: error.message || "Não foi possível gerar a imagem no momento.",
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setIsGenerating(false);
       setProcessProgress(0);
     }
   };
@@ -451,11 +489,11 @@ const ImageAIEditor: React.FC<ImageAIEditorProps> = ({ productName, onImageSelec
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Button 
                     onClick={generateImageWithAI}
-                    disabled={loading || !searchQuery.trim()}
+                    disabled={loading || isGenerating || !searchQuery.trim()}
                     variant="outline"
                     className="h-auto p-4 flex-col gap-2"
                   >
-                    {loading ? (
+                    {isGenerating ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                       <Sparkles className="w-5 h-5" />
