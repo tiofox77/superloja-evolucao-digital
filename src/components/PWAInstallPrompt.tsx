@@ -30,15 +30,24 @@ export const PWAInstallPrompt: React.FC = () => {
       const { data, error } = await supabase
         .from('pwa_settings')
         .select('*')
-        .single();
+        .limit(1);
       
-      if (error) throw error;
-      if (data) {
-        setPWASettings(data);
-        console.log('Configurações PWA carregadas:', data);
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+      
+      if (data && data.length > 0) {
+        setPWASettings(data[0]);
+        console.log('Configurações PWA carregadas:', data[0]);
       }
     } catch (error) {
       console.error('Erro ao carregar configurações PWA:', error);
+      // Use default settings on error
+      setPWASettings({
+        install_prompt_enabled: false,
+        install_prompt_delay: 3000,
+        name: 'SuperLoja'
+      });
     }
   };
 
