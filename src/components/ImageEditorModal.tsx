@@ -137,56 +137,79 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
       setProgress(60);
 
-      // Process the image
-      const result = await segmenter(editedImage);
-
-      if (!result || !Array.isArray(result) || result.length === 0 || !result[0].mask) {
-        throw new Error('Resultado de segmentação inválido');
-      }
-
-      setProgress(80);
-
-      // Create canvas for masked image
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Não foi possível obter contexto do canvas');
+      // Create a temporary canvas to get the current edited image
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) throw new Error('Não foi possível obter contexto do canvas');
 
       const img = new Image();
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
+      img.crossOrigin = 'anonymous';
+      img.onload = async () => {
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        tempCtx.drawImage(img, 0, 0);
+
+        // Get the current canvas data URL instead of using the original image
+        const currentImageData = tempCanvas.toDataURL('image/jpeg', 0.9);
+
+        // Process the current edited image
+        const result = await segmenter(currentImageData);
+
+        if (!result || !Array.isArray(result) || result.length === 0 || !result[0].mask) {
+          throw new Error('Resultado de segmentação inválido');
+        }
+
+        setProgress(80);
+
+        // Create output canvas for masked image
+        const outputCanvas = document.createElement('canvas');
+        const outputCtx = outputCanvas.getContext('2d');
+        if (!outputCtx) throw new Error('Não foi possível obter contexto de saída');
+
+        outputCanvas.width = tempCanvas.width;
+        outputCanvas.height = tempCanvas.height;
+        outputCtx.drawImage(tempCanvas, 0, 0);
 
         // Apply mask to alpha channel
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const imageData = outputCtx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
         const data = imageData.data;
 
         for (let i = 0; i < result[0].mask.data.length; i++) {
+          // Invert the mask to keep the subject (1 - mask value)
           const alpha = Math.round((1 - result[0].mask.data[i]) * 255);
           data[i * 4 + 3] = alpha;
         }
 
-        ctx.putImageData(imageData, 0, 0);
+        outputCtx.putImageData(imageData, 0, 0);
         
-        const finalImage = canvas.toDataURL('image/png', 1.0);
+        const finalImage = outputCanvas.toDataURL('image/png', 1.0);
         setEditedImage(finalImage);
+        setOriginalImage(finalImage); // Update original too to prevent filter reapplication
+        
+        setProgress(100);
         
         toast({
           title: "✅ Fundo removido com sucesso!",
           description: "Imagem processada com IA"
         });
+
+        setLoading(false);
+        setProgress(0);
       };
+
+      img.onerror = () => {
+        throw new Error('Erro ao carregar imagem para processamento');
+      };
+
       img.src = editedImage;
 
-      setProgress(100);
-
     } catch (error: any) {
+      console.error('Erro na remoção de fundo:', error);
       toast({
         title: "❌ Erro ao remover fundo",
         description: error.message || "Não foi possível processar a imagem",
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
       setProgress(0);
     }
