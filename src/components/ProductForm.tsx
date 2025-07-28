@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Upload, Image as ImageIcon, Loader2, Star, Images, Sparkles, Package, Palette, Ruler } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Loader2, Star, Images, Sparkles, Package, Palette, Ruler, Edit3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ImageAIEditor from '@/components/ImageAIEditor';
+import { ImageEditorModal } from '@/components/ImageEditorModal';
 
 interface ProductFormProps {
   product?: any;
@@ -27,6 +28,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
   const [generatingSEO, setGeneratingSEO] = useState(false);
   const [newColor, setNewColor] = useState('');
   const [newSize, setNewSize] = useState('');
+  const [imageEditorOpen, setImageEditorOpen] = useState(false);
+  const [editingImageUrl, setEditingImageUrl] = useState('');
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -965,22 +968,34 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                       <Badge className="absolute top-2 left-2 bg-yellow-500 text-white">
                         Principal
                       </Badge>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => {
-                          const newImages = formData.images.filter(img => img !== formData.image_url);
-                          setFormData(prev => ({
-                            ...prev,
-                            image_url: newImages[0] || '',
-                            images: newImages
-                          }));
-                        }}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setEditingImageUrl(formData.image_url);
+                            setImageEditorOpen(true);
+                          }}
+                        >
+                          <Edit3 className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            const newImages = formData.images.filter(img => img !== formData.image_url);
+                            setFormData(prev => ({
+                              ...prev,
+                              image_url: newImages[0] || '',
+                              images: newImages
+                            }));
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1002,15 +1017,27 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => removeImage(imageUrl)}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
+                          <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setEditingImageUrl(imageUrl);
+                                setImageEditorOpen(true);
+                              }}
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => removeImage(imageUrl)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
                           <Button
                             type="button"
                             size="sm"
@@ -1206,6 +1233,29 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
           </Button>
         </div>
       </form>
+
+      {/* Image Editor Modal */}
+      <ImageEditorModal
+        isOpen={imageEditorOpen}
+        onClose={() => setImageEditorOpen(false)}
+        imageUrl={editingImageUrl}
+        onImageUpdate={(newImageUrl) => {
+          if (editingImageUrl === formData.image_url) {
+            // Updating main image
+            setFormData(prev => ({
+              ...prev,
+              image_url: newImageUrl,
+              images: prev.images.map(img => img === editingImageUrl ? newImageUrl : img)
+            }));
+          } else {
+            // Updating gallery image
+            setFormData(prev => ({
+              ...prev,
+              images: prev.images.map(img => img === editingImageUrl ? newImageUrl : img)
+            }));
+          }
+        }}
+      />
     </div>
   );
 };
