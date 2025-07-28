@@ -7,6 +7,9 @@ interface CookieData {
   firstVisit: string;
   lastVisit: string;
   visitCount: number;
+  lastVisitDate: string; // Data da última visita (YYYY-MM-DD)
+  todayPageViews: number; // Visualizações de hoje
+  isNewVisitorToday: boolean; // Se é novo visitante hoje
   referrer?: string;
   utmSource?: string;
   utmMedium?: string;
@@ -43,6 +46,7 @@ export const useCookieAnalytics = () => {
 
   const initializeCookieData = () => {
     const now = new Date().toISOString();
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const utmParams = extractUTMParams();
     
     // Verificar se já existe dados do visitante
@@ -51,13 +55,25 @@ export const useCookieAnalytics = () => {
     if (existingData) {
       try {
         const data = JSON.parse(decodeURIComponent(existingData));
+        const lastVisitDate = data.lastVisitDate || data.firstVisit?.split('T')[0];
+        const isNewDay = lastVisitDate !== today;
         
-        // Atualizar última visita e contagem
+        // Gerar nova sessão se necessário
+        let currentSessionId = sessionStorage.getItem('session_id');
+        if (!currentSessionId) {
+          currentSessionId = 'session_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+          sessionStorage.setItem('session_id', currentSessionId);
+        }
+        
+        // Atualizar dados do visitante
         const updatedData = {
           ...data,
           lastVisit: now,
-          visitCount: (data.visitCount || 1) + 1,
-          sessionId: sessionStorage.getItem('session_id') || data.sessionId,
+          lastVisitDate: today,
+          sessionId: currentSessionId,
+          visitCount: isNewDay ? (data.visitCount || 1) + 1 : (data.visitCount || 1),
+          todayPageViews: isNewDay ? 1 : ((data.todayPageViews || 0) + 1),
+          isNewVisitorToday: isNewDay,
           // Manter UTM do primeiro acesso, a menos que seja uma nova campanha
           ...(!data.utmSource && utmParams.utmSource ? utmParams : {})
         };
@@ -65,24 +81,33 @@ export const useCookieAnalytics = () => {
         setCookieData(updatedData);
         setCookie('superloja_analytics', encodeURIComponent(JSON.stringify(updatedData)));
         
-        // Rastrear visitante recorrente
-        trackEvent('returning_visitor', {
-          visitCount: updatedData.visitCount,
-          daysSinceFirst: Math.ceil((new Date(now).getTime() - new Date(data.firstVisit).getTime()) / (1000 * 60 * 60 * 24))
-        });
+        // Rastrear apenas se for um novo dia ou primeira visita hoje
+        if (isNewDay) {
+          trackEvent('daily_visitor', {
+            visitCount: updatedData.visitCount,
+            daysSinceFirst: Math.ceil((new Date(now).getTime() - new Date(data.firstVisit).getTime()) / (1000 * 60 * 60 * 24)),
+            isReturning: updatedData.visitCount > 1
+          });
+        } else {
+          // Apenas rastrear como sessão adicional, não como novo visitante
+          trackEvent('additional_session', {
+            todayPageViews: updatedData.todayPageViews,
+            sessionId: currentSessionId
+          });
+        }
         
       } catch (error) {
         console.error('Erro ao parsear cookie de analytics:', error);
         // Se cookie corrompido, criar novo
-        createNewVisitorData(now, utmParams);
+        createNewVisitorData(now, today, utmParams);
       }
     } else {
       // Novo visitante
-      createNewVisitorData(now, utmParams);
+      createNewVisitorData(now, today, utmParams);
     }
   };
 
-  const createNewVisitorData = (now: string, utmParams: any) => {
+  const createNewVisitorData = (now: string, today: string, utmParams: any) => {
     const visitorId = localStorage.getItem('visitor_id') || 
       'visitor_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
     const sessionId = sessionStorage.getItem('session_id') || 
@@ -93,7 +118,10 @@ export const useCookieAnalytics = () => {
       sessionId,
       firstVisit: now,
       lastVisit: now,
+      lastVisitDate: today,
       visitCount: 1,
+      todayPageViews: 1,
+      isNewVisitorToday: true,
       referrer: document.referrer,
       ...utmParams
     };
@@ -108,6 +136,7 @@ export const useCookieAnalytics = () => {
     // Rastrear novo visitante
     trackEvent('new_visitor', {
       referrer: document.referrer,
+      firstTime: true,
       ...utmParams
     });
   };
@@ -153,30 +182,42 @@ export const useCookieAnalytics = () => {
     });
   };
 
-  // Rastrear tempo de sessão
+  // Rastrear tempo de sessão (otimizado)
   const trackSessionTime = () => {
     const startTime = Date.now();
+    let hasTracked = false;
     
     const sendSessionTime = () => {
+      if (hasTracked) return; // Evitar múltiplas chamadas
+      
       const sessionDuration = Math.round((Date.now() - startTime) / 1000);
-      if (sessionDuration > 30) { // Só rastrear sessões > 30 segundos
+      if (sessionDuration > 10) { // Só rastrear sessões > 10 segundos
+        hasTracked = true;
         trackEvent('session_duration', {
           duration: sessionDuration,
           visitorId: cookieData?.visitorId,
-          visitCount: cookieData?.visitCount
+          visitCount: cookieData?.visitCount,
+          isNewVisitorToday: cookieData?.isNewVisitorToday
         });
       }
     };
     
-    // Rastrear quando sair da página
+    // Rastrear quando sair da página (com debounce)
+    let timeout: NodeJS.Timeout;
+    const debouncedTrack = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(sendSessionTime, 1000);
+    };
+    
     window.addEventListener('beforeunload', sendSessionTime);
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
-        sendSessionTime();
+        debouncedTrack();
       }
     });
     
     return () => {
+      clearTimeout(timeout);
       window.removeEventListener('beforeunload', sendSessionTime);
     };
   };
