@@ -204,15 +204,22 @@ async function handleInstagramMessage(messaging: any, supabase: any) {
   const senderId = messaging.sender.id;
   const messageText = messaging.message.text;
   
-  console.log(`📨 Nova mensagem Instagram de ${senderId}: ${messageText}`);
+  console.log(`📨 === NOVA MENSAGEM INSTAGRAM ===`);
+  console.log(`👤 Sender ID: ${senderId}`);
+  console.log(`💬 Mensagem: ${messageText}`);
+  console.log(`🕒 Timestamp: ${messaging.timestamp}`);
+  console.log(`📊 Estrutura completa:`, JSON.stringify(messaging, null, 2));
   
   try {
     // Verificar se o bot Instagram está habilitado
-    const { data: botSettings } = await supabase
+    console.log('🔍 Verificando se bot Instagram está habilitado...');
+    const { data: botSettings, error: botError } = await supabase
       .from('ai_settings')
       .select('value')
       .eq('key', 'instagram_bot_enabled')
-      .single();
+      .maybeSingle();
+    
+    console.log('🤖 Bot settings result:', { botSettings, botError });
     
     if (botSettings?.value !== 'true') {
       console.log('🚫 Bot Instagram desabilitado');
