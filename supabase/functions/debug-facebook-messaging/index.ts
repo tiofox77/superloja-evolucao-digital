@@ -16,8 +16,23 @@ serve(async (req) => {
     console.log('🔍 === INICIANDO DEBUG FACEBOOK MESSAGING ===');
 
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('❌ Variáveis de ambiente Supabase não configuradas');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Configuração Supabase incompleta - variáveis de ambiente não encontradas'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        }
+      );
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const debugResults = {
@@ -98,8 +113,11 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
+          fully_functional: false,
           debug_results: debugResults,
-          message: 'Nenhum token Facebook encontrado'
+          error: 'Nenhum token Facebook encontrado',
+          recommendations: ['Configure o token Facebook na página de configurações ou nas secrets do Supabase'],
+          message: 'Nenhum token Facebook encontrado para testes'
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

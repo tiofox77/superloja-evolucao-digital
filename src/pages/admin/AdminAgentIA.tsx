@@ -452,28 +452,56 @@ export default function AdminAgentIA() {
 
       console.log('📊 Resultado debug:', { data, error });
 
-      if (error) {
+      // Tentar extrair informações mesmo com erro
+      let debugInfo = null;
+      if (error && error.message?.includes('non-2xx status code')) {
+        try {
+          // Tentar fazer uma nova chamada para obter a resposta detalhada
+          const response = await fetch(`https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/debug-facebook-messaging`, {
+            method: 'POST',
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE',
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          debugInfo = await response.json();
+          console.log('📋 Debug info extraída:', debugInfo);
+          
+        } catch (fetchError) {
+          console.log('Não foi possível obter detalhes do debug');
+        }
+      }
+
+      if (error && !debugInfo) {
         console.error('❌ Erro no debug:', error);
         throw error;
       }
       
+      const finalData = data || debugInfo;
+      const isSuccess = finalData?.success !== false;
+      
       const result = {
         service: 'Debug Facebook',
-        status: data.fully_functional ? 'success' as const : 'error' as const,
-        message: data.fully_functional 
+        status: (isSuccess && finalData?.fully_functional) ? 'success' as const : 'error' as const,
+        message: isSuccess && finalData?.fully_functional 
           ? '✅ Sistema funcionando perfeitamente!' 
-          : `❌ ${data.debug_results.summary.issues_found.length} problema(s) encontrado(s)`,
-        details: data,
+          : `❌ ${finalData?.debug_results?.summary?.issues_found?.length || 'Vários'} problema(s) encontrado(s)`,
+        details: finalData,
         timestamp: new Date().toLocaleString()
       };
       
       setTestResults(prev => [...prev.filter(r => r.service !== 'Debug Facebook'), result]);
       
       // Mostrar recomendações se houver problemas
-      if (!data.fully_functional && data.recommendations?.length > 0) {
-        toast.error('Problemas encontrados! Veja os detalhes.');
-        console.log('📋 Recomendações:', data.recommendations);
-      } else if (data.fully_functional) {
+      if (!isSuccess || !finalData?.fully_functional) {
+        if (finalData?.recommendations?.length > 0) {
+          toast.error('Problemas encontrados! Veja os detalhes e recomendações.');
+          console.log('📋 Recomendações:', finalData.recommendations);
+        } else {
+          toast.error(finalData?.error || 'Problemas encontrados no debug');
+        }
+      } else {
         toast.success('🎉 Sistema funcionando perfeitamente!');
       }
       
