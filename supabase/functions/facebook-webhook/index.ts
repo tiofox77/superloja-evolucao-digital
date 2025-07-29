@@ -25,6 +25,18 @@ serve(async (req) => {
       const token = url.searchParams.get('hub.verify_token');
       const challenge = url.searchParams.get('hub.challenge');
       
+      // Se não tem parâmetros de verificação, retorna status OK
+      if (!mode && !token && !challenge) {
+        console.log('📡 Webhook acessado diretamente - Status OK');
+        return new Response('Webhook Facebook está online e funcionando! ✅', { 
+          status: 200,
+          headers: {
+            'Content-Type': 'text/plain',
+            ...corsHeaders
+          }
+        });
+      }
+      
       console.log('=== WEBHOOK VERIFICATION ===');
       console.log('Mode:', mode);
       console.log('Token recebido:', token);
