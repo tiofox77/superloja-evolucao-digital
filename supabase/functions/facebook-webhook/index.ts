@@ -339,27 +339,46 @@ Para ver nosso catálogo: https://superloja.vip`;
 }
 
 async function sendFacebookMessage(recipientId: string, message: string, supabase: any) {
-  // Primeiro tenta buscar token das configurações Meta
+  // Primeiro tenta buscar token das configurações AI (onde o admin salva)
   let PAGE_ACCESS_TOKEN = null;
   let tokenSource = 'none';
   
   try {
-    const { data: metaSettings } = await supabase
-      .from('meta_settings')
-      .select('access_token')
-      .limit(1)
+    const { data: aiSettings } = await supabase
+      .from('ai_settings')
+      .select('value')
+      .eq('key', 'facebook_page_token')
       .maybeSingle();
     
-    if (metaSettings?.access_token) {
-      PAGE_ACCESS_TOKEN = metaSettings.access_token;
-      tokenSource = 'meta_settings';
-      console.log('✅ Usando token das configurações Meta');
+    if (aiSettings?.value) {
+      PAGE_ACCESS_TOKEN = aiSettings.value;
+      tokenSource = 'ai_settings';
+      console.log('✅ Usando token das configurações AI (admin)');
     }
   } catch (error) {
-    console.log('⚠️ Erro ao buscar token Meta, tentando fallback');
+    console.log('⚠️ Erro ao buscar token AI settings, tentando Meta settings');
+  }
+
+  // Fallback 1: Configurações Meta
+  if (!PAGE_ACCESS_TOKEN) {
+    try {
+      const { data: metaSettings } = await supabase
+        .from('meta_settings')
+        .select('access_token')
+        .limit(1)
+        .maybeSingle();
+      
+      if (metaSettings?.access_token) {
+        PAGE_ACCESS_TOKEN = metaSettings.access_token;
+        tokenSource = 'meta_settings';
+        console.log('✅ Usando token das configurações Meta');
+      }
+    } catch (error) {
+      console.log('⚠️ Erro ao buscar token Meta, tentando secrets');
+    }
   }
   
-  // Fallback para o token das secrets se não encontrar nas configurações Meta
+  // Fallback 2: Secrets do Supabase
   if (!PAGE_ACCESS_TOKEN) {
     PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
     tokenSource = 'secrets';

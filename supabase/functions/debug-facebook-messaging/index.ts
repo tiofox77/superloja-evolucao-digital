@@ -50,31 +50,62 @@ serve(async (req) => {
       }
     };
 
-    // STEP 1: Verificar token das configurações Meta
-    console.log('📋 STEP 1: Verificando token das configurações Meta...');
+    // STEP 1: Verificar token das configurações AI (onde o admin salva)
+    console.log('📋 STEP 1: Verificando token das configurações AI...');
     try {
-      const { data: metaSettings, error: metaError } = await supabase
-        .from('meta_settings')
-        .select('access_token')
-        .limit(1)
+      const { data: aiSettings, error: aiError } = await supabase
+        .from('ai_settings')
+        .select('value')
+        .eq('key', 'facebook_page_token')
         .maybeSingle();
 
       debugResults.step1_meta_token = {
-        found: !!metaSettings?.access_token,
-        token_preview: metaSettings?.access_token ? metaSettings.access_token.substring(0, 20) + '...' : null,
-        error: metaError?.message || null
+        found: !!aiSettings?.value,
+        token_preview: aiSettings?.value ? aiSettings.value.substring(0, 20) + '...' : null,
+        error: aiError?.message || null,
+        source: 'ai_settings'
       };
 
-      if (metaSettings?.access_token) {
-        debugResults.summary.token_source = 'meta_settings';
-        console.log('✅ Token encontrado nas configurações Meta');
+      if (aiSettings?.value) {
+        debugResults.summary.token_source = 'ai_settings';
+        console.log('✅ Token encontrado nas configurações AI');
       } else {
-        console.log('⚠️ Token não encontrado nas configurações Meta');
-        debugResults.summary.issues_found.push('Token não encontrado na tabela meta_settings');
+        console.log('⚠️ Token não encontrado nas configurações AI');
+        debugResults.summary.issues_found.push('Token não encontrado na tabela ai_settings');
       }
     } catch (error) {
-      debugResults.step1_meta_token = { error: error.message };
-      debugResults.summary.issues_found.push('Erro ao acessar tabela meta_settings: ' + error.message);
+      debugResults.step1_meta_token = { error: error.message, source: 'ai_settings' };
+      debugResults.summary.issues_found.push('Erro ao acessar tabela ai_settings: ' + error.message);
+    }
+
+    // STEP 1.5: Verificar token das configurações Meta (fallback)
+    console.log('📋 STEP 1.5: Verificando token das configurações Meta...');
+    if (debugResults.summary.token_source === 'none') {
+      try {
+        const { data: metaSettings, error: metaError } = await supabase
+          .from('meta_settings')
+          .select('access_token')
+          .limit(1)
+          .maybeSingle();
+
+        debugResults.step1_meta_token = {
+          ...debugResults.step1_meta_token,
+          meta_found: !!metaSettings?.access_token,
+          meta_token_preview: metaSettings?.access_token ? metaSettings.access_token.substring(0, 20) + '...' : null,
+          meta_error: metaError?.message || null
+        };
+
+        if (metaSettings?.access_token) {
+          debugResults.summary.token_source = 'meta_settings';
+          console.log('✅ Token encontrado nas configurações Meta');
+        } else {
+          console.log('⚠️ Token não encontrado nas configurações Meta');
+          debugResults.summary.issues_found.push('Token não encontrado na tabela meta_settings');
+        }
+      } catch (error) {
+        debugResults.step1_meta_token.meta_error = error.message;
+        debugResults.summary.issues_found.push('Erro ao acessar tabela meta_settings: ' + error.message);
+      }
     }
 
     // STEP 2: Verificar token das secrets (fallback)
@@ -95,7 +126,14 @@ serve(async (req) => {
 
     // Determinar qual token usar para os testes
     let testToken = null;
-    if (debugResults.step1_meta_token?.found) {
+    if (debugResults.summary.token_source === 'ai_settings') {
+      const { data: aiSettings } = await supabase
+        .from('ai_settings')
+        .select('value')
+        .eq('key', 'facebook_page_token')
+        .maybeSingle();
+      testToken = aiSettings?.value;
+    } else if (debugResults.summary.token_source === 'meta_settings') {
       const { data: metaSettings } = await supabase
         .from('meta_settings')
         .select('access_token')
