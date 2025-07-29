@@ -21,19 +21,64 @@ serve(async (req) => {
 
     console.log('🧪 Testando token Facebook...');
 
-    // Testar token com Graph API
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/me?access_token=${page_token}&fields=name,id,category,followers_count,about`
+    // Primeiro, verificar que tipo de token é (usuário ou página)
+    const tokenInfoResponse = await fetch(
+      `https://graph.facebook.com/v18.0/me?access_token=${page_token}&fields=id,name`
     );
 
-    const data = await response.json();
+    const tokenData = await tokenInfoResponse.json();
     
-    if (!response.ok) {
-      console.error('❌ Erro Facebook:', data);
-      throw new Error(data.error?.message || 'Token inválido');
+    if (!tokenInfoResponse.ok) {
+      console.error('❌ Erro ao verificar token:', tokenData);
+      throw new Error(tokenData.error?.message || 'Token inválido');
     }
 
-    console.log(`✅ Página Facebook encontrada: ${data.name}`);
+    console.log('📋 Informações do token:', tokenData);
+
+    // Tentar buscar informações como página
+    let pageData = null;
+    let isPageToken = false;
+    
+    try {
+      const pageResponse = await fetch(
+        `https://graph.facebook.com/v18.0/me?access_token=${page_token}&fields=name,id,category,followers_count,about,access_token`
+      );
+      
+      const pageResult = await pageResponse.json();
+      
+      if (pageResponse.ok && pageResult.category) {
+        pageData = pageResult;
+        isPageToken = true;
+        console.log('✅ Token de página válido:', pageData.name);
+      }
+    } catch (error) {
+      console.log('⚠️  Não é um token de página, verificando se é token de usuário...');
+    }
+
+    // Se não for token de página, buscar as páginas do usuário
+    if (!isPageToken) {
+      const userPagesResponse = await fetch(
+        `https://graph.facebook.com/v18.0/me/accounts?access_token=${page_token}&fields=name,id,category,access_token`
+      );
+      
+      const userPagesData = await userPagesResponse.json();
+      
+      if (!userPagesResponse.ok) {
+        console.error('❌ Erro ao buscar páginas do usuário:', userPagesData);
+        throw new Error('Token não tem acesso a páginas ou é inválido');
+      }
+      
+      if (userPagesData.data && userPagesData.data.length > 0) {
+        pageData = {
+          ...tokenData,
+          pages: userPagesData.data,
+          total_pages: userPagesData.data.length
+        };
+        console.log(`✅ Token de usuário com ${userPagesData.data.length} página(s) acessível(eis)`);
+      } else {
+        throw new Error('Token de usuário não tem acesso a nenhuma página');
+      }
+    }
 
     // Testar permissões de mensagens
     const permissionsResponse = await fetch(
@@ -45,17 +90,27 @@ serve(async (req) => {
       (perm: any) => perm.permission === 'pages_messaging' && perm.status === 'granted'
     );
 
-    return new Response(JSON.stringify({
+    const responseData = {
       success: true,
-      page_name: data.name,
-      page_id: data.id,
-      page_category: data.category,
-      followers_count: data.followers_count,
-      about: data.about,
+      token_type: isPageToken ? 'page' : 'user',
       messaging_permission: hasMessagingPermission,
       permissions: permissionsData.data,
-      test_timestamp: new Date().toISOString()
-    }), {
+      test_timestamp: new Date().toISOString(),
+      ...(isPageToken ? {
+        page_name: pageData.name,
+        page_id: pageData.id,
+        page_category: pageData.category,
+        followers_count: pageData.followers_count,
+        about: pageData.about
+      } : {
+        user_name: pageData.name,
+        user_id: pageData.id,
+        accessible_pages: pageData.pages,
+        total_pages: pageData.total_pages
+      })
+    };
+
+    return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
