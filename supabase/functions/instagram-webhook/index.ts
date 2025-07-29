@@ -211,7 +211,25 @@ async function handleInstagramMessage(messaging: any, supabase: any) {
   console.log(`📊 Estrutura completa:`, JSON.stringify(messaging, null, 2));
   
   try {
-    // Verificar se o bot Instagram está habilitado
+    // 1. Verificar se humano está ativo no chat
+    console.log('👤 Verificando se humano está ativo no chat...');
+    const isHumanActive = await checkIfHumanIsActive(senderId, supabase);
+    
+    if (isHumanActive) {
+      console.log('🚫 Humano ativo no chat - IA suspensa');
+      // Apenas salvar a mensagem, não responder
+      await supabase.from('ai_conversations').insert({
+        platform: 'instagram',
+        user_id: senderId,
+        message: messageText,
+        type: 'received',
+        timestamp: new Date().toISOString(),
+        metadata: { human_active: true, ai_paused: true }
+      });
+      return;
+    }
+    
+    // 2. Verificar se o bot Instagram está habilitado
     console.log('🔍 Verificando se bot Instagram está habilitado...');
     const { data: botSettings, error: botError } = await supabase
       .from('ai_settings')
@@ -330,9 +348,9 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
       return getFallbackResponse(userMessage, senderId, supabase);
     }
 
-    // Construir prompt para Instagram
+    // Construir prompt para Instagram com contexto melhorado
     const systemPrompt = buildInstagramSystemPrompt(userContext, relevantProducts);
-    const conversationHistory = await getRecentConversationHistory(senderId, supabase);
+    const conversationHistory = await getEnhancedConversationHistory(senderId, supabase);
 
     // Análise inteligente do contexto da conversa
     const contextAnalysis = analyzeConversationContext(conversationHistory, userMessage);
@@ -1084,4 +1102,179 @@ async function notifyAdminForEscalation(userId: string, userMessage: string, rea
   } catch (error) {
     console.error('❌ Erro completo na notificação do admin:', error);
   }
+}
+
+// Função para verificar se humano está ativo no chat
+async function checkIfHumanIsActive(userId: string, supabase: any): Promise<boolean> {
+  try {
+    console.log('👤 Verificando status humano para usuário:', userId);
+    
+    // Verificar se há uma sessão humana ativa nos últimos 30 minutos
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    
+    const { data: recentHumanActivity } = await supabase
+      .from('ai_conversations')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('platform', 'instagram')
+      .or('type.eq.human_response,metadata.cs.{"human_active":true}')
+      .gte('timestamp', thirtyMinutesAgo)
+      .order('timestamp', { ascending: false })
+      .limit(1);
+    
+    if (recentHumanActivity && recentHumanActivity.length > 0) {
+      console.log('🚫 Humano ativo detectado nos últimos 30 minutos');
+      return true;
+    }
+    
+    // Verificar se há flag manual de "humano assumiu conversa"
+    const { data: chatStatus } = await supabase
+      .from('ai_conversation_context')
+      .select('context_data')
+      .eq('user_id', userId)
+      .eq('platform', 'instagram')
+      .maybeSingle();
+    
+    if (chatStatus?.context_data?.human_takeover === true) {
+      console.log('🚫 Flag manual de takeover humano ativa');
+      return true;
+    }
+    
+    console.log('✅ Nenhuma atividade humana recente - IA pode responder');
+    return false;
+    
+  } catch (error) {
+    console.error('❌ Erro ao verificar status humano:', error);
+    return false; // Em caso de erro, deixa IA responder
+  }
+}
+
+// Função melhorada para ler contexto completo da conversa
+async function getEnhancedConversationHistory(userId: string, supabase: any): Promise<any[]> {
+  try {
+    console.log('📚 Carregando contexto completo da conversa para:', userId);
+    
+    // Buscar últimas 10 mensagens para contexto mais rico
+    const { data: conversations } = await supabase
+      .from('ai_conversations')
+      .select('message, type, timestamp, metadata')
+      .eq('user_id', userId)
+      .eq('platform', 'instagram')
+      .order('timestamp', { ascending: false })
+      .limit(10);
+
+    if (!conversations) {
+      console.log('📭 Nenhuma conversa anterior encontrada');
+      return [];
+    }
+
+    // Analisar padrões na conversa
+    const conversationAnalysis = {
+      totalMessages: conversations.length,
+      lastUserMessage: conversations.find(c => c.type === 'received'),
+      lastBotMessage: conversations.find(c => c.type === 'sent'),
+      recentTopics: extractTopicsFromMessages(conversations),
+      userSentiment: analyzeSentiment(conversations.filter(c => c.type === 'received')),
+      hasUnresolvedIssues: checkForUnresolvedIssues(conversations)
+    };
+
+    console.log('🧠 Análise da conversa:', conversationAnalysis);
+
+    // Formatar para OpenAI com análise de contexto
+    const formattedHistory = conversations
+      .reverse()
+      .map((conv: any) => ({
+        role: conv.type === 'received' ? 'user' : 'assistant',
+        content: conv.message,
+        timestamp: conv.timestamp,
+        metadata: conv.metadata
+      }));
+
+    // Adicionar contexto resumido no início se há muitas mensagens
+    if (conversations.length > 6) {
+      const contextSummary = `[CONTEXTO: Conversa com ${conversationAnalysis.totalMessages} mensagens. Tópicos recentes: ${conversationAnalysis.recentTopics.join(', ')}. Sentiment: ${conversationAnalysis.userSentiment}]`;
+      
+      formattedHistory.unshift({
+        role: 'system',
+        content: contextSummary,
+        timestamp: new Date().toISOString(),
+        metadata: { type: 'context_summary' }
+      });
+    }
+
+    return formattedHistory.slice(-8); // Últimas 8 incluindo resumo
+
+  } catch (error) {
+    console.error('❌ Erro ao carregar contexto:', error);
+    return [];
+  }
+}
+
+// Função para extrair tópicos das mensagens
+function extractTopicsFromMessages(messages: any[]): string[] {
+  const topics = new Set<string>();
+  
+  const topicKeywords = {
+    'entrega': ['entrega', 'entregar', 'envio', 'frete'],
+    'pagamento': ['pagamento', 'pagar', 'preço', 'valor', 'custo'],
+    'produtos': ['produto', 'artigo', 'item', 'comprar'],
+    'suporte': ['problema', 'ajuda', 'dúvida', 'não funciona'],
+    'horario': ['horário', 'quando', 'aberto', 'funciona'],
+    'localizacao': ['onde', 'endereço', 'localização', 'loja']
+  };
+
+  messages.forEach(msg => {
+    if (msg.type === 'received') {
+      const msgLower = msg.message.toLowerCase();
+      
+      Object.entries(topicKeywords).forEach(([topic, keywords]) => {
+        if (keywords.some(keyword => msgLower.includes(keyword))) {
+          topics.add(topic);
+        }
+      });
+    }
+  });
+
+  return Array.from(topics);
+}
+
+// Função para analisar sentiment básico
+function analyzeSentiment(userMessages: any[]): string {
+  if (userMessages.length === 0) return 'neutro';
+  
+  const positiveWords = ['obrigado', 'ótimo', 'bom', 'gostei', 'perfeito', 'sim'];
+  const negativeWords = ['problema', 'ruim', 'não funciona', 'erro', 'dificuldade', 'frustrado'];
+  
+  let positiveCount = 0;
+  let negativeCount = 0;
+  
+  userMessages.forEach(msg => {
+    const msgLower = msg.message.toLowerCase();
+    positiveCount += positiveWords.filter(word => msgLower.includes(word)).length;
+    negativeCount += negativeWords.filter(word => msgLower.includes(word)).length;
+  });
+  
+  if (positiveCount > negativeCount) return 'positivo';
+  if (negativeCount > positiveCount) return 'negativo';
+  return 'neutro';
+}
+
+// Função para verificar problemas não resolvidos
+function checkForUnresolvedIssues(messages: any[]): boolean {
+  const recentMessages = messages.slice(0, 4); // Últimas 4 mensagens
+  
+  const problemIndicators = [
+    'ainda não entendi',
+    'continua não funcionando',
+    'mesmo problema',
+    'não resolveu',
+    'não ajudou'
+  ];
+  
+  return recentMessages.some(msg => 
+    msg.type === 'received' && 
+    problemIndicators.some(indicator => 
+      msg.message.toLowerCase().includes(indicator)
+    )
+  );
 }

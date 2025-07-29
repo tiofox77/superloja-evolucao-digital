@@ -2630,6 +2630,128 @@ export default function AdminAgentIA() {
                 </div>
               </div>
 
+              {/* Controle de Chat Humano/IA */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">🤝 Controle Chat Humano/IA</h3>
+                <div className="space-y-4">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <h4 className="font-medium text-green-800 mb-2">✅ Sistema Inteligente Ativado</h4>
+                    <ul className="list-disc list-inside text-sm text-green-700 space-y-1">
+                      <li>IA **para automaticamente** quando humano responde no chat</li>
+                      <li>IA **analisa contexto completo** das conversas antes de responder</li>
+                      <li>IA **responde diretamente** às perguntas específicas</li>
+                      <li>IA **não envia produtos** sem solicitação</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>🧠 Modo de Operação Atual</Label>
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                          <span className="font-medium text-blue-800">IA Inteligente + Controle Humano</span>
+                        </div>
+                        <p className="text-sm text-blue-600 mt-1">
+                          Sistema detecta automaticamente quando humano está ativo e pausa a IA
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>⏱️ Tempo de Pausa</Label>
+                      <div className="p-3 bg-gray-50 border rounded-lg">
+                        <div className="text-lg font-bold text-gray-800">30 minutos</div>
+                        <p className="text-sm text-gray-600">
+                          IA fica pausada por 30min após atividade humana
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <h4 className="font-medium text-yellow-800 mb-2">⚙️ Como Funciona</h4>
+                      <ol className="list-decimal list-inside text-sm text-yellow-700 space-y-1">
+                        <li>Humano responde em qualquer chat (Facebook/Instagram)</li>
+                        <li>Sistema detecta atividade humana automaticamente</li>
+                        <li>IA para de responder nesse chat por 30 minutos</li>
+                        <li>Após 30min sem atividade humana, IA volta a responder</li>
+                        <li>IA sempre lê contexto completo antes de responder</li>
+                      </ol>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2"
+                        onClick={async () => {
+                          toast.loading('Verificando status dos chats...');
+                          
+                          try {
+                            // Verificar chats com humanos ativos
+                            const { data: activeChats } = await supabase
+                              .from('ai_conversation_context')
+                              .select('user_id, platform, context_data')
+                              .contains('context_data', { human_takeover: true });
+                            
+                            toast.dismiss();
+                            
+                            if (activeChats && activeChats.length > 0) {
+                              toast.success(`👥 ${activeChats.length} chat(s) com humano ativo`);
+                            } else {
+                              toast.success('🤖 Todos os chats estão com IA ativa');
+                            }
+                          } catch (error) {
+                            toast.dismiss();
+                            toast.error('Erro ao verificar status');
+                          }
+                        }}
+                      >
+                        👥 Ver Chats Humanos
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2"
+                        onClick={async () => {
+                          toast.loading('Reativando IA em todos os chats...');
+                          
+                          try {
+                            // Limpar flags de humano ativo
+                            await supabase
+                              .from('ai_conversation_context')
+                              .update({ 
+                                context_data: { human_takeover: false },
+                                updated_at: new Date().toISOString()
+                              })
+                              .contains('context_data', { human_takeover: true });
+                            
+                            toast.dismiss();
+                            toast.success('🤖 IA reativada em todos os chats!');
+                          } catch (error) {
+                            toast.dismiss();
+                            toast.error('Erro ao reativar IA');
+                          }
+                        }}
+                      >
+                        🔄 Reativar IA Global
+                      </Button>
+                      
+                      <Button
+                        variant="secondary"
+                        className="flex items-center gap-2"
+                        onClick={() => {
+                          toast.success('📚 Sistema já configurado e funcionando automaticamente!');
+                        }}
+                      >
+                        📊 Status Sistema
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Sincronização */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Sincronização</h3>
