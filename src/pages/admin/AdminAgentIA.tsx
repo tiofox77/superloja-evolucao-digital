@@ -1078,6 +1078,46 @@ export default function AdminAgentIA() {
                     >
                       🔄 Sincronizar Tokens
                     </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={async () => {
+                        if (!settings.facebook_page_token) {
+                          toast.error('Configure o token da página primeiro');
+                          return;
+                        }
+
+                        toast.loading('Configurando subscrição webhook...');
+                        
+                        try {
+                          const { data, error } = await supabase.functions.invoke('configure-facebook-webhook', {
+                            body: {
+                              page_token: settings.facebook_page_token,
+                              page_id: '230190170178019' // ID da página Superloja
+                            }
+                          });
+
+                          if (error) throw error;
+
+                          console.log('🔧 Resultado configuração:', data);
+                          
+                          toast.dismiss();
+                          
+                          if (data.success) {
+                            toast.success('✅ Webhook configurado! Agora teste enviando uma mensagem.');
+                          } else {
+                            toast.error(`❌ Erro: ${data.error}`);
+                          }
+                          
+                        } catch (error: any) {
+                          console.error('❌ Erro ao configurar:', error);
+                          toast.dismiss();
+                          toast.error(`Erro: ${error.message}`);
+                        }
+                      }}
+                    >
+                      🔧 Configurar Subscrição
+                    </Button>
                   </div>
                 </div>
               </div>
