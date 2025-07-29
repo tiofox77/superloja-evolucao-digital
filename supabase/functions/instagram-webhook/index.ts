@@ -820,7 +820,7 @@ async function sendInstagramImage(recipientId: string, imageUrl: string, caption
               }
             }
           }
-        });
+        })
       }
     );
     
