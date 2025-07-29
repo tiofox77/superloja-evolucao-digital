@@ -1118,6 +1118,45 @@ export default function AdminAgentIA() {
                     >
                       🔧 Configurar Subscrição
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        toast.loading('Testando sistema completo...');
+                        
+                        try {
+                          const { data, error } = await supabase.functions.invoke('test-messaging-system');
+
+                          if (error) throw error;
+
+                          console.log('🧪 Resultado do teste:', data);
+                          
+                          toast.dismiss();
+                          
+                          if (data.success) {
+                            const issues = [];
+                            if (!data.troubleshooting.database_working) issues.push('Banco de dados');
+                            if (!data.troubleshooting.webhook_accessible) issues.push('Webhook inacessível');
+                            if (!data.troubleshooting.messages_processing) issues.push('Processamento de mensagens');
+                            
+                            if (issues.length === 0) {
+                              toast.success('✅ Sistema funcionando! Problema pode ser configuração do Facebook.');
+                            } else {
+                              toast.error(`❌ Problemas encontrados: ${issues.join(', ')}`);
+                            }
+                          } else {
+                            toast.error(`❌ Erro no teste: ${data.error}`);
+                          }
+                          
+                        } catch (error: any) {
+                          console.error('❌ Erro ao testar:', error);
+                          toast.dismiss();
+                          toast.error(`Erro: ${error.message}`);
+                        }
+                      }}
+                    >
+                      🧪 Testar Sistema
+                    </Button>
                   </div>
                 </div>
               </div>
