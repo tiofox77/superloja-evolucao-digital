@@ -288,8 +288,9 @@ async function handleImageRequest(senderId: string, messageText: string, supabas
     for (const product of productsWithImages.slice(0, 3)) { // Máximo 3 produtos
       const price = parseFloat(product.price).toLocaleString('pt-AO');
       const stock = product.in_stock ? 'Em estoque' : 'Indisponível';
+      const productLink = `https://superloja.vip/produto/${product.slug || product.id}`;
       
-      const caption = `🛍️ ${product.name}\n💰 ${price} Kz\n📦 ${stock}\n\n${product.description || ''}`;
+      const caption = `🛍️ ${product.name}\n💰 ${price} Kz\n📦 ${stock}\n\n${product.description || ''}\n\n🔗 Ver detalhes: ${productLink}`;
       
       // Enviar imagem com legenda
       await sendFacebookImage(senderId, product.image_url, caption, supabase);
@@ -540,7 +541,7 @@ async function getRelevantProducts(message: string, supabase: any): Promise<any[
     for (const keyword of keywords) {
       const { data: keywordProducts } = await supabase
         .from('products')
-        .select('id, name, price, original_price, description, image_url, images, in_stock, stock_quantity')
+        .select('id, name, slug, price, original_price, description, image_url, images, in_stock, stock_quantity')
         .eq('active', true)
         .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%`)
         .limit(2);
@@ -555,7 +556,7 @@ async function getRelevantProducts(message: string, supabase: any): Promise<any[
   if (products.length === 0) {
     const { data: generalProducts } = await supabase
       .from('products')
-      .select('id, name, price, original_price, description, image_url, images, in_stock, stock_quantity')
+      .select('id, name, slug, price, original_price, description, image_url, images, in_stock, stock_quantity')
       .eq('active', true)
       .or(`name.ilike.%${message}%,description.ilike.%${message}%`)
       .limit(3);
@@ -656,13 +657,19 @@ ${products.map(p => {
 ${hasImage}`;
 }).join('\n')}
 
-🌐 Site completo: https://superloja.vip
+🌐 LINKS DIRETOS:
+${products.length === 1 
+  ? `🔗 Ver produto: https://superloja.vip/produto/${products[0].slug || products[0].id}`
+  : `🛒 Ver catálogo completo: https://superloja.vip/produtos`
+}
 
 IMPORTANTE: 
 - Sempre mencione o preço e disponibilidade
 - Se tiver imagem, mencione que pode mostrar
 - Seja específico sobre cada produto
-- Ofereça mais informações se necessário`;
+- Inclua sempre o link direto para facilitar a compra
+- Para produto único: link direto do produto
+- Para múltiplos produtos: link do catálogo`;
   }
 
   return basePrompt + contextualInfo + `
