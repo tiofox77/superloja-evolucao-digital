@@ -518,6 +518,67 @@ export default function AdminAgentIA() {
     }
   };
 
+  const testFacebookSend = async () => {
+    const testResult: TestResult = {
+      service: 'Facebook Send',
+      status: 'testing',
+      message: 'Testando envio real...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook Send'), testResult]);
+    
+    try {
+      console.log('🧪 Testando envio real Facebook...');
+      
+      // Usar um ID de teste (você pode usar o seu próprio PSID)
+      const testRecipientId = '24320548907583618'; // ID que aparece nos logs
+      const testMessage = `🧪 Teste de envio - ${new Date().toLocaleTimeString()}`;
+      
+      const { data, error } = await supabase.functions.invoke('test-facebook-send', {
+        body: {
+          recipient_id: testRecipientId,
+          message: testMessage
+        }
+      });
+
+      console.log('📤 Resposta teste envio:', { data, error });
+
+      if (error) {
+        console.error('❌ Erro teste envio:', error);
+        throw error;
+      }
+      
+      const result = {
+        service: 'Facebook Send',
+        status: data.success ? 'success' as const : 'error' as const,
+        message: data.success 
+          ? `✅ Mensagem enviada! ID: ${data.details?.message_id}` 
+          : `❌ Falha: ${data.error}`,
+        details: data,
+        timestamp: new Date().toLocaleString()
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook Send'), result]);
+      
+      if (data.success) {
+        toast.success('🎉 Mensagem enviada com sucesso!');
+      } else {
+        toast.error('❌ Falha no envio: ' + data.error);
+      }
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Facebook Send',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook Send'), errorResult]);
+      toast.error('Erro ao testar envio');
+    }
+  };
+
   const testCompleteSystem = async () => {
     toast.loading('Executando teste completo do sistema...');
     
@@ -1065,6 +1126,13 @@ export default function AdminAgentIA() {
                   className="flex items-center gap-2 border-orange-500 text-orange-600 hover:bg-orange-50"
                 >
                   🔍 Debug Mensagens
+                </Button>
+                <Button 
+                  onClick={testFacebookSend} 
+                  variant="outline"
+                  className="flex items-center gap-2 border-green-500 text-green-600 hover:bg-green-50"
+                >
+                  📤 Teste Envio Real
                 </Button>
                 <Button 
                   onClick={testCompleteSystem} 
