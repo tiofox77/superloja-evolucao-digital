@@ -39,6 +39,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
     price: product?.price || '',
     original_price: product?.original_price || '',
     category_id: product?.category_id || '',
+    subcategory_id: product?.subcategory_id || '',
     
     stock_quantity: product?.stock_quantity || 0,
     in_stock: product?.in_stock ?? true,
@@ -160,6 +161,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         original_price: formData.original_price ? parseFloat(formData.original_price) : null,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        subcategory_id: formData.subcategory_id || null,
         seo_title: formData.seo_title || null,
         seo_description: formData.seo_description || null,
         seo_keywords: formData.seo_keywords || null,
@@ -549,7 +551,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                     </Label>
                     <Select 
                       value={formData.category_id} 
-                      onValueChange={(value) => setFormData({...formData, category_id: value})}
+                      onValueChange={(value) => setFormData({...formData, category_id: value, subcategory_id: ''})}
                     >
                       <SelectTrigger className="mt-2">
                         <SelectValue placeholder="Selecione a categoria principal" />
@@ -565,25 +567,95 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
+                   {/* Subcategorias */}
+                   {formData.category_id && (() => {
+                     const subcategories = categories.filter(cat => cat.parent_id === formData.category_id);
+                     
+                     if (subcategories.length === 0) return null;
+                     
+                     return (
+                       <div className="space-y-3">
+                         <Label className="text-base font-semibold flex items-center gap-2">
+                           🏷️ Subcategoria (opcional)
+                         </Label>
+                         
+                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                           {subcategories.map((subcategory) => (
+                             <Card 
+                               key={subcategory.id}
+                               className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
+                                 formData.subcategory_id === subcategory.id 
+                                   ? 'ring-2 ring-primary bg-primary/5' 
+                                   : 'hover:shadow-md'
+                               }`}
+                               onClick={() => setFormData({...formData, subcategory_id: subcategory.id})}
+                             >
+                               <CardContent className="p-4">
+                                 <div className="flex items-center gap-3">
+                                   {subcategory.icon && (
+                                     <span className="text-2xl">{subcategory.icon}</span>
+                                   )}
+                                   <div className="flex-1">
+                                     <h4 className="font-medium text-sm">{subcategory.name}</h4>
+                                     {subcategory.description && (
+                                       <p className="text-xs text-muted-foreground mt-1">
+                                         {subcategory.description}
+                                       </p>
+                                     )}
+                                   </div>
+                                   {formData.subcategory_id === subcategory.id && (
+                                     <div className="w-3 h-3 bg-primary rounded-full"></div>
+                                   )}
+                                 </div>
+                               </CardContent>
+                             </Card>
+                           ))}
+                         </div>
+                         
+                         {formData.subcategory_id && (
+                           <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             onClick={() => setFormData({...formData, subcategory_id: ''})}
+                             className="mt-2"
+                           >
+                             <X className="w-4 h-4 mr-2" />
+                             Remover Subcategoria
+                           </Button>
+                         )}
+                       </div>
+                     );
+                   })()}
 
-                </div>
+                 </div>
 
-                  {/* Preview da Categorização */}
-                  {formData.category_id && (
-                    <div className="space-y-3">
-                      <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
-                      <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
-                            {categories.find(cat => cat.id === formData.category_id)?.name}
-                          </Badge>
-                        </div>
-                        
-                        <p className="text-sm text-green-700 dark:text-green-300 mt-2">
-                          ✅ O produto será exibido na navegação conforme a categorização acima
-                        </p>
-                      </div>
+                   {/* Preview da Categorização */}
+                   {formData.category_id && (
+                     <div className="space-y-3">
+                       <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
+                       <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
+                         <div className="flex flex-wrap items-center gap-2">
+                           <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+                             {categories.find(cat => cat.id === formData.category_id)?.name}
+                           </Badge>
+                           
+                           {formData.subcategory_id && (
+                             <>
+                               <span className="text-muted-foreground">›</span>
+                               <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
+                                 {categories.find(cat => cat.id === formData.subcategory_id)?.name}
+                               </Badge>
+                             </>
+                           )}
+                         </div>
+                         
+                         <p className="text-sm text-green-700 dark:text-green-300 mt-2">
+                           ✅ O produto será exibido na navegação conforme a categorização acima
+                         </p>
+                       </div>
+                     </div>
+                   )}
                     </div>
                   )}
               </CardContent>
