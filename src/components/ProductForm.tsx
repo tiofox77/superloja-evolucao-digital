@@ -628,36 +628,33 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                      );
                    })()}
 
-                 </div>
-
-                   {/* Preview da Categorização */}
-                   {formData.category_id && (
-                     <div className="space-y-3">
-                       <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
-                       <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
-                         <div className="flex flex-wrap items-center gap-2">
-                           <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
-                             {categories.find(cat => cat.id === formData.category_id)?.name}
-                           </Badge>
-                           
-                           {formData.subcategory_id && (
-                             <>
-                               <span className="text-muted-foreground">›</span>
-                               <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
-                                 {categories.find(cat => cat.id === formData.subcategory_id)?.name}
-                               </Badge>
-                             </>
-                           )}
-                         </div>
-                         
-                         <p className="text-sm text-green-700 dark:text-green-300 mt-2">
-                           ✅ O produto será exibido na navegação conforme a categorização acima
-                         </p>
-                       </div>
-                     </div>
-                   )}
+                  {/* Preview da Categorização */}
+                  {formData.category_id && (
+                    <div className="space-y-3">
+                      <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
+                      <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+                            {categories.find(cat => cat.id === formData.category_id)?.name}
+                          </Badge>
+                          
+                          {formData.subcategory_id && (
+                            <>
+                              <span className="text-muted-foreground">›</span>
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
+                                {categories.find(cat => cat.id === formData.subcategory_id)?.name}
+                              </Badge>
+                            </>
+                          )}
+                        </div>
+                        
+                        <p className="text-sm text-green-700 dark:text-green-300 mt-2">
+                          ✅ O produto será exibido na navegação conforme a categorização acima
+                        </p>
+                      </div>
                     </div>
                   )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
