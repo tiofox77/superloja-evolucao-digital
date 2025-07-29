@@ -106,7 +106,7 @@ const SaudeBemEstar = () => {
               *,
               categories!inner(name, slug)
             `)
-            .in('category_id', categoryIds)
+            .or(`category_id.in.(${categoryIds.join(',')}),subcategory_id.in.(${categoryIds.join(',')})`)
             .eq('active', true);
 
           if (productsError) throw productsError;
@@ -127,7 +127,7 @@ const SaudeBemEstar = () => {
             const { count } = await supabase
               .from('products')
               .select('*', { count: 'exact', head: true })
-              .eq('category_id', category.id)
+              .or(`category_id.eq.${category.id},subcategory_id.eq.${category.id}`)
               .eq('active', true);
 
             return {
