@@ -68,7 +68,7 @@ const SaudeBemEstar = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [priceRange, setPriceRange] = useState([0, 1000]);
+  const [priceRange, setPriceRange] = useState([0, 15000]);
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
   const [sortBy, setSortBy] = useState('name');
@@ -403,7 +403,7 @@ const SaudeBemEstar = () => {
                       <Slider
                         value={priceRange}
                         onValueChange={setPriceRange}
-                        max={1000}
+                        max={15000}
                         min={0}
                         step={10}
                         className="w-full [&>span:first-child]:bg-gradient-to-r [&>span:first-child]:from-pink-300 [&>span:first-child]:to-orange-300 [&_[role=slider]]:bg-gradient-to-r [&_[role=slider]]:from-pink-500 [&_[role=slider]]:to-orange-500 [&_[role=slider]]:border-0"
