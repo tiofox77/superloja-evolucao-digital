@@ -292,11 +292,23 @@ export default function AdminAgentIA() {
       const successResult = {
         service: 'Facebook',
         status: 'success' as const,
-        message: `✅ Token válido - Página: ${data.page_name}`,
-        details: data
+        message: data.token_type === 'page' 
+          ? `✅ Token válido - Página: ${data.page_name}` 
+          : `✅ Token de usuário válido - ${data.total_pages} página(s) acessível(eis)`,
+        details: data,
+        timestamp: new Date().toLocaleString()
       };
       
       setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook'), successResult]);
+      
+      // Se for token de usuário, mostrar aviso sobre permissão
+      if (data.token_type === 'user' && !data.messaging_permission) {
+        toast.warning('⚠️  Token de usuário sem permissão pages_messaging. Use o helper abaixo para obter token de página.');
+      } else if (data.token_type === 'page' && data.messaging_permission) {
+        toast.success('🎉 Token de página válido com permissões de mensagem!');
+      } else if (data.token_type === 'page' && !data.messaging_permission) {
+        toast.warning('⚠️  Token de página sem permissão pages_messaging');
+      }
       
     } catch (error: any) {
       const errorResult = {
@@ -792,6 +804,79 @@ export default function AdminAgentIA() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+              
+              {/* Helper para Token da Página Facebook */}
+              {testResults.some(r => r.service === 'Facebook' && r.status === 'success' && r.details?.token_type === 'user') && (
+                <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <h4 className="font-medium mb-2 text-amber-800">
+                    📘 Helper: Como obter o Token da Página
+                  </h4>
+                  <p className="text-sm text-amber-700 mb-3">
+                    Você está usando um token de usuário. Para o bot funcionar, precisa do token específico da página.
+                  </p>
+                  
+                  {/* Mostrar páginas disponíveis */}
+                  {testResults.find(r => r.service === 'Facebook')?.details?.accessible_pages && (
+                    <div className="mb-4">
+                      <h5 className="font-medium text-amber-800 mb-2">Páginas disponíveis:</h5>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {testResults.find(r => r.service === 'Facebook')?.details?.accessible_pages.map((page: any, idx: number) => (
+                          <div key={idx} className="p-2 bg-white border rounded text-xs">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <strong>{page.name}</strong>
+                                <p className="text-muted-foreground">{page.category}</p>
+                                <p className="text-muted-foreground">ID: {page.id}</p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(page.access_token);
+                                  toast.success(`Token da página "${page.name}" copiado!`);
+                                  // Atualizar automaticamente o campo
+                                  setSettings(prev => ({...prev, facebook_page_token: page.access_token}));
+                                }}
+                              >
+                                Usar Esta Página
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <strong className="text-amber-800">Método 1 (Recomendado): Usar páginas acima</strong>
+                      <p className="text-amber-700">
+                        Clique em "Usar Esta Página" na página desejada. O token será automaticamente copiado.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <strong className="text-amber-800">Método 2: Facebook Graph Explorer</strong>
+                      <ol className="list-decimal list-inside text-amber-700 space-y-1 ml-2">
+                        <li>Acesse <a href="https://developers.facebook.com/tools/explorer/" target="_blank" className="text-blue-600 underline">Facebook Graph Explorer</a></li>
+                        <li>Selecione sua aplicação no dropdown</li>
+                        <li>Em "User or Page", selecione a página desejada</li>
+                        <li>Clique em "Generate Access Token"</li>
+                        <li>Marque as permissões: <code>pages_messaging</code>, <code>pages_manage_metadata</code></li>
+                        <li>Copie o token gerado</li>
+                      </ol>
+                    </div>
+                    
+                    <div className="p-2 bg-amber-100 rounded">
+                      <strong className="text-amber-800">⚠️ Importante:</strong>
+                      <p className="text-amber-700">
+                        O token deve ter a permissão <code>pages_messaging</code> para o bot responder mensagens.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
