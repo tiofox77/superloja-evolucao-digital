@@ -42,6 +42,8 @@ interface KnowledgeItem {
 interface AISettings {
   openai_api_key: string;
   facebook_page_token: string;
+  instagram_page_token: string;
+  instagram_bot_enabled: boolean;
   bot_enabled: boolean;
   max_response_length: number;
   fallback_to_human: boolean;
@@ -89,6 +91,8 @@ export default function AdminAgentIA() {
   const [settings, setSettings] = useState<AISettings>({
     openai_api_key: '',
     facebook_page_token: '',
+    instagram_page_token: '',
+    instagram_bot_enabled: false,
     bot_enabled: true,
     max_response_length: 200,
     fallback_to_human: true,
@@ -189,6 +193,8 @@ export default function AdminAgentIA() {
     const settingsObj: any = {
       openai_api_key: '',
       facebook_page_token: '',
+      instagram_page_token: '',
+      instagram_bot_enabled: 'false',
       bot_enabled: 'true',
       max_response_length: '200',
       fallback_to_human: 'true',
@@ -389,6 +395,62 @@ export default function AdminAgentIA() {
       };
       
       setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook'), errorResult]);
+    }
+  };
+
+
+  const testInstagram = async () => {
+    const testResult: TestResult = {
+      service: 'Instagram',
+      status: 'testing',
+      message: 'Testando webhook Instagram...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram'), testResult]);
+    
+    try {
+      console.log('🧪 Testando Instagram...');
+      
+      const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/instagram-webhook', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      let message = '';
+      let status: 'success' | 'error' = 'success';
+      
+      if (response.ok) {
+        const text = await response.text();
+        if (text.includes('funcionando')) {
+          message = '✅ Webhook Instagram funcionando corretamente!';
+        } else {
+          message = '✅ Instagram webhook respondendo';
+        }
+      } else if (response.status === 403) {
+        message = '✅ Webhook funcionando (403 é esperado para teste direto)';
+      } else {
+        message = `❌ Webhook retornou status: ${response.status}`;
+        status = 'error';
+      }
+      
+      const result = {
+        service: 'Instagram',
+        status,
+        message,
+        details: { status: response.status, ok: response.ok }
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram'), result]);
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Instagram',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram'), errorResult]);
     }
   };
 
@@ -1748,6 +1810,90 @@ export default function AdminAgentIA() {
                       → Obter token Facebook
                     </a>
                   </p>
+                </div>
+              </div>
+
+              {/* Instagram Integration */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Integração Instagram</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="instagram-bot-enabled"
+                      checked={!!(settings.instagram_bot_enabled)}
+                      onCheckedChange={(checked) => setSettings(prev => ({...prev, instagram_bot_enabled: checked}))}
+                    />
+                    <Label htmlFor="instagram-bot-enabled">Habilitar Bot Instagram</Label>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="instagram-token">Token Página Instagram</Label>
+                    <Input
+                      id="instagram-token"
+                      type="password"
+                      value={settings.instagram_page_token || ''}
+                      onChange={(e) => setSettings(prev => ({...prev, instagram_page_token: e.target.value}))}
+                      placeholder="EAA... (mesmo token do Facebook)"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      💡 Use o mesmo token do Facebook se sua página está conectada ao Instagram
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">🔗 Configuração do Webhook Instagram</h4>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <strong>URL do Webhook:</strong>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="text-xs bg-white p-2 rounded border flex-1">
+                            https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/instagram-webhook
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              navigator.clipboard.writeText('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/instagram-webhook');
+                              toast.success('URL do webhook Instagram copiada!');
+                            }}
+                          >
+                            Copiar
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <strong>Verify Token:</strong>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="text-xs bg-white p-2 rounded border flex-1">
+                            minha_superloja_instagram_webhook_token_2024
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              navigator.clipboard.writeText('minha_superloja_instagram_webhook_token_2024');
+                              toast.success('Token de verificação Instagram copiado!');
+                            }}
+                          >
+                            Copiar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <p className="text-blue-700 text-sm">
+                        <strong>Como configurar:</strong>
+                      </p>
+                      <ol className="list-decimal list-inside text-blue-600 text-sm space-y-1 mt-1">
+                        <li>Acesse <a href="https://developers.facebook.com/" target="_blank" className="underline">Facebook Developers</a></li>
+                        <li>Vá para sua aplicação → Produtos → Messenger → Configurações</li>
+                        <li>Configure também o webhook para Instagram na mesma aplicação</li>
+                        <li>Certifique-se que a página Instagram está conectada à página Facebook</li>
+                      </ol>
+                    </div>
+                  </div>
                 </div>
               </div>
 
