@@ -48,6 +48,7 @@ const Produto = () => {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
   const { addToCart, isLoading } = useCart();
   const { toast } = useToast();
   const { trackEvent } = useAnalytics();
@@ -102,6 +103,15 @@ const Produto = () => {
     }).format(price);
   };
 
+  const handleVariantSelect = (variant: Variant) => {
+    setSelectedVariant(variant);
+    // Se a variante tem imagem, atualizar a imagem selecionada
+    if (variant.image_url) {
+      const variantImages = [variant.image_url, ...images];
+      setSelectedImage(0); // Mostra a imagem da variante primeiro
+    }
+  };
+
   const handleAddToCart = async () => {
     if (!product) return;
     await addToCart(product.id, quantity);
@@ -110,8 +120,9 @@ const Produto = () => {
     trackEvent('add_to_cart', {
       product_id: product.id,
       product_name: product.name,
-      product_price: product.price,
-      quantity: quantity
+      product_price: selectedVariant?.price || product.price,
+      quantity: quantity,
+      variant: selectedVariant?.name
     });
   };
 
@@ -156,9 +167,18 @@ const Produto = () => {
     );
   }
 
-  const images = product.images && product.images.length > 0 
+  // Construir array de imagens incluindo variante selecionada
+  const baseImages = product.images && product.images.length > 0 
     ? product.images 
     : [product.image_url || '/placeholder.svg'];
+  
+  const images = selectedVariant?.image_url 
+    ? [selectedVariant.image_url, ...baseImages.filter(img => img !== selectedVariant.image_url)]
+    : baseImages;
+
+  // Preço atual baseado na variante selecionada
+  const currentPrice = selectedVariant?.price || product.price;
+  const currentStock = selectedVariant?.stock_quantity || product.stock_quantity;
 
   // SEO dinâmico baseado no produto
   const productSEO = product ? {
@@ -297,18 +317,24 @@ const Produto = () => {
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <span className="text-3xl font-bold text-primary">
-                  {formatPrice(product.price)}
+                  {formatPrice(currentPrice)}
                 </span>
-                {product.original_price && product.original_price > product.price && (
+                {product.original_price && product.original_price > currentPrice && (
                   <span className="text-xl text-muted-foreground line-through">
                     {formatPrice(product.original_price)}
                   </span>
                 )}
               </div>
               
-              {product.original_price && product.original_price > product.price && (
+              {selectedVariant && (
+                <p className="text-sm text-muted-foreground">
+                  Variante selecionada: <span className="font-medium">{selectedVariant.name}</span>
+                </p>
+              )}
+              
+              {product.original_price && product.original_price > currentPrice && (
                 <p className="text-success font-medium">
-                  Economia de {formatPrice(product.original_price - product.price)}
+                  Economia de {formatPrice(product.original_price - currentPrice)}
                 </p>
               )}
             </div>
@@ -330,34 +356,37 @@ const Produto = () => {
               <div>
                 <h3 className="font-semibold mb-3">Variantes disponíveis</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {product.variants.map((variant: any, index: number) => (
-                    <div 
-                      key={index}
-                      className="border rounded-lg p-3 hover:border-primary transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        {variant.image_url && (
-                          <img 
-                            src={variant.image_url} 
-                            alt={variant.name}
-                            className="w-12 h-12 object-cover rounded"
-                          />
-                        )}
-                        <div className="flex-1">
-                          <h4 className="font-medium">{variant.name}</h4>
-                          <p className="text-sm text-primary font-semibold">
-                            {formatPrice(variant.price)}
-                          </p>
-                          {variant.sku && (
-                            <p className="text-xs text-muted-foreground">SKU: {variant.sku}</p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            {variant.stock_quantity} em estoque
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                   {product.variants.map((variant: any, index: number) => (
+                     <div 
+                       key={index}
+                       onClick={() => handleVariantSelect(variant)}
+                       className={`border rounded-lg p-3 hover:border-primary transition-colors cursor-pointer ${
+                         selectedVariant?.name === variant.name ? 'border-primary bg-primary/5' : ''
+                       }`}
+                     >
+                       <div className="flex items-center gap-3">
+                         {variant.image_url && (
+                           <img 
+                             src={variant.image_url} 
+                             alt={variant.name}
+                             className="w-12 h-12 object-cover rounded"
+                           />
+                         )}
+                         <div className="flex-1">
+                           <h4 className="font-medium">{variant.name}</h4>
+                           <p className="text-sm text-primary font-semibold">
+                             {formatPrice(variant.price)}
+                           </p>
+                           {variant.sku && (
+                             <p className="text-xs text-muted-foreground">SKU: {variant.sku}</p>
+                           )}
+                           <p className="text-xs text-muted-foreground">
+                             {variant.stock_quantity} em estoque
+                           </p>
+                         </div>
+                       </div>
+                     </div>
+                   ))}
                 </div>
               </div>
             )}
@@ -376,28 +405,28 @@ const Produto = () => {
                     <Minus className="w-4 h-4" />
                   </Button>
                   <span className="w-12 text-center font-medium">{quantity}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setQuantity(quantity + 1)}
-                    disabled={quantity >= product.stock_quantity}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {product.stock_quantity} unidades disponíveis
-                </p>
+                   <Button
+                     variant="outline"
+                     size="icon"
+                     onClick={() => setQuantity(quantity + 1)}
+                     disabled={quantity >= currentStock}
+                   >
+                     <Plus className="w-4 h-4" />
+                   </Button>
+                 </div>
+                 <p className="text-sm text-muted-foreground mt-1">
+                   {currentStock} unidades disponíveis
+                 </p>
               </div>
 
               {/* Ações */}
               <div className="flex gap-3">
-                <Button
-                  size="lg"
-                  className="flex-1"
-                  onClick={handleAddToCart}
-                  disabled={!product.in_stock || isLoading || product.stock_quantity <= 0}
-                >
+                 <Button
+                   size="lg"
+                   className="flex-1"
+                   onClick={handleAddToCart}
+                   disabled={!product.in_stock || isLoading || currentStock <= 0}
+                 >
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   {isLoading ? 'Adicionando...' : 'Adicionar ao Carrinho'}
                 </Button>
