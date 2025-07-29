@@ -7,15 +7,24 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('🧪 TEST FUNCTION CALLED - Method:', req.method);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log('✅ CORS preflight handled');
+    return new Response(null, { headers: corsHeaders, status: 200 });
   }
 
   try {
-    const { recipient_id, message } = await req.json();
+    console.log('📦 Request headers:', Object.fromEntries(req.headers.entries()));
+    
+    const body = await req.json();
+    console.log('📥 Request body:', body);
+    
+    const { recipient_id, message } = body;
     
     if (!recipient_id || !message) {
+      console.error('❌ Missing parameters');
       return new Response(
         JSON.stringify({
           success: false,
@@ -28,67 +37,58 @@ serve(async (req) => {
       );
     }
 
-    console.log('🧪 === TESTE REAL DE ENVIO FACEBOOK ===');
+    console.log('🧪 === TESTE FACEBOOK SEND ===');
     console.log('📱 Recipient:', recipient_id);
-    console.log('📝 Message:', message.substring(0, 50) + '...');
+    console.log('📝 Message:', message);
 
-    // Initialize Supabase client
+    // Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Buscar token igual ao webhook
-    let PAGE_ACCESS_TOKEN = null;
-    let tokenSource = 'none';
     
-    // 1. Buscar na ai_settings primeiro
-    try {
-      const { data: aiSettings } = await supabase
-        .from('ai_settings')
-        .select('value')
-        .eq('key', 'facebook_page_token')
-        .maybeSingle();
-      
-      if (aiSettings?.value) {
-        PAGE_ACCESS_TOKEN = aiSettings.value;
-        tokenSource = 'ai_settings';
-        console.log('✅ Token encontrado na ai_settings');
-      }
-    } catch (error) {
-      console.log('⚠️ Erro ao buscar ai_settings');
-    }
-
-    // 2. Fallback para meta_settings
-    if (!PAGE_ACCESS_TOKEN) {
-      try {
-        const { data: metaSettings } = await supabase
-          .from('meta_settings')
-          .select('access_token')
-          .limit(1)
-          .maybeSingle();
-        
-        if (metaSettings?.access_token) {
-          PAGE_ACCESS_TOKEN = metaSettings.access_token;
-          tokenSource = 'meta_settings';
-          console.log('✅ Token encontrado na meta_settings');
-        }
-      } catch (error) {
-        console.log('⚠️ Erro ao buscar meta_settings');
-      }
-    }
-
-    // 3. Fallback para secrets
-    if (!PAGE_ACCESS_TOKEN) {
-      PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
-      tokenSource = 'secrets';
-      console.log('✅ Token encontrado nas secrets');
-    }
-
-    if (!PAGE_ACCESS_TOKEN) {
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('❌ Supabase vars missing');
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Nenhum token Facebook encontrado'
+          error: 'Configuração Supabase incompleta'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        }
+      );
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get token from ai_settings (where admin saves it)
+    console.log('🔍 Buscando token...');
+    const { data: aiSettings, error: tokenError } = await supabase
+      .from('ai_settings')
+      .select('value')
+      .eq('key', 'facebook_page_token')
+      .maybeSingle();
+    
+    if (tokenError) {
+      console.error('❌ Token error:', tokenError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Erro ao buscar token: ' + tokenError.message
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        }
+      );
+    }
+
+    if (!aiSettings?.value) {
+      console.error('❌ Token not found');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Token Facebook não encontrado na configuração'
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -97,43 +97,37 @@ serve(async (req) => {
       );
     }
 
-    console.log('🔑 Token source:', tokenSource);
-    console.log('🔑 Token preview:', PAGE_ACCESS_TOKEN.substring(0, 20) + '...');
+    const PAGE_ACCESS_TOKEN = aiSettings.value;
+    console.log('✅ Token found:', PAGE_ACCESS_TOKEN.substring(0, 20) + '...');
 
-    // Tentar enviar mensagem
-    console.log('📤 Enviando mensagem...');
+    // Send message to Facebook
+    console.log('📤 Sending to Facebook...');
+    const facebookUrl = `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`;
     
-    const sendResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient: { id: recipient_id },
-          message: { text: message }
-        }),
-      }
-    );
+    const sendResponse = await fetch(facebookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient: { id: recipient_id },
+        message: { text: message }
+      }),
+    });
     
     const sendResult = await sendResponse.json();
     
-    console.log('📊 Resposta Facebook:', {
+    console.log('📊 Facebook response:', {
       status: sendResponse.status,
       ok: sendResponse.ok,
       result: sendResult
     });
 
     if (sendResponse.ok) {
-      console.log('✅ Mensagem enviada com sucesso!');
-      console.log('📨 Message ID:', sendResult.message_id);
-      console.log('📱 Recipient ID:', sendResult.recipient_id);
-
+      console.log('✅ SUCCESS! Message sent');
       return new Response(
         JSON.stringify({
           success: true,
           message: 'Mensagem enviada com sucesso!',
           facebook_response: sendResult,
-          token_source: tokenSource,
           details: {
             message_id: sendResult.message_id,
             recipient_id: sendResult.recipient_id
@@ -144,16 +138,12 @@ serve(async (req) => {
         }
       );
     } else {
-      console.error('❌ Erro ao enviar mensagem:');
-      console.error('📊 Status:', sendResponse.status);
-      console.error('💥 Error details:', sendResult);
-      
+      console.error('❌ Facebook API error:', sendResult);
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Falha ao enviar mensagem',
+          error: 'Falha na API Facebook',
           facebook_error: sendResult,
-          token_source: tokenSource,
           status_code: sendResponse.status
         }),
         { 
@@ -164,11 +154,11 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('❌ Erro no teste:', error);
+    console.error('❌ Function error:', error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message || 'Erro interno'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
