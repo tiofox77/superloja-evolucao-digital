@@ -1301,7 +1301,8 @@ export default function AdminAgentIA() {
                        </div>
                      </div>
                    </div>
-                 </div>
+                  </div>
+                </div>
                </CardContent>
              </Card>
 
