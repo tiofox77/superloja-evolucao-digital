@@ -229,27 +229,87 @@ async function handleMessage(messaging: any, supabase: any) {
     
     console.log('💾 Mensagem salva no banco');
     
-    // Processar com IA
-    const aiResponse = await processWithAI(messageText, senderId, supabase);
-    console.log(`🤖 Resposta IA: ${aiResponse}`);
+    // Verificar se usuário está pedindo fotos/imagens
+    const isRequestingImages = checkIfRequestingImages(messageText);
     
-    // Enviar resposta
-    await sendFacebookMessage(senderId, aiResponse, supabase);
-    
-    // Salvar resposta enviada
-    await supabase.from('ai_conversations').insert({
-      platform: 'facebook',
-      user_id: senderId,
-      message: aiResponse,
-      type: 'sent',
-      timestamp: new Date().toISOString()
-    });
+    if (isRequestingImages) {
+      console.log('📸 Usuário está pedindo imagens');
+      await handleImageRequest(senderId, messageText, supabase);
+    } else {
+      // Processar com IA normal
+      const aiResponse = await processWithAI(messageText, senderId, supabase);
+      console.log(`🤖 Resposta IA: ${aiResponse}`);
+      
+      // Enviar resposta
+      await sendFacebookMessage(senderId, aiResponse, supabase);
+      
+      // Salvar resposta enviada
+      await supabase.from('ai_conversations').insert({
+        platform: 'facebook',
+        user_id: senderId,
+        message: aiResponse,
+        type: 'sent',
+        timestamp: new Date().toISOString()
+      });
+    }
     
     console.log('✅ Processamento completo');
     
   } catch (error) {
     console.error('❌ Erro ao processar mensagem:', error);
     await sendFacebookMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente!', supabase);
+  }
+}
+
+// Função para verificar se usuário está pedindo imagens
+function checkIfRequestingImages(message: string): boolean {
+  const messageLower = message.toLowerCase();
+  const imageKeywords = [
+    'foto', 'fotos', 'imagem', 'imagens', 'mostrar', 'mostra', 'ver', 'veja',
+    'picture', 'photo', 'image', 'show', 'see', 'visualizar'
+  ];
+  
+  return imageKeywords.some(keyword => messageLower.includes(keyword));
+}
+
+// Função para lidar com pedidos de imagens
+async function handleImageRequest(senderId: string, messageText: string, supabase: any) {
+  try {
+    // Buscar produtos relevantes com imagens
+    const products = await getRelevantProducts(messageText, supabase);
+    const productsWithImages = products.filter(p => p.image_url);
+    
+    if (productsWithImages.length === 0) {
+      await sendFacebookMessage(senderId, 'Desculpe, não encontrei produtos com imagens para mostrar. 😔', supabase);
+      return;
+    }
+    
+    // Enviar imagens dos produtos encontrados
+    for (const product of productsWithImages.slice(0, 3)) { // Máximo 3 produtos
+      const price = parseFloat(product.price).toLocaleString('pt-AO');
+      const stock = product.in_stock ? 'Em estoque' : 'Indisponível';
+      
+      const caption = `🛍️ ${product.name}\n💰 ${price} Kz\n📦 ${stock}\n\n${product.description || ''}`;
+      
+      // Enviar imagem com legenda
+      await sendFacebookImage(senderId, product.image_url, caption, supabase);
+      
+      // Delay pequeno entre envios
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Salvar resposta enviada no histórico
+    await supabase.from('ai_conversations').insert({
+      platform: 'facebook',
+      user_id: senderId,
+      message: `📸 Enviou ${productsWithImages.length} imagem(ns) de produtos`,
+      type: 'sent',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao enviar imagens:', error);
+    await sendFacebookMessage(senderId, 'Desculpe, tive um problema ao buscar as imagens. 😔', supabase);
   }
 }
 
@@ -581,17 +641,19 @@ CONTEXTO DO USUÁRIO:
   if (products.length > 0) {
     contextualInfo += `\n\n📦 PRODUTOS ENCONTRADOS:
 ${products.map(p => {
-  const price = (parseFloat(p.price) / 100).toFixed(2);
-  const originalPrice = p.original_price ? ` (era ${(parseFloat(p.original_price) / 100).toFixed(2)} Kz)` : '';
+  // Correção: Não dividir por 100, mostrar valor direto em Kz
+  const price = parseFloat(p.price).toLocaleString('pt-AO');
+  const originalPrice = p.original_price ? ` (era ${parseFloat(p.original_price).toLocaleString('pt-AO')} Kz)` : '';
   const stock = p.in_stock ? `✅ Em estoque` : `❌ Indisponível`;
   const stockQty = p.stock_quantity > 0 ? ` (${p.stock_quantity} unidades)` : '';
+  const hasImage = p.image_url ? '📸 Imagem disponível' : '';
   
   return `
 🛍️ **${p.name}**
 💰 Preço: ${price} Kz${originalPrice}
 📋 ${p.description || 'Descrição não disponível'}
 📦 Status: ${stock}${stockQty}
-🖼️ Imagem: ${p.image_url || 'Sem imagem'}`;
+${hasImage}`;
 }).join('\n')}
 
 🌐 Site completo: https://superloja.vip
@@ -852,5 +914,102 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
     console.error('🌐 Network error:', error.message);
     console.error('🔗 URL tentativa:', `https://graph.facebook.com/v18.0/me/messages`);
     console.error('🔑 Token usado (primeiros 20 chars):', PAGE_ACCESS_TOKEN.substring(0, 20) + '...');
+  }
+}
+
+// Função para enviar imagens do Facebook
+async function sendFacebookImage(recipientId: string, imageUrl: string, caption: string, supabase: any) {
+  // Buscar token da mesma forma que sendFacebookMessage
+  let PAGE_ACCESS_TOKEN = null;
+  let tokenSource = 'none';
+  
+  try {
+    const { data: aiSettings } = await supabase
+      .from('ai_settings')
+      .select('value')
+      .eq('key', 'facebook_page_token')
+      .maybeSingle();
+    
+    if (aiSettings?.value) {
+      PAGE_ACCESS_TOKEN = aiSettings.value;
+      tokenSource = 'ai_settings';
+    }
+  } catch (error) {
+    console.log('⚠️ Erro ao buscar token AI settings para imagem');
+  }
+
+  if (!PAGE_ACCESS_TOKEN) {
+    try {
+      const { data: metaSettings } = await supabase
+        .from('meta_settings')
+        .select('access_token')
+        .limit(1)
+        .maybeSingle();
+      
+      if (metaSettings?.access_token) {
+        PAGE_ACCESS_TOKEN = metaSettings.access_token;
+        tokenSource = 'meta_settings';
+      }
+    } catch (error) {
+      console.log('⚠️ Erro ao buscar token Meta para imagem');
+    }
+  }
+  
+  if (!PAGE_ACCESS_TOKEN) {
+    PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+    tokenSource = 'secrets';
+  }
+  
+  if (!PAGE_ACCESS_TOKEN) {
+    console.error('❌ Nenhum token Facebook encontrado para enviar imagem');
+    return;
+  }
+  
+  console.log(`📸 Enviando imagem para ${recipientId}`);
+  console.log(`🖼️ URL da imagem: ${imageUrl}`);
+  console.log(`📝 Legenda: ${caption.substring(0, 50)}...`);
+  
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          message: {
+            attachment: {
+              type: 'image',
+              payload: {
+                url: imageUrl,
+                is_reusable: true
+              }
+            }
+          }
+        }),
+      }
+    );
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log('✅ Imagem enviada com sucesso!');
+      console.log('📨 Message ID:', result.message_id);
+      
+      // Enviar legenda separadamente
+      if (caption && caption.trim()) {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Delay de 0.5s
+        await sendFacebookMessage(recipientId, caption, supabase);
+      }
+    } else {
+      console.error('❌ Erro ao enviar imagem Facebook:', result);
+      // Fallback: enviar apenas a mensagem de texto
+      await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Imagem: ${imageUrl}`, supabase);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro de rede ao enviar imagem:', error);
+    // Fallback: enviar apenas a mensagem de texto
+    await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
   }
 }
