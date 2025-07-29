@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ImageAIEditor from '@/components/ImageAIEditor';
 import { ImageEditorModal } from '@/components/ImageEditorModal';
+import { ProductVariants } from '@/components/ProductVariants';
 
 interface ProductFormProps {
   product?: any;
@@ -38,7 +39,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
     price: product?.price || '',
     original_price: product?.original_price || '',
     category_id: product?.category_id || '',
-    subcategory_id: product?.subcategory_id || '',
+    
     stock_quantity: product?.stock_quantity || 0,
     in_stock: product?.in_stock ?? true,
     featured: product?.featured ?? false,
@@ -548,7 +549,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                     </Label>
                     <Select 
                       value={formData.category_id} 
-                      onValueChange={(value) => setFormData({...formData, category_id: value, subcategory_id: ''})}
+                      onValueChange={(value) => setFormData({...formData, category_id: value})}
                     >
                       <SelectTrigger className="mt-2">
                         <SelectValue placeholder="Selecione a categoria principal" />
@@ -566,104 +567,25 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                     </Select>
                   </div>
 
-                  {/* Subcategorias */}
-                  {formData.category_id && (
-                    <div className="space-y-3">
-                      <Label className="text-base font-semibold flex items-center gap-2">
-                        🏷️ Subcategoria
-                      </Label>
-                      
-                      {(() => {
-                        const subcategories = categories.filter(cat => cat.parent_id === formData.category_id);
-                        
-                        if (subcategories.length === 0) {
-                          return (
-                            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200">
-                              <p className="text-sm text-amber-800 dark:text-amber-200">
-                                ℹ️ Esta categoria não possui subcategorias ainda.
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {subcategories.map((subcategory) => (
-                              <Card 
-                                key={subcategory.id}
-                                className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
-                                  formData.subcategory_id === subcategory.id 
-                                    ? 'ring-2 ring-primary bg-primary/5' 
-                                    : 'hover:shadow-md'
-                                }`}
-                                onClick={() => setFormData({...formData, subcategory_id: subcategory.id})}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex items-center gap-3">
-                                    {subcategory.icon && (
-                                      <span className="text-2xl">{subcategory.icon}</span>
-                                    )}
-                                    <div className="flex-1">
-                                      <h4 className="font-medium text-sm">{subcategory.name}</h4>
-                                      {subcategory.description && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          {subcategory.description}
-                                        </p>
-                                      )}
-                                    </div>
-                                    {formData.subcategory_id === subcategory.id && (
-                                      <div className="w-3 h-3 bg-primary rounded-full"></div>
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                      
-                      {formData.subcategory_id && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setFormData({...formData, subcategory_id: ''})}
-                          className="mt-2"
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Remover Subcategoria
-                        </Button>
-                      )}
-                    </div>
-                  )}
                 </div>
 
-                {/* Preview da Categorização */}
-                {formData.category_id && (
-                  <div className="space-y-3">
-                    <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
-                    <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
-                          {categories.find(cat => cat.id === formData.category_id)?.name}
-                        </Badge>
+                  {/* Preview da Categorização */}
+                  {formData.category_id && (
+                    <div className="space-y-3">
+                      <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
+                      <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+                            {categories.find(cat => cat.id === formData.category_id)?.name}
+                          </Badge>
+                        </div>
                         
-                        {formData.subcategory_id && (
-                          <>
-                            <span className="text-muted-foreground">›</span>
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
-                              {categories.find(cat => cat.id === formData.subcategory_id)?.name}
-                            </Badge>
-                          </>
-                        )}
+                        <p className="text-sm text-green-700 dark:text-green-300 mt-2">
+                          ✅ O produto será exibido na navegação conforme a categorização acima
+                        </p>
                       </div>
-                      
-                      <p className="text-sm text-green-700 dark:text-green-300 mt-2">
-                        ✅ O produto será exibido na navegação conforme a categorização acima
-                      </p>
                     </div>
-                  </div>
-                )}
+                  )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -780,86 +702,100 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Cores */}
-                <div>
-                  <Label className="text-base font-semibold flex items-center gap-2">
-                    🎨 Cores Disponíveis
-                  </Label>
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      value={newColor}
-                      onChange={(e) => setNewColor(e.target.value)}
-                      placeholder="Ex: Azul Royal, Vermelho Ferrari..."
-                      className="flex-1"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addColor();
-                        }
-                      }}
-                    />
-                    <Button type="button" onClick={addColor} variant="outline">
-                      Adicionar
-                    </Button>
-                  </div>
-                  {formData.colors.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {formData.colors.map((color, index) => (
-                        <Badge key={index} variant="secondary" className="flex items-center gap-2 py-1 px-3">
-                          <span className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-purple-400"></span>
-                          {color}
-                          <button
-                            type="button"
-                            onClick={() => removeColor(color)}
-                            className="ml-1 hover:text-destructive transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <ProductVariants
+                  variants={formData.variants}
+                  onVariantsChange={(variants) => setFormData({...formData, variants})}
+                />
 
-                {/* Tamanhos */}
-                <div>
-                  <Label className="text-base font-semibold flex items-center gap-2">
-                    📏 Tamanhos Disponíveis
-                  </Label>
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      value={newSize}
-                      onChange={(e) => setNewSize(e.target.value)}
-                      placeholder="Ex: PP, P, M, G, GG, XG..."
-                      className="flex-1"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addSize();
-                        }
-                      }}
-                    />
-                    <Button type="button" onClick={addSize} variant="outline">
-                      Adicionar
-                    </Button>
-                  </div>
-                  {formData.sizes.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {formData.sizes.map((size, index) => (
-                        <Badge key={index} variant="outline" className="flex items-center gap-1 py-1 px-3">
-                          <Ruler className="w-3 h-3" />
-                          {size}
-                          <button
-                            type="button"
-                            onClick={() => removeSize(size)}
-                            className="ml-1 hover:text-destructive transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </Badge>
-                      ))}
+                {/* Cores e Tamanhos Simples */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Cores */}
+                  <div>
+                    <Label className="text-base font-semibold flex items-center gap-2">
+                      🎨 Cores Simples
+                    </Label>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Para variações básicas sem imagens/preços específicos
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="Ex: Azul, Vermelho, Preto..."
+                        className="flex-1"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addColor();
+                          }
+                        }}
+                      />
+                      <Button type="button" onClick={addColor} variant="outline">
+                        Adicionar
+                      </Button>
                     </div>
-                  )}
+                    {formData.colors.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {formData.colors.map((color, index) => (
+                          <Badge key={index} variant="secondary" className="flex items-center gap-2 py-1 px-3">
+                            <span className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-purple-400"></span>
+                            {color}
+                            <button
+                              type="button"
+                              onClick={() => removeColor(color)}
+                              className="ml-1 hover:text-destructive transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tamanhos */}
+                  <div>
+                    <Label className="text-base font-semibold flex items-center gap-2">
+                      📏 Tamanhos Simples
+                    </Label>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Para variações básicas sem imagens/preços específicos
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        value={newSize}
+                        onChange={(e) => setNewSize(e.target.value)}
+                        placeholder="Ex: PP, P, M, G, GG, XG..."
+                        className="flex-1"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addSize();
+                          }
+                        }}
+                      />
+                      <Button type="button" onClick={addSize} variant="outline">
+                        Adicionar
+                      </Button>
+                    </div>
+                    {formData.sizes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {formData.sizes.map((size, index) => (
+                          <Badge key={index} variant="outline" className="flex items-center gap-1 py-1 px-3">
+                            <Ruler className="w-3 h-3" />
+                            {size}
+                            <button
+                              type="button"
+                              onClick={() => removeSize(size)}
+                              className="ml-1 hover:text-destructive transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
