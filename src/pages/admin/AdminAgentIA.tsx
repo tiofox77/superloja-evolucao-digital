@@ -1020,14 +1020,63 @@ export default function AdminAgentIA() {
                       onClick={async () => {
                         toast.loading('Verificando mensagens recentes...');
                         
-                        // Recarregar conversas para mostrar se há mensagens recentes
-                        await loadConversations();
-                        
-                        toast.dismiss();
-                        toast.success('✅ Verifique a aba "Conversas" para ver mensagens recebidas!');
+                        try {
+                          console.log('🔍 Carregando conversas...');
+                          await loadConversations();
+                          
+                          // Também verificar se há mensagens no banco
+                          const { data: messages, error } = await (supabase as any)
+                            .from('ai_conversations')
+                            .select('*')
+                            .order('timestamp', { ascending: false })
+                            .limit(5);
+                          
+                          console.log('📝 Mensagens encontradas:', messages);
+                          
+                          if (error) {
+                            console.error('❌ Erro ao buscar mensagens:', error);
+                            toast.dismiss();
+                            toast.error('Erro ao buscar mensagens');
+                            return;
+                          }
+                          
+                          if (!messages || messages.length === 0) {
+                            toast.dismiss();
+                            toast.warning('📭 Nenhuma mensagem encontrada. Envie uma mensagem na página do Facebook primeiro!');
+                          } else {
+                            toast.dismiss();
+                            toast.success(`✅ ${messages.length} mensagem(s) encontrada(s)! Verifique a aba "Conversas"`);
+                          }
+                          
+                        } catch (error) {
+                          console.error('❌ Erro ao verificar mensagens:', error);
+                          toast.dismiss();
+                          toast.error('Erro ao verificar mensagens');
+                        }
                       }}
                     >
                       🔍 Verificar Mensagens
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        toast.loading('Sincronizando tokens...');
+                        
+                        try {
+                          // Sincronizar tokens nos secrets
+                          await syncWithSecrets();
+                          
+                          toast.dismiss();
+                          toast.success('🔄 Tokens sincronizados! Agora teste enviar uma mensagem.');
+                        } catch (error) {
+                          console.error('❌ Erro na sincronização:', error);
+                          toast.dismiss();
+                          toast.error('Erro ao sincronizar tokens');
+                        }
+                      }}
+                    >
+                      🔄 Sincronizar Tokens
                     </Button>
                   </div>
                 </div>
