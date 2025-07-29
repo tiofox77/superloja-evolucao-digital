@@ -520,16 +520,19 @@ function extractProductKeywords(message: string): string[] {
   const messageLower = message.toLowerCase();
   const keywords: string[] = [];
   
-  // Categorias de produtos
+  // Categorias de produtos (MELHORADAS para Angola)
   const productCategories = {
+    'auricular': ['auricular', 'fone', 'fones', 'escutador', 'auscultador', 'headphone', 'earphone', 'ouvido'],
     'mouse': ['mouse', 'rato'],
     'teclado': ['teclado', 'keyboard'],
     'cabo': ['cabo', 'carregador', 'adaptador', 'fio'],
     'organizador': ['organizador', 'organizar', 'arrumação'],
     'sem fio': ['sem fio', 'wireless', 'bluetooth'],
     'usb': ['usb', 'pendrive', 'pen drive'],
-    'fone': ['fone', 'headphone', 'earphone', 'ouvido'],
-    'carregador': ['carregador', 'charger', 'fonte']
+    'carregador': ['carregador', 'charger', 'fonte'],
+    'bluetooth': ['bluetooth', 'sem fio', 'wireless'],
+    'esportivo': ['esportivo', 'sport', 'exercício', 'corrida'],
+    'gaming': ['gaming', 'gamer', 'jogos', 'jogo']
   };
   
   // Verificar cada categoria
@@ -579,13 +582,13 @@ CONTEXTO DO USUÁRIO:
     contextualInfo += `\n\n📦 PRODUTOS ENCONTRADOS:
 ${products.map(p => {
   const price = (parseFloat(p.price) / 100).toFixed(2);
-  const originalPrice = p.original_price ? ` (era R$ ${(parseFloat(p.original_price) / 100).toFixed(2)})` : '';
+  const originalPrice = p.original_price ? ` (era ${(parseFloat(p.original_price) / 100).toFixed(2)} Kz)` : '';
   const stock = p.in_stock ? `✅ Em estoque` : `❌ Indisponível`;
   const stockQty = p.stock_quantity > 0 ? ` (${p.stock_quantity} unidades)` : '';
   
   return `
 🛍️ **${p.name}**
-💰 Preço: R$ ${price}${originalPrice}
+💰 Preço: ${price} Kz${originalPrice}
 📋 ${p.description || 'Descrição não disponível'}
 📦 Status: ${stock}${stockQty}
 🖼️ Imagem: ${p.image_url || 'Sem imagem'}`;
@@ -604,31 +607,49 @@ IMPORTANTE:
 
 INSTRUÇÕES PARA APRESENTAR PRODUTOS:
 1. Quando encontrar produtos relevantes, SEMPRE apresente de forma detalhada
-2. Mencione NOME, PREÇO, DISPONIBILIDADE e DESCRIÇÃO
+2. Mencione NOME, PREÇO (em Kz), DISPONIBILIDADE e DESCRIÇÃO
 3. Use emojis para destacar informações importantes
 4. Se houver imagem, mencione que pode mostrar/enviar
 5. Compare preços se houver preço original
 6. Informe sobre estoque disponível
 7. Seja empolgante mas honesto sobre os produtos
-8. Ofereça ajuda adicional (especificações, dúvidas, etc.)
+8. **SEMPRE FAÇA PERGUNTAS** para especificar melhor a necessidade
 
-EXEMPLO DE RESPOSTA PARA PRODUTOS:
-"Encontrei ótimas opções para você! 🛍️
+TERMOS ANGOLANOS EQUIVALENTES:
+- Auricular = Fone = Escutador = Auscultador = Headphone
+- Mouse = Rato (dispositivo)
+- Carregador = Cabo de carregamento = Adaptador
 
-🖱️ **Mouse Sem-Fio** - R$ 75,00
-📦 Em estoque (5 unidades)
-Perfeito para trabalho e jogos!
+ESTRATÉGIA INTERATIVA:
+- Se usuário pergunta "auricular", pergunte: Bluetooth ou com fio? Para que tipo de uso?
+- Se usuário pergunta "mouse", pergunte: Para que uso? Gaming, trabalho ou uso geral?
+- Se usuário pergunta preço, mostre opções e pergunte qual prefere
+- SEMPRE ofereça alternativas e especificações
 
-📸 Posso te mostrar as imagens! Quer mais detalhes sobre algum produto específico?"
+EXEMPLO DE RESPOSTA PARA AURICULARES:
+"Encontrei várias opções de auriculares! 🎧
+
+🎵 **Auricular Bluetooth XYZ** - 750,00 Kz
+✅ Sem fio, cancelamento de ruído
+📦 Em estoque (3 unidades)
+
+🎶 **Auricular com Fio ABC** - 450,00 Kz  
+🔌 Ótima qualidade de som
+📦 Em estoque (8 unidades)
+
+Que tipo prefere? Bluetooth para exercícios ou com fio para usar no computador? 
+📸 Posso mostrar as imagens de qualquer um!"
 
 INSTRUÇÕES GERAIS:
 1. Responda de forma natural e conversacional
-2. Use as informações de produtos quando disponível
+2. Use as informações de produtos quando disponível  
 3. Seja específico e útil
 4. Mantenha respostas entre 2-4 frases para produtos
-5. Encoraje mais perguntas
+5. Encoraje mais perguntas e seja interativo
 6. NUNCA repita sempre a mesma resposta genérica
-7. Seja único e entusiasmado em cada resposta`;
+7. Seja único e entusiasmado em cada resposta
+8. Use preços em Kz (Kwanza) sempre
+9. Reconheça termos angolanos: auricular, escutador, auscultador`;
 }
 
 // Função para obter histórico recente
