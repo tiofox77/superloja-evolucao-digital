@@ -587,6 +587,7 @@ export type Database = {
           slug: string
           starting_bid: number | null
           stock_quantity: number | null
+          subcategory_id: string | null
           updated_at: string
           variants: Json | null
           weight: number | null
@@ -627,6 +628,7 @@ export type Database = {
           slug: string
           starting_bid?: number | null
           stock_quantity?: number | null
+          subcategory_id?: string | null
           updated_at?: string
           variants?: Json | null
           weight?: number | null
@@ -667,6 +669,7 @@ export type Database = {
           slug?: string
           starting_bid?: number | null
           stock_quantity?: number | null
+          subcategory_id?: string | null
           updated_at?: string
           variants?: Json | null
           weight?: number | null

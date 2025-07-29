@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, Upload, Image as ImageIcon, Loader2, Star, Images, Sparkles, Package, Palette, Ruler } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Loader2, Star, Images, Sparkles, Package, Palette, Ruler, Edit3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ImageAIEditor from '@/components/ImageAIEditor';
+import { ImageEditorModal } from '@/components/ImageEditorModal';
+import { ProductVariants } from '@/components/ProductVariants';
 
 interface ProductFormProps {
   product?: any;
@@ -27,6 +29,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
   const [generatingSEO, setGeneratingSEO] = useState(false);
   const [newColor, setNewColor] = useState('');
   const [newSize, setNewSize] = useState('');
+  const [imageEditorOpen, setImageEditorOpen] = useState(false);
+  const [editingImageUrl, setEditingImageUrl] = useState('');
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -36,6 +40,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
     original_price: product?.original_price || '',
     category_id: product?.category_id || '',
     subcategory_id: product?.subcategory_id || '',
+    
     stock_quantity: product?.stock_quantity || 0,
     in_stock: product?.in_stock ?? true,
     featured: product?.featured ?? false,
@@ -156,6 +161,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
         original_price: formData.original_price ? parseFloat(formData.original_price) : null,
         stock_quantity: parseInt(formData.stock_quantity) || 0,
         slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        subcategory_id: formData.subcategory_id || null,
         seo_title: formData.seo_title || null,
         seo_description: formData.seo_description || null,
         seo_keywords: formData.seo_keywords || null,
@@ -562,105 +568,95 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                       </SelectContent>
                     </Select>
                   </div>
+                   
+                   {/* Subcategorias */}
+                   {formData.category_id && (() => {
+                     const subcategories = categories.filter(cat => cat.parent_id === formData.category_id);
+                     
+                     if (subcategories.length === 0) return null;
+                     
+                     return (
+                       <div className="space-y-3">
+                         <Label className="text-base font-semibold flex items-center gap-2">
+                           🏷️ Subcategoria (opcional)
+                         </Label>
+                         
+                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                           {subcategories.map((subcategory) => (
+                             <Card 
+                               key={subcategory.id}
+                               className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
+                                 formData.subcategory_id === subcategory.id 
+                                   ? 'ring-2 ring-primary bg-primary/5' 
+                                   : 'hover:shadow-md'
+                               }`}
+                               onClick={() => setFormData({...formData, subcategory_id: subcategory.id})}
+                             >
+                               <CardContent className="p-4">
+                                 <div className="flex items-center gap-3">
+                                   {subcategory.icon && (
+                                     <span className="text-2xl">{subcategory.icon}</span>
+                                   )}
+                                   <div className="flex-1">
+                                     <h4 className="font-medium text-sm">{subcategory.name}</h4>
+                                     {subcategory.description && (
+                                       <p className="text-xs text-muted-foreground mt-1">
+                                         {subcategory.description}
+                                       </p>
+                                     )}
+                                   </div>
+                                   {formData.subcategory_id === subcategory.id && (
+                                     <div className="w-3 h-3 bg-primary rounded-full"></div>
+                                   )}
+                                 </div>
+                               </CardContent>
+                             </Card>
+                           ))}
+                         </div>
+                         
+                         {formData.subcategory_id && (
+                           <Button
+                             type="button"
+                             variant="outline"
+                             size="sm"
+                             onClick={() => setFormData({...formData, subcategory_id: ''})}
+                             className="mt-2"
+                           >
+                             <X className="w-4 h-4 mr-2" />
+                             Remover Subcategoria
+                           </Button>
+                         )}
+                       </div>
+                     );
+                   })()}
 
-                  {/* Subcategorias */}
+                  {/* Preview da Categorização */}
                   {formData.category_id && (
                     <div className="space-y-3">
-                      <Label className="text-base font-semibold flex items-center gap-2">
-                        🏷️ Subcategoria
-                      </Label>
-                      
-                      {(() => {
-                        const subcategories = categories.filter(cat => cat.parent_id === formData.category_id);
+                      <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
+                      <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
+                            {categories.find(cat => cat.id === formData.category_id)?.name}
+                          </Badge>
+                          
+                          {formData.subcategory_id && (
+                            <>
+                              <span className="text-muted-foreground">›</span>
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
+                                {categories.find(cat => cat.id === formData.subcategory_id)?.name}
+                              </Badge>
+                            </>
+                          )}
+                        </div>
                         
-                        if (subcategories.length === 0) {
-                          return (
-                            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200">
-                              <p className="text-sm text-amber-800 dark:text-amber-200">
-                                ℹ️ Esta categoria não possui subcategorias ainda.
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {subcategories.map((subcategory) => (
-                              <Card 
-                                key={subcategory.id}
-                                className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
-                                  formData.subcategory_id === subcategory.id 
-                                    ? 'ring-2 ring-primary bg-primary/5' 
-                                    : 'hover:shadow-md'
-                                }`}
-                                onClick={() => setFormData({...formData, subcategory_id: subcategory.id})}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex items-center gap-3">
-                                    {subcategory.icon && (
-                                      <span className="text-2xl">{subcategory.icon}</span>
-                                    )}
-                                    <div className="flex-1">
-                                      <h4 className="font-medium text-sm">{subcategory.name}</h4>
-                                      {subcategory.description && (
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                          {subcategory.description}
-                                        </p>
-                                      )}
-                                    </div>
-                                    {formData.subcategory_id === subcategory.id && (
-                                      <div className="w-3 h-3 bg-primary rounded-full"></div>
-                                    )}
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                      
-                      {formData.subcategory_id && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setFormData({...formData, subcategory_id: ''})}
-                          className="mt-2"
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Remover Subcategoria
-                        </Button>
-                      )}
+                        <p className="text-sm text-green-700 dark:text-green-300 mt-2">
+                          ✅ O produto será exibido na navegação conforme a categorização acima
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
-
-                {/* Preview da Categorização */}
-                {formData.category_id && (
-                  <div className="space-y-3">
-                    <Label className="text-base font-semibold">📋 Preview da Categorização</Label>
-                    <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="default" className="bg-green-100 text-green-800 border-green-300">
-                          {categories.find(cat => cat.id === formData.category_id)?.name}
-                        </Badge>
-                        
-                        {formData.subcategory_id && (
-                          <>
-                            <span className="text-muted-foreground">›</span>
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-300">
-                              {categories.find(cat => cat.id === formData.subcategory_id)?.name}
-                            </Badge>
-                          </>
-                        )}
-                      </div>
-                      
-                      <p className="text-sm text-green-700 dark:text-green-300 mt-2">
-                        ✅ O produto será exibido na navegação conforme a categorização acima
-                      </p>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -777,86 +773,100 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Cores */}
-                <div>
-                  <Label className="text-base font-semibold flex items-center gap-2">
-                    🎨 Cores Disponíveis
-                  </Label>
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      value={newColor}
-                      onChange={(e) => setNewColor(e.target.value)}
-                      placeholder="Ex: Azul Royal, Vermelho Ferrari..."
-                      className="flex-1"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addColor();
-                        }
-                      }}
-                    />
-                    <Button type="button" onClick={addColor} variant="outline">
-                      Adicionar
-                    </Button>
-                  </div>
-                  {formData.colors.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {formData.colors.map((color, index) => (
-                        <Badge key={index} variant="secondary" className="flex items-center gap-2 py-1 px-3">
-                          <span className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-purple-400"></span>
-                          {color}
-                          <button
-                            type="button"
-                            onClick={() => removeColor(color)}
-                            className="ml-1 hover:text-destructive transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <ProductVariants
+                  variants={formData.variants}
+                  onVariantsChange={(variants) => setFormData({...formData, variants})}
+                />
 
-                {/* Tamanhos */}
-                <div>
-                  <Label className="text-base font-semibold flex items-center gap-2">
-                    📏 Tamanhos Disponíveis
-                  </Label>
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      value={newSize}
-                      onChange={(e) => setNewSize(e.target.value)}
-                      placeholder="Ex: PP, P, M, G, GG, XG..."
-                      className="flex-1"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addSize();
-                        }
-                      }}
-                    />
-                    <Button type="button" onClick={addSize} variant="outline">
-                      Adicionar
-                    </Button>
-                  </div>
-                  {formData.sizes.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {formData.sizes.map((size, index) => (
-                        <Badge key={index} variant="outline" className="flex items-center gap-1 py-1 px-3">
-                          <Ruler className="w-3 h-3" />
-                          {size}
-                          <button
-                            type="button"
-                            onClick={() => removeSize(size)}
-                            className="ml-1 hover:text-destructive transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </Badge>
-                      ))}
+                {/* Cores e Tamanhos Simples */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Cores */}
+                  <div>
+                    <Label className="text-base font-semibold flex items-center gap-2">
+                      🎨 Cores Simples
+                    </Label>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Para variações básicas sem imagens/preços específicos
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        value={newColor}
+                        onChange={(e) => setNewColor(e.target.value)}
+                        placeholder="Ex: Azul, Vermelho, Preto..."
+                        className="flex-1"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addColor();
+                          }
+                        }}
+                      />
+                      <Button type="button" onClick={addColor} variant="outline">
+                        Adicionar
+                      </Button>
                     </div>
-                  )}
+                    {formData.colors.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {formData.colors.map((color, index) => (
+                          <Badge key={index} variant="secondary" className="flex items-center gap-2 py-1 px-3">
+                            <span className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-400 to-purple-400"></span>
+                            {color}
+                            <button
+                              type="button"
+                              onClick={() => removeColor(color)}
+                              className="ml-1 hover:text-destructive transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tamanhos */}
+                  <div>
+                    <Label className="text-base font-semibold flex items-center gap-2">
+                      📏 Tamanhos Simples
+                    </Label>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Para variações básicas sem imagens/preços específicos
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <Input
+                        value={newSize}
+                        onChange={(e) => setNewSize(e.target.value)}
+                        placeholder="Ex: PP, P, M, G, GG, XG..."
+                        className="flex-1"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addSize();
+                          }
+                        }}
+                      />
+                      <Button type="button" onClick={addSize} variant="outline">
+                        Adicionar
+                      </Button>
+                    </div>
+                    {formData.sizes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {formData.sizes.map((size, index) => (
+                          <Badge key={index} variant="outline" className="flex items-center gap-1 py-1 px-3">
+                            <Ruler className="w-3 h-3" />
+                            {size}
+                            <button
+                              type="button"
+                              onClick={() => removeSize(size)}
+                              className="ml-1 hover:text-destructive transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -965,22 +975,34 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                       <Badge className="absolute top-2 left-2 bg-yellow-500 text-white">
                         Principal
                       </Badge>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => {
-                          const newImages = formData.images.filter(img => img !== formData.image_url);
-                          setFormData(prev => ({
-                            ...prev,
-                            image_url: newImages[0] || '',
-                            images: newImages
-                          }));
-                        }}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setEditingImageUrl(formData.image_url);
+                            setImageEditorOpen(true);
+                          }}
+                        >
+                          <Edit3 className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            const newImages = formData.images.filter(img => img !== formData.image_url);
+                            setFormData(prev => ({
+                              ...prev,
+                              image_url: newImages[0] || '',
+                              images: newImages
+                            }));
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1002,15 +1024,27 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                               className="w-full h-full object-cover"
                             />
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => removeImage(imageUrl)}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
+                          <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setEditingImageUrl(imageUrl);
+                                setImageEditorOpen(true);
+                              }}
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => removeImage(imageUrl)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
                           <Button
                             type="button"
                             size="sm"
@@ -1206,6 +1240,29 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
           </Button>
         </div>
       </form>
+
+      {/* Image Editor Modal */}
+      <ImageEditorModal
+        isOpen={imageEditorOpen}
+        onClose={() => setImageEditorOpen(false)}
+        imageUrl={editingImageUrl}
+        onImageUpdate={(newImageUrl) => {
+          if (editingImageUrl === formData.image_url) {
+            // Updating main image
+            setFormData(prev => ({
+              ...prev,
+              image_url: newImageUrl,
+              images: prev.images.map(img => img === editingImageUrl ? newImageUrl : img)
+            }));
+          } else {
+            // Updating gallery image
+            setFormData(prev => ({
+              ...prev,
+              images: prev.images.map(img => img === editingImageUrl ? newImageUrl : img)
+            }));
+          }
+        }}
+      />
     </div>
   );
 };

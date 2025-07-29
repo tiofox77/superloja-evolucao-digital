@@ -68,7 +68,7 @@ const SaudeBemEstar = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [priceRange, setPriceRange] = useState([0, 1000]);
+  const [priceRange, setPriceRange] = useState([0, 15000]);
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
   const [sortBy, setSortBy] = useState('name');
@@ -77,54 +77,67 @@ const SaudeBemEstar = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Buscar categoria principal
-        const { data: mainCategory, error: mainError } = await supabase
+        // IDs específicos das categorias de Saúde e Bem Estar
+        const mainCategoryId = 'ba6f3316-9070-4a78-b309-faafac8d4b79'; // Saúde e Bem Estar
+        const subcategoryIds = [
+          'b93367f1-4246-438e-be7d-ce756f67c040', // Higiene Pessoal
+          '17eb9e09-b023-4b7d-a70c-e4a6252e4aff'  // Cuidados com o Corpo
+        ];
+        
+        const allCategoryIds = [mainCategoryId, ...subcategoryIds];
+        console.log('Using category IDs:', allCategoryIds);
+
+        // Buscar categoria principal e subcategorias
+        const { data: allCategoriesData } = await supabase
           .from('categories')
           .select('*')
-          .eq('slug', 'saude-bem-estar')
-          .single();
+          .in('id', allCategoryIds);
 
-        if (mainError) throw mainError;
+        console.log('Categories loaded:', allCategoriesData);
 
-        // Buscar subcategorias
-        const { data: subcategories, error: subError } = await supabase
-          .from('categories')
+        // Buscar produtos que estão em qualquer uma dessas categorias
+        // Inclui produtos com category_id OU subcategory_id nas categorias relacionadas
+        console.log('Searching for category IDs:', allCategoryIds);
+        
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
           .select('*')
-          .eq('parent_id', mainCategory.id);
+          .or(`category_id.in.(${allCategoryIds.join(',')}),subcategory_id.in.(${allCategoryIds.join(',')})`)
+          .eq('active', true);
 
-        if (subError) throw subError;
-
-        // Buscar produtos das subcategorias
-        const categoryIds = subcategories?.map(cat => cat.id) || [];
-        if (categoryIds.length > 0) {
-          const { data: productsData, error: productsError } = await supabase
-            .from('products')
-            .select(`
-              *,
-              categories!inner(name, slug)
-            `)
-            .in('category_id', categoryIds)
-            .eq('active', true);
-
-          if (productsError) throw productsError;
-
-          const formattedProducts = productsData?.map(product => ({
-            ...product,
-            category_name: product.categories.name,
-            category_slug: product.categories.slug
-          })) || [];
-
-          setProducts(formattedProducts);
-          setFilteredProducts(formattedProducts);
+        if (productsError) {
+          console.error('Products error:', productsError);
+          throw productsError;
         }
+        
+        console.log('Products found:', productsData?.length || 0);
 
+        const categoriesMap = new Map(allCategoriesData?.map(cat => [cat.id, cat]) || []);
+
+        const formattedProducts = productsData?.map(product => {
+          const productCategory = categoriesMap.get(product.category_id) || categoriesMap.get(product.subcategory_id);
+          return {
+            ...product,
+            category_name: productCategory?.name || 'Saúde e Bem Estar',
+            category_slug: productCategory?.slug || 'saude-bem-estar'
+          };
+        }) || [];
+
+        console.log('Formatted Products:', formattedProducts);
+
+        setProducts(formattedProducts);
+        setFilteredProducts(formattedProducts);
+
+        // Usar as subcategorias carregadas anteriormente para contagem
+        const subcategoriesData = allCategoriesData?.filter(cat => cat.id !== mainCategoryId) || [];
+        
         // Contar produtos para cada subcategoria
         const categoriesWithCount = await Promise.all(
-          (subcategories || []).map(async (category) => {
+          subcategoriesData.map(async (category) => {
             const { count } = await supabase
               .from('products')
               .select('*', { count: 'exact', head: true })
-              .eq('category_id', category.id)
+              .or(`category_id.eq.${category.id},subcategory_id.eq.${category.id}`)
               .eq('active', true);
 
             return {
@@ -381,13 +394,16 @@ const SaudeBemEstar = () => {
                   {/* Faixa de Preço */}
                   <div>
                     <label className="text-sm font-medium mb-3 block text-gray-700">
-                      Preço: <span className="text-pink-600 font-semibold">R$ {priceRange[0]} - R$ {priceRange[1]}</span>
+                      Preço: <span className="text-pink-600 font-semibold">
+                        {new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA', minimumFractionDigits: 0 }).format(priceRange[0])} - 
+                        {new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA', minimumFractionDigits: 0 }).format(priceRange[1])}
+                      </span>
                     </label>
                     <div className="px-2">
                       <Slider
                         value={priceRange}
                         onValueChange={setPriceRange}
-                        max={1000}
+                        max={15000}
                         min={0}
                         step={10}
                         className="w-full [&>span:first-child]:bg-gradient-to-r [&>span:first-child]:from-pink-300 [&>span:first-child]:to-orange-300 [&_[role=slider]]:bg-gradient-to-r [&_[role=slider]]:from-pink-500 [&_[role=slider]]:to-orange-500 [&_[role=slider]]:border-0"
@@ -610,12 +626,20 @@ const SaudeBemEstar = () => {
 
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-lg font-bold text-primary">
-                                R$ {product.price.toFixed(2)}
+                               <div className="text-lg font-bold text-primary">
+                                {new Intl.NumberFormat('pt-AO', {
+                                  style: 'currency',
+                                  currency: 'AOA',
+                                  minimumFractionDigits: 0
+                                }).format(product.price)}
                               </div>
                               {product.original_price && product.original_price > product.price && (
                                 <div className="text-sm text-muted-foreground line-through">
-                                  R$ {product.original_price.toFixed(2)}
+                                  {new Intl.NumberFormat('pt-AO', {
+                                    style: 'currency',
+                                    currency: 'AOA',
+                                    minimumFractionDigits: 0
+                                  }).format(product.original_price)}
                                 </div>
                               )}
                             </div>
@@ -674,11 +698,19 @@ const SaudeBemEstar = () => {
 
                                 <div className="text-right ml-4">
                                   <div className="text-lg font-bold text-primary">
-                                    R$ {product.price.toFixed(2)}
+                                    {new Intl.NumberFormat('pt-AO', {
+                                      style: 'currency',
+                                      currency: 'AOA',
+                                      minimumFractionDigits: 0
+                                    }).format(product.price)}
                                   </div>
                                   {product.original_price && product.original_price > product.price && (
                                     <div className="text-sm text-muted-foreground line-through">
-                                      R$ {product.original_price.toFixed(2)}
+                                      {new Intl.NumberFormat('pt-AO', {
+                                        style: 'currency',
+                                        currency: 'AOA',
+                                        minimumFractionDigits: 0
+                                      }).format(product.original_price)}
                                     </div>
                                   )}
                                   

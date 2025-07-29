@@ -6,6 +6,7 @@ import {
   Users, 
   FolderOpen, 
   BarChart3, 
+  TrendingUp,
   Settings,
   Tag,
   Upload,
@@ -72,6 +73,11 @@ const menuItems = [
     title: 'Relatórios',
     url: '/admin/relatorios',
     icon: BarChart3,
+  },
+  {
+    title: 'Analytics',
+    url: '/admin/analytics',
+    icon: TrendingUp,
   },
   {
     title: 'Relatórios Produtos',
