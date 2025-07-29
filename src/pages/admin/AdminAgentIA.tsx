@@ -879,6 +879,114 @@ export default function AdminAgentIA() {
                   </div>
                 </div>
               )}
+              
+              {/* Helper para configurar Webhook do Facebook */}
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-medium mb-2 text-blue-800">
+                  🔧 Configuração do Webhook Facebook
+                </h4>
+                <p className="text-sm text-blue-700 mb-3">
+                  Para o bot responder automaticamente, você precisa configurar o webhook no Facebook:
+                </p>
+                
+                <div className="space-y-4">
+                  <div className="p-3 bg-white border rounded">
+                    <h5 className="font-medium text-blue-800 mb-2">1. URL do Webhook</h5>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs bg-gray-100 p-2 rounded flex-1">
+                        https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook');
+                          toast.success('URL do webhook copiada!');
+                        }}
+                      >
+                        Copiar
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-white border rounded">
+                    <h5 className="font-medium text-blue-800 mb-2">2. Verify Token</h5>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs bg-gray-100 p-2 rounded flex-1">
+                        minha_superloja_webhook_token_2024
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText('minha_superloja_webhook_token_2024');
+                          toast.success('Verify token copiado!');
+                        }}
+                      >
+                        Copiar
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-white border rounded">
+                    <h5 className="font-medium text-blue-800 mb-2">3. Configurar no Facebook</h5>
+                    <ol className="list-decimal list-inside text-sm text-blue-700 space-y-1">
+                      <li>Acesse <a href="https://developers.facebook.com/" target="_blank" className="text-blue-600 underline">Facebook Developers</a></li>
+                      <li>Vá para sua aplicação → Produtos → Messenger → Configurações</li>
+                      <li>Na seção "Webhooks", clique em "Configurar Webhooks"</li>
+                      <li>Cole a URL do webhook acima</li>
+                      <li>Cole o Verify Token acima</li>
+                      <li>Selecione os eventos: <code>messages</code>, <code>messaging_postbacks</code></li>
+                      <li>Clique em "Verificar e Salvar"</li>
+                      <li>Depois, associe o webhook à sua página</li>
+                    </ol>
+                  </div>
+                  
+                  <div className="p-3 bg-amber-100 border border-amber-300 rounded">
+                    <h5 className="font-medium text-amber-800 mb-2">⚠️ Verificações Importantes</h5>
+                    <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
+                      <li>Certifique-se que o token da página tem permissão <code>pages_messaging</code></li>
+                      <li>A página deve estar em modo "Desenvolvedor" ou "Ativo"</li>
+                      <li>O webhook deve estar associado especificamente à sua página</li>
+                      <li>Teste mandando uma mensagem para a página após a configuração</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open('https://developers.facebook.com/', '_blank')}
+                    >
+                      Abrir Facebook Developers
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Testar se webhook responde
+                        toast.loading('Testando webhook...', { id: 'webhook-test' });
+                        fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook', {
+                          method: 'GET',
+                          headers: { 'Content-Type': 'application/json' }
+                        }).then(response => {
+                          toast.dismiss('webhook-test');
+                          if (response.ok) {
+                            toast.success('✅ Webhook está respondendo!');
+                          } else {
+                            toast.error('❌ Webhook não está respondendo');
+                          }
+                        }).catch(() => {
+                          toast.dismiss('webhook-test');
+                          toast.error('❌ Erro ao testar webhook');
+                        });
+                      }}
+                    >
+                      Testar Webhook
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
