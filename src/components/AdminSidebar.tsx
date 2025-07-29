@@ -18,7 +18,8 @@ import {
   Gavel,
   Image,
   BookOpen,
-  FileDown
+  FileDown,
+  Bot
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -93,6 +94,11 @@ const menuItems = [
     title: 'Solicitações',
     url: '/admin/solicitacoes',
     icon: FileText,
+  },
+  {
+    title: 'Agente IA',
+    url: '/admin/agente-ia',
+    icon: Bot,
   },
 ];
 

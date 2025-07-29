@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Edge Functions - SuperLoja AI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .test-section h3 {
+            color: #4F46E5;
+            margin-top: 0;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #4F46E5;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #3B37CB;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        .urls {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .urls code {
+            background: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Teste Edge Functions - SuperLoja AI</h1>
+        
+        <div class="urls">
+            <h4>📍 URLs das Functions:</h4>
+            <p><strong>Facebook Webhook:</strong><br>
+            <code>https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook</code></p>
+            <p><strong>Website Chat AI:</strong><br>
+            <code>https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/website-chat-ai</code></p>
+        </div>
+
+        <!-- Teste 1: Website Chat AI -->
+        <div class="test-section">
+            <h3>🌐 Teste 1: Website Chat AI</h3>
+            <p>Testa se a função de chat do website está funcionando:</p>
+            
+            <input type="text" id="chatMessage" placeholder="Digite sua mensagem (ex: Olá, quero comprar um smartphone)" value="Olá, quero comprar um smartphone">
+            <input type="text" id="userId" placeholder="User ID (ex: user123)" value="user123">
+            <input type="text" id="sessionId" placeholder="Session ID (ex: session123)" value="session123">
+            
+            <button onclick="testWebsiteChat()">🚀 Testar Website Chat</button>
+            <div id="chatResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- Teste 2: Facebook Webhook Verification -->
+        <div class="test-section">
+            <h3>📘 Teste 2: Facebook Webhook Verification</h3>
+            <p>Testa se o webhook do Facebook está configurado corretamente:</p>
+            
+            <input type="text" id="verifyToken" placeholder="Verify Token" value="superloja_webhook_2024">
+            
+            <button onclick="testFacebookWebhook()">🔍 Testar Verificação Facebook</button>
+            <div id="facebookResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- Teste 3: Status das Functions -->
+        <div class="test-section">
+            <h3>📊 Teste 3: Status das Functions</h3>
+            <p>Verifica se as functions estão online:</p>
+            
+            <button onclick="checkFunctionsStatus()">📡 Verificar Status</button>
+            <div id="statusResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- Logs -->
+        <div class="test-section">
+            <h3>📝 Logs de Teste</h3>
+            <textarea id="logs" rows="10" readonly placeholder="Os logs dos testes aparecerão aqui..."></textarea>
+            <button onclick="clearLogs()">🗑️ Limpar Logs</button>
+        </div>
+    </div>
+
+    <script>
+        function addLog(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.value += `[${timestamp}] ${message}\n`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').value = '';
+        }
+
+        async function testWebsiteChat() {
+            const message = document.getElementById('chatMessage').value;
+            const userId = document.getElementById('userId').value;
+            const sessionId = document.getElementById('sessionId').value;
+            const resultDiv = document.getElementById('chatResult');
+
+            if (!message || !userId) {
+                alert('Por favor, preencha pelo menos a mensagem e o User ID');
+                return;
+            }
+
+            addLog(`Testando Website Chat: "${message}"`);
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Enviando mensagem para a AI...';
+
+            try {
+                const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/website-chat-ai', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        userId: userId,
+                        sessionId: sessionId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ SUCCESS!\n\nResposta da AI:\n"${data.response}"\n\nStatus: ${response.status}`;
+                    addLog(`✅ Website Chat SUCCESS: ${data.response}`);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ ERROR!\n\nStatus: ${response.status}\nErro: ${JSON.stringify(data, null, 2)}`;
+                    addLog(`❌ Website Chat ERROR: ${JSON.stringify(data)}`);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ NETWORK ERROR!\n\n${error.message}`;
+                addLog(`❌ Website Chat NETWORK ERROR: ${error.message}`);
+            }
+        }
+
+        async function testFacebookWebhook() {
+            const verifyToken = document.getElementById('verifyToken').value;
+            const resultDiv = document.getElementById('facebookResult');
+
+            addLog(`Testando Facebook Webhook com token: ${verifyToken}`);
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Testando verificação do webhook...';
+
+            try {
+                const url = `https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook?hub.mode=subscribe&hub.verify_token=${verifyToken}&hub.challenge=test123`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE'
+                    }
+                });
+
+                const responseText = await response.text();
+
+                if (response.ok && responseText === 'test123') {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ SUCCESS!\n\nWebhook verification OK!\nChallenge response: ${responseText}\nStatus: ${response.status}`;
+                    addLog(`✅ Facebook Webhook SUCCESS: Verification OK`);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ ERROR!\n\nStatus: ${response.status}\nResponse: ${responseText}`;
+                    addLog(`❌ Facebook Webhook ERROR: Status ${response.status}, Response: ${responseText}`);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ NETWORK ERROR!\n\n${error.message}`;
+                addLog(`❌ Facebook Webhook NETWORK ERROR: ${error.message}`);
+            }
+        }
+
+        async function checkFunctionsStatus() {
+            const resultDiv = document.getElementById('statusResult');
+            
+            addLog('Verificando status das Edge Functions...');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Verificando status das functions...';
+
+            let statusText = '📊 STATUS DAS EDGE FUNCTIONS:\n\n';
+
+            // Test Website Chat AI
+            try {
+                const chatResponse = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/website-chat-ai', {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE'
+                    }
+                });
+                statusText += `🌐 Website Chat AI: ${chatResponse.ok ? '✅ ONLINE' : '❌ OFFLINE'} (${chatResponse.status})\n`;
+            } catch (error) {
+                statusText += `🌐 Website Chat AI: ❌ ERROR (${error.message})\n`;
+            }
+
+            // Test Facebook Webhook
+            try {
+                const fbResponse = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE'
+                    }
+                });
+                statusText += `📘 Facebook Webhook: ${fbResponse.status === 403 ? '✅ ONLINE' : '❌ OFFLINE'} (${fbResponse.status})\n`;
+            } catch (error) {
+                statusText += `📘 Facebook Webhook: ❌ ERROR (${error.message})\n`;
+            }
+
+            statusText += '\n🔗 URLs das Functions:\n';
+            statusText += '• Website Chat: https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/website-chat-ai\n';
+            statusText += '• Facebook Webhook: https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook\n';
+
+            resultDiv.className = 'result success';
+            resultDiv.textContent = statusText;
+            addLog('✅ Status check completed');
+        }
+
+        // Auto-run status check on load
+        window.onload = function() {
+            addLog('🚀 Página de teste carregada');
+            addLog('🔧 Edge Functions deployadas automaticamente via MCP');
+            addLog('📋 Pronto para testar as functions...');
+        };
+    </script>
+</body>
+</html>

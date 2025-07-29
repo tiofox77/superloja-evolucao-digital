@@ -4,6 +4,7 @@ import { Footer } from '@/components/Footer';
 import { Hero } from '@/components/Hero';
 import { FeaturedProducts } from '@/components/FeaturedProducts';
 import { SEOHead } from '@/components/SEOHead';
+import ChatWidget from '@/components/ChatWidget';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useSettings } from '@/contexts/SettingsContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -392,6 +393,10 @@ const Index = () => {
         )}
         
       </main>
+      
+      {/* Chat Widget */}
+      <ChatWidget />
+      
       <Footer />
     </div>
   );

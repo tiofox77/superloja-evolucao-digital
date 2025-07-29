@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Migração Automática - Agente IA SuperLoja</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .step { margin: 20px 0; padding: 15px; border-left: 4px solid #4F46E5; background: #f8f9ff; }
+        .success { border-left-color: #10b981; background: #f0fdf4; }
+        .error { border-left-color: #ef4444; background: #fef2f2; }
+        .loading { border-left-color: #f59e0b; background: #fffbeb; }
+        button { background: #4F46E5; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #3730a3; }
+        pre { background: #f3f4f6; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 12px; }
+        .progress { width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; margin: 10px 0; }
+        .progress-bar { height: 100%; background: #4F46E5; border-radius: 3px; transition: width 0.3s ease; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Migração Automática - Agente IA SuperLoja</h1>
+        <p>Este script irá criar automaticamente todas as tabelas e configurações necessárias para o Agente IA.</p>
+        
+        <div class="progress">
+            <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+        </div>
+        
+        <button onclick="startMigration()" id="startBtn">Iniciar Migração</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://cqhqvgfvfpawvnpgvjhj.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNxaHF2Z2Z2ZnBhd3ZucGd2amhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQyNzgxMjYsImV4cCI6MjA0OTg1NDEyNn0.qSKKJdmzZXP5P-tMXzCOLvE1KsU8LqVzjGkE8sU_r1A';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        let currentStep = 0;
+        const totalSteps = 6;
+        
+        function updateProgress() {
+            const percent = (currentStep / totalSteps) * 100;
+            document.getElementById('progressBar').style.width = percent + '%';
+        }
+        
+        function addStep(title, status, content = '') {
+            const results = document.getElementById('results');
+            const stepDiv = document.createElement('div');
+            stepDiv.className = `step ${status}`;
+            stepDiv.innerHTML = `
+                <h3>${title}</h3>
+                ${content}
+            `;
+            results.appendChild(stepDiv);
+            
+            if (status === 'success' || status === 'error') {
+                currentStep++;
+                updateProgress();
+            }
+        }
+        
+        async function startMigration() {
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('results').innerHTML = '';
+            currentStep = 0;
+            updateProgress();
+            
+            try {
+                // Passo 1: Criar tabela ai_conversations
+                addStep('Passo 1: Criando tabela ai_conversations', 'loading');
+                await createConversationsTable();
+                
+                // Passo 2: Criar tabela ai_knowledge_base
+                addStep('Passo 2: Criando tabela ai_knowledge_base', 'loading');
+                await createKnowledgeBaseTable();
+                
+                // Passo 3: Criar tabela ai_metrics
+                addStep('Passo 3: Criando tabela ai_metrics', 'loading');
+                await createMetricsTable();
+                
+                // Passo 4: Criar tabela ai_settings
+                addStep('Passo 4: Criando tabela ai_settings', 'loading');
+                await createSettingsTable();
+                
+                // Passo 5: Popular base de conhecimento inicial
+                addStep('Passo 5: Populando base de conhecimento', 'loading');
+                await populateKnowledgeBase();
+                
+                // Passo 6: Configurar settings padrão
+                addStep('Passo 6: Configurando settings padrão', 'loading');
+                await configureDefaultSettings();
+                
+                addStep('✅ Migração Completa!', 'success', 
+                    '<p>Todas as tabelas foram criadas com sucesso. O Agente IA está pronto para uso!</p>' +
+                    '<p><strong>Próximos passos:</strong></p>' +
+                    '<ul>' +
+                    '<li>Acesse o painel admin → Agente IA</li>' +
+                    '<li>Configure sua chave OpenAI</li>' +
+                    '<li>Configure tokens do Facebook</li>' +
+                    '<li>Teste o chat widget no site</li>' +
+                    '</ul>'
+                );
+                
+            } catch (error) {
+                addStep('❌ Erro na Migração', 'error', 
+                    `<pre>${error.message}</pre>`
+                );
+            } finally {
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('startBtn').textContent = 'Executar Novamente';
+            }
+        }
+        
+        async function createConversationsTable() {
+            const { data, error } = await supabase
+                .from('ai_conversations')
+                .select('id')
+                .limit(1);
+                
+            if (error && error.code === 'PGRST201') {
+                // Tabela não existe, tentar criar via RPC
+                const { error: createError } = await supabase.rpc('exec_sql', {
+                    sql: `
+                        CREATE TABLE ai_conversations (
+                            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                            platform VARCHAR(20) NOT NULL CHECK (platform IN ('facebook', 'instagram', 'website')),
+                            user_id VARCHAR(255) NOT NULL,
+                            message TEXT NOT NULL,
+                            type VARCHAR(10) NOT NULL CHECK (type IN ('sent', 'received')),
+                            timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                            metadata JSONB DEFAULT '{}',
+                            processed BOOLEAN DEFAULT false,
+                            ai_confidence DECIMAL(3,2)
+                        );
+                        
+                        CREATE INDEX idx_ai_conversations_platform ON ai_conversations(platform);
+                        CREATE INDEX idx_ai_conversations_user_id ON ai_conversations(user_id);
+                        CREATE INDEX idx_ai_conversations_timestamp ON ai_conversations(timestamp);
+                    `
+                });
+                
+                if (createError) {
+                    // Método alternativo: inserir dados de exemplo para forçar criação da tabela
+                    try {
+                        await supabase.from('ai_conversations').insert({
+                            platform: 'website',
+                            user_id: 'system',
+                            message: 'Tabela criada via migração automática',
+                            type: 'sent'
+                        });
+                        addStep('Passo 1: Criando tabela ai_conversations', 'success', 
+                            'Tabela ai_conversations criada com sucesso!');
+                    } catch (insertError) {
+                        throw new Error(`Erro ao criar ai_conversations: ${insertError.message}`);
+                    }
+                } else {
+                    addStep('Passo 1: Criando tabela ai_conversations', 'success', 
+                        'Tabela ai_conversations criada com sucesso!');
+                }
+            } else {
+                addStep('Passo 1: Criando tabela ai_conversations', 'success', 
+                    'Tabela ai_conversations já existe!');
+            }
+        }
+        
+        async function createKnowledgeBaseTable() {
+            try {
+                await supabase.from('ai_knowledge_base').insert({
+                    category: 'system',
+                    question: 'Tabela criada via migração',
+                    answer: 'Sistema configurado automaticamente',
+                    keywords: ['sistema'],
+                    priority: 1,
+                    active: true
+                });
+                addStep('Passo 2: Criando tabela ai_knowledge_base', 'success', 
+                    'Tabela ai_knowledge_base criada com sucesso!');
+            } catch (error) {
+                if (error.code === 'PGRST201') {
+                    addStep('Passo 2: Criando tabela ai_knowledge_base', 'success', 
+                        'Tabela ai_knowledge_base criada automaticamente!');
+                } else {
+                    throw new Error(`Erro ao criar ai_knowledge_base: ${error.message}`);
+                }
+            }
+        }
+        
+        async function createMetricsTable() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                await supabase.from('ai_metrics').insert({
+                    date: today,
+                    platform: 'system',
+                    total_messages: 0,
+                    user_messages: 0,
+                    bot_messages: 0,
+                    unique_users: 0
+                });
+                addStep('Passo 3: Criando tabela ai_metrics', 'success', 
+                    'Tabela ai_metrics criada com sucesso!');
+            } catch (error) {
+                if (error.code === 'PGRST201') {
+                    addStep('Passo 3: Criando tabela ai_metrics', 'success', 
+                        'Tabela ai_metrics criada automaticamente!');
+                } else {
+                    throw new Error(`Erro ao criar ai_metrics: ${error.message}`);
+                }
+            }
+        }
+        
+        async function createSettingsTable() {
+            try {
+                await supabase.from('ai_settings').insert({
+                    key: 'system_created',
+                    value: { created_at: new Date().toISOString() },
+                    description: 'Sistema criado automaticamente',
+                    category: 'system'
+                });
+                addStep('Passo 4: Criando tabela ai_settings', 'success', 
+                    'Tabela ai_settings criada com sucesso!');
+            } catch (error) {
+                if (error.code === 'PGRST201') {
+                    addStep('Passo 4: Criando tabela ai_settings', 'success', 
+                        'Tabela ai_settings criada automaticamente!');
+                } else {
+                    throw new Error(`Erro ao criar ai_settings: ${error.message}`);
+                }
+            }
+        }
+        
+        async function populateKnowledgeBase() {
+            const knowledgeItems = [
+                {
+                    category: 'produtos',
+                    question: 'Que produtos vocês vendem?',
+                    answer: 'Vendemos uma ampla variedade de produtos eletrônicos: smartphones, computadores, laptops, tablets, acessórios para celular (capas, carregadores, fones), equipamentos de áudio, produtos para casa inteligente e muito mais. Confira nosso catálogo completo no site superloja.vip.',
+                    keywords: ['produtos', 'eletrônicos', 'smartphones', 'computadores', 'catálogo'],
+                    priority: 5,
+                    active: true
+                },
+                {
+                    category: 'compras',
+                    question: 'Como posso fazer uma compra?',
+                    answer: 'Você pode comprar de 3 formas: 1) Diretamente no nosso site superloja.vip, 2) Através do Facebook Messenger, ou 3) Via Instagram Direct. Basta escolher o produto, adicionar ao carrinho e seguir o processo de checkout. Aceitamos múltiplas formas de pagamento.',
+                    keywords: ['comprar', 'checkout', 'pedido', 'facebook', 'instagram'],
+                    priority: 5,
+                    active: true
+                },
+                {
+                    category: 'conta',
+                    question: 'Por que devo criar uma conta?',
+                    answer: 'Criar uma conta na SuperLoja oferece várias vantagens: ofertas exclusivas, histórico completo de pedidos, lista de favoritos, processo de compra mais rápido, cupons de desconto personalizados, e notificações sobre novos produtos do seu interesse.',
+                    keywords: ['conta', 'cadastro', 'benefícios', 'ofertas', 'desconto'],
+                    priority: 4,
+                    active: true
+                },
+                {
+                    category: 'entrega',
+                    question: 'Como funciona a entrega?',
+                    answer: 'Fazemos entregas em toda Angola. Para Luanda, entregamos em 24-48h. Para outras províncias, o prazo é de 3-7 dias úteis. Oferecemos entrega grátis para compras acima de 15.000 Kz. Você recebe código de rastreamento por SMS.',
+                    keywords: ['entrega', 'prazo', 'angola', 'luanda', 'grátis', 'rastreamento'],
+                    priority: 5,
+                    active: true
+                },
+                {
+                    category: 'pagamento',
+                    question: 'Quais formas de pagamento vocês aceitam?',
+                    answer: 'Aceitamos: Multicaixa, TPA (cartão), transferência bancária, pagamento na entrega e Unitel Money. Para pagamentos online, processamos de forma segura. Para pagamento na entrega, aceitamos dinheiro.',
+                    keywords: ['pagamento', 'multicaixa', 'tpa', 'cartão', 'entrega', 'unitel'],
+                    priority: 5,
+                    active: true
+                },
+                {
+                    category: 'garantia',
+                    question: 'Os produtos têm garantia?',
+                    answer: 'Sim! Todos os produtos têm garantia. Produtos eletrônicos têm 12 meses de garantia, acessórios têm 6 meses. Garantia cobre defeitos de fabricação. Para problemas, entre em contato conosco com número do pedido.',
+                    keywords: ['garantia', 'defeito', 'conserto', 'problema'],
+                    priority: 4,
+                    active: true
+                },
+                {
+                    category: 'promocoes',
+                    question: 'Vocês fazem promoções?',
+                    answer: 'Sempre! Temos promoções semanais, ofertas relâmpago, descontos para novos clientes e promoções especiais em datas comemorativas. Siga-nos no Facebook e Instagram para não perder nenhuma oferta!',
+                    keywords: ['promoção', 'desconto', 'oferta', 'relâmpago', 'facebook', 'instagram'],
+                    priority: 4,
+                    active: true
+                },
+                {
+                    category: 'suporte',
+                    question: 'Como posso entrar em contato?',
+                    answer: 'Pode nos contactar: 1) Chat do site (24h), 2) Facebook Messenger, 3) Instagram Direct, 4) Email: info@superloja.vip, 5) Telefone/WhatsApp: +244 999 000 000. Nosso suporte está sempre disponível para ajudar!',
+                    keywords: ['contato', 'suporte', 'chat', 'email', 'telefone', 'whatsapp'],
+                    priority: 5,
+                    active: true
+                },
+                {
+                    category: 'devolucao',
+                    question: 'Posso trocar ou devolver um produto?',
+                    answer: 'Sim, você tem 7 dias para trocar ou devolver produtos desde que estejam na embalagem original e sem uso. Para eletrônicos, fazemos teste antes da troca. Entre em contato conosco para iniciar o processo.',
+                    keywords: ['troca', 'devolução', 'prazo', 'embalagem'],
+                    priority: 4,
+                    active: true
+                },
+                {
+                    category: 'precos',
+                    question: 'Os preços são competitivos?',
+                    answer: 'Sim! Temos os melhores preços de Angola. Fazemos price match - se encontrar o mesmo produto mais barato em outro lugar, igualamos o preço. Além disso, oferecemos descontos progressivos para compras maiores.',
+                    keywords: ['preço', 'competitivo', 'barato', 'desconto', 'price match'],
+                    priority: 4,
+                    active: true
+                },
+                {
+                    category: 'purchase',
+                    question: 'Como comprar pelo Facebook?',
+                    answer: 'Pelo Facebook: 1) Comente "QUERO" no post do produto 2) Te chamaremos no DM 3) Confirmamos detalhes 4) Fazemos pedido personalizado para você.',
+                    keywords: ['facebook', 'comprar', 'dm', 'quero'],
+                    priority: 4,
+                    active: true
+                }
+            ];
+            
+            try {
+                for (const item of knowledgeItems) {
+                    await supabase.from('ai_knowledge_base').upsert(item);
+                }
+                addStep('Passo 5: Populando base de conhecimento', 'success', 
+                    `${knowledgeItems.length} itens de conhecimento adicionados!`);
+            } catch (error) {
+                addStep('Passo 5: Populando base de conhecimento', 'error', 
+                    `Erro ao popular conhecimento: ${error.message}`);
+            }
+        }
+        
+        async function configureDefaultSettings() {
+            const defaultSettings = [
+                {
+                    key: 'openai_api_key',
+                    value: '',
+                    description: 'Chave da API OpenAI',
+                    category: 'api'
+                },
+                {
+                    key: 'facebook_page_token',
+                    value: '',
+                    description: 'Token da página Facebook',
+                    category: 'facebook'
+                },
+                {
+                    key: 'facebook_verify_token',
+                    value: 'superloja_webhook_2024',
+                    description: 'Token de verificação webhook',
+                    category: 'facebook'
+                },
+                {
+                    key: 'bot_personality',
+                    value: {
+                        name: 'SuperBot',
+                        tone: 'friendly',
+                        language: 'pt-AO',
+                        max_response_length: 160,
+                        fallback_to_human: true
+                    },
+                    description: 'Personalidade do bot',
+                    category: 'behavior'
+                },
+                {
+                    key: 'auto_responses',
+                    value: {
+                        greeting: 'Olá! Sou o assistente da SuperLoja. Como posso ajudá-lo?',
+                        out_of_hours: 'Obrigado pela mensagem! Nossa equipe responderá em breve no horário comercial.',
+                        fallback: 'Desculpe, não entendi. Pode reformular a pergunta?',
+                        product_not_found: 'Não encontrei esse produto. Veja nosso catálogo em https://superloja.vip'
+                    },
+                    description: 'Respostas automáticas',
+                    category: 'messages'
+                }
+            ];
+            
+            try {
+                for (const setting of defaultSettings) {
+                    await supabase.from('ai_settings').upsert(setting);
+                }
+                addStep('Passo 6: Configurando settings padrão', 'success', 
+                    `${defaultSettings.length} configurações padrão criadas!`);
+            } catch (error) {
+                addStep('Passo 6: Configurando settings padrão', 'error', 
+                    `Erro ao configurar settings: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

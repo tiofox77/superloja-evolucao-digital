@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Simples - Facebook Webhook</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 5px; font-family: monospace; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .loading { background: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste Simples - Facebook Webhook</h1>
+    
+    <p><strong>URL da Function:</strong><br>
+    <code>https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook</code></p>
+    
+    <h3>1. Teste de Status (sem autenticação)</h3>
+    <button onclick="testStatus()">📡 Verificar Status</button>
+    <div id="statusResult" class="result" style="display:none;"></div>
+    
+    <h3>2. Teste GET simples</h3>
+    <button onclick="testSimpleGet()">🔍 Teste GET</button>
+    <div id="getResult" class="result" style="display:none;"></div>
+    
+    <h3>3. Verificar Headers</h3>
+    <button onclick="testHeaders()">📋 Ver Headers</button>
+    <div id="headersResult" class="result" style="display:none;"></div>
+
+    <script>
+        async function testStatus() {
+            const resultDiv = document.getElementById('statusResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Verificando status...';
+
+            try {
+                // Teste simples sem autenticação
+                const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook', {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+
+                let resultText = `📊 STATUS DO FACEBOOK WEBHOOK:\n\n`;
+                resultText += `Status: ${response.status} ${response.statusText}\n`;
+                resultText += `URL: ${response.url}\n`;
+                resultText += `Type: ${response.type}\n`;
+                resultText += `OK: ${response.ok}\n\n`;
+
+                // Tentar ler o response
+                try {
+                    const text = await response.text();
+                    resultText += `Response: ${text}\n`;
+                } catch (e) {
+                    resultText += `Response: [Não foi possível ler]\n`;
+                }
+
+                if (response.status === 401) {
+                    resultDiv.className = 'result error';
+                    resultText += `\n❌ ERRO 401: A function precisa de autenticação.\n`;
+                    resultText += `✅ Mas isso significa que ela ESTÁ ONLINE!\n`;
+                } else if (response.status === 403) {
+                    resultDiv.className = 'result success';
+                    resultText += `\n✅ WEBHOOK FUNCIONANDO!\n`;
+                    resultText += `Status 403 é esperado sem verificação.\n`;
+                } else {
+                    resultDiv.className = 'result success';
+                    resultText += `\n✅ WEBHOOK RESPONDENDO!\n`;
+                }
+
+                resultDiv.textContent = resultText;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ ERRO DE REDE:\n\n${error.message}\n\nPossíveis causas:\n- CORS bloqueado\n- Function offline\n- Problema de rede`;
+            }
+        }
+
+        async function testSimpleGet() {
+            const resultDiv = document.getElementById('getResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Testando GET simples...';
+
+            try {
+                const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook?test=true', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE'
+                    }
+                });
+
+                const responseText = await response.text();
+
+                let resultText = `📡 TESTE GET:\n\n`;
+                resultText += `Status: ${response.status}\n`;
+                resultText += `Response: ${responseText}\n\n`;
+
+                if (response.status === 403 && responseText === 'Verification failed') {
+                    resultDiv.className = 'result success';
+                    resultText += `✅ WEBHOOK FUNCIONANDO!\n`;
+                    resultText += `Status 403 = "Verification failed" é normal.\n`;
+                    resultText += `Significa que a function está processando corretamente!\n`;
+                } else {
+                    resultDiv.className = 'result success';
+                    resultText += `✅ Response recebida com sucesso!\n`;
+                }
+
+                resultDiv.textContent = resultText;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ ERRO:\n\n${error.message}`;
+            }
+        }
+
+        async function testHeaders() {
+            const resultDiv = document.getElementById('headersResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = '🔄 Verificando headers...';
+
+            try {
+                const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook', {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE'
+                    }
+                });
+
+                let resultText = `📋 HEADERS TEST:\n\n`;
+                resultText += `Status: ${response.status}\n`;
+                resultText += `Headers disponíveis:\n`;
+
+                for (let [name, value] of response.headers) {
+                    resultText += `${name}: ${value}\n`;
+                }
+
+                resultDiv.className = 'result success';
+                resultDiv.textContent = resultText;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ ERRO:\n\n${error.message}`;
+            }
+        }
+
+        // Auto-test on load
+        window.onload = function() {
+            console.log('Página carregada - pronto para testar webhook Facebook');
+        };
+    </script>
+</body>
+</html>
