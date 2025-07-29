@@ -524,11 +524,12 @@ function buildInstagramSystemPrompt(userContext: any, products: any[]): string {
 - Mantenha o foco no tópico da pergunta
 
 INFORMAÇÕES DA SUPERLOJA:
-🚚 ENTREGA: Entregamos em todo Brasil via Correios e transportadoras. Prazo: 3-7 dias úteis para capitais, 5-10 dias para interior. Frete grátis acima de R$ 200.
-💰 PAGAMENTO: PIX (5% desconto), cartão (até 12x), boleto
+🚚 ENTREGA: Entregamos grátis em toda Luanda e arredores! Prazo: 1-3 dias úteis em Luanda, 3-5 dias para outras províncias de Angola.
+💰 PAGAMENTO: Transferência bancária, Multicaixa, dinheiro na entrega
 🔒 GARANTIA: 12 meses de garantia em todos os produtos
-📞 CONTATO: WhatsApp (11) 9999-9999, Email: contato@superloja.vip
+📞 CONTATO: WhatsApp +244 923 000 000, Email: contato@superloja.vip
 ⏰ FUNCIONAMENTO: Seg-Sex 8h-18h, Sáb 8h-14h
+🏢 LOCALIZAÇÃO: Luanda, Angola
 
 PERSONALIDADE:
 - Natural, amigável e direto
@@ -542,9 +543,9 @@ PERSONALIDADE:
   if (products.length > 0) {
     contextualInfo = `\n\n📦 PRODUTOS DISPONÍVEIS (mencione APENAS se o usuário perguntar sobre produtos):
 ${products.slice(0, 3).map(p => {
-  const price = parseFloat(p.price).toLocaleString('pt-BR');
+  const price = parseFloat(p.price).toLocaleString('pt-AO');
   const stock = p.in_stock ? `✅ Disponível` : `❌ Indisponível`;
-  return `• ${p.name}: R$ ${price} - ${stock}`;
+  return `• ${p.name}: ${price} Kz - ${stock}`;
 }).join('\n')}
 
 🌐 Catálogo completo: https://superloja.vip/produtos`;
@@ -553,8 +554,8 @@ ${products.slice(0, 3).map(p => {
   return basePrompt + contextualInfo + `
 
 EXEMPLOS DE RESPOSTAS DIRETAS:
-- Se perguntarem sobre entrega: "📦 Entregamos em todo Brasil! Prazo: 3-7 dias úteis para capitais..."
-- Se perguntarem sobre pagamento: "💳 Aceitamos PIX (5% desconto), cartão até 12x..."
+- Se perguntarem sobre entrega: "📦 Entregamos grátis em toda Luanda! Prazo: 1-3 dias úteis em Luanda, 3-5 dias outras províncias"
+- Se perguntarem sobre pagamento: "💳 Aceitamos transferência bancária, Multicaixa, dinheiro na entrega"
 - Se perguntarem sobre funcionamento: "⚙️ Como funciona: [explicação específica]..."
 - Se perguntarem sobre horário: "⏰ Funcionamos Seg-Sex 8h-18h, Sáb 8h-14h"
 
