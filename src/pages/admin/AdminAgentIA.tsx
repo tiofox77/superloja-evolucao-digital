@@ -236,6 +236,35 @@ export default function AdminAgentIA() {
     }
   };
 
+  const syncMetaToken = async () => {
+    const toastId = toast.loading('Sincronizando token das configurações Meta...');
+    
+    try {
+      console.log('🔄 Sincronizando token Meta...');
+      
+      const { data, error } = await supabase.functions.invoke('sync-meta-token');
+
+      console.log('📤 Resposta sync Meta:', { data, error });
+
+      if (error) {
+        console.error('❌ Erro sync Meta:', error);
+        throw error;
+      }
+      
+      toast.dismiss(toastId);
+      toast.success('✅ Token Meta sincronizado com sucesso!');
+      console.log('✅ Sync Meta completo:', data);
+      
+      // Recarregar configurações
+      await loadSettings();
+      
+    } catch (error: any) {
+      console.error('💥 Erro sync Meta:', error);
+      toast.dismiss(toastId);
+      toast.error(`❌ Erro: ${error.message || 'Falha na sincronização'}`);
+    }
+  };
+
   const testOpenAI = async () => {
     const testResult: TestResult = {
       service: 'OpenAI',
@@ -1539,7 +1568,7 @@ export default function AdminAgentIA() {
               {/* Sincronização */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Sincronização</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Button 
                     onClick={syncWithSecrets} 
                     variant="outline"
@@ -1548,17 +1577,24 @@ export default function AdminAgentIA() {
                     🔄 Sincronizar com Secrets
                   </Button>
                   <Button 
+                    onClick={syncMetaToken} 
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    🔗 Usar Token Meta
+                  </Button>
+                  <Button 
                     onClick={testTables} 
                     variant="outline"
                     className="flex items-center gap-2"
                   >
                     🔍 Verificar Tabelas
                   </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  A sincronização copia as chaves para os secrets do Supabase automaticamente
-                </p>
-              </div>
+                 </div>
+                 <p className="text-sm text-muted-foreground">
+                   💡 Use "Usar Token Meta" para sincronizar o token que você salvou na página de configurações Meta/Facebook
+                 </p>
+               </div>
 
               {/* Quick Setup Links */}
               <div className="space-y-4">

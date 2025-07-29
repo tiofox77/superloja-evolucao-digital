@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.test-facebook-webhook]
 verify_jwt = false
+
+[functions.sync-meta-token]
+verify_jwt = false
