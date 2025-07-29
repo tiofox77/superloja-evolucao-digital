@@ -94,32 +94,33 @@ const SaudeBemEstar = () => {
 
         if (subError) throw subError;
 
-        // Buscar produtos das subcategorias E da categoria principal
-        const categoryIds = subcategories?.map(cat => cat.id) || [];
-        // Adicionar também a categoria principal
-        categoryIds.push(mainCategory.id);
-        
-        if (categoryIds.length > 0) {
-          const { data: productsData, error: productsError } = await supabase
-            .from('products')
-            .select(`
-              *,
-              categories!inner(name, slug)
-            `)
-            .or(`category_id.in.(${categoryIds.join(',')}),subcategory_id.in.(${categoryIds.join(',')})`)
-            .eq('active', true);
-
-          if (productsError) throw productsError;
-
-          const formattedProducts = productsData?.map(product => ({
-            ...product,
-            category_name: product.categories.name,
-            category_slug: product.categories.slug
-          })) || [];
-
-          setProducts(formattedProducts);
-          setFilteredProducts(formattedProducts);
+        // Coletar todos os IDs de categorias (principal + subcategorias)
+        const allCategoryIds = [mainCategory.id];
+        if (subcategories && subcategories.length > 0) {
+          allCategoryIds.push(...subcategories.map(cat => cat.id));
         }
+
+        // Buscar produtos que estão em qualquer uma dessas categorias
+        // Inclui produtos com category_id OU subcategory_id nas categorias relacionadas
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select(`
+            *,
+            categories!inner(name, slug)
+          `)
+          .or(`category_id.in.(${allCategoryIds.join(',')}),subcategory_id.in.(${allCategoryIds.join(',')})`)
+          .eq('active', true);
+
+        if (productsError) throw productsError;
+
+        const formattedProducts = productsData?.map(product => ({
+          ...product,
+          category_name: product.categories.name,
+          category_slug: product.categories.slug
+        })) || [];
+
+        setProducts(formattedProducts);
+        setFilteredProducts(formattedProducts);
 
         // Contar produtos para cada subcategoria
         const categoriesWithCount = await Promise.all(
