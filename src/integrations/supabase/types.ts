@@ -1223,7 +1223,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_recent_conversations: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          platform: string
+          user_id: string
+          message: string
+          type: string
+          msg_timestamp: string
+          metadata: Json
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
