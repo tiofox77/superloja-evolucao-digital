@@ -567,6 +567,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onSave, onCan
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                   
                    {/* Subcategorias */}
                    {formData.category_id && (() => {
                      const subcategories = categories.filter(cat => cat.parent_id === formData.category_id);
