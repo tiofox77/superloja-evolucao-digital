@@ -318,9 +318,14 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
     const systemPrompt = buildInstagramSystemPrompt(userContext, relevantProducts);
     const conversationHistory = await getRecentConversationHistory(senderId, supabase);
 
+    // Análise inteligente do contexto da conversa
+    const contextAnalysis = analyzeConversationContext(conversationHistory, userMessage);
+    console.log('🧠 Análise do contexto:', contextAnalysis);
+
     console.log('🧠 Chamando OpenAI para Instagram...');
     console.log('📊 Histórico:', conversationHistory.length, 'mensagens');
     console.log('🔍 Produtos relevantes:', relevantProducts.length);
+    console.log('💡 Contexto detectado:', contextAnalysis.type);
 
     // Chamar OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -332,8 +337,11 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
       body: JSON.stringify({
         model: model,
         messages: [
-          { role: 'system', content: systemPrompt },
-          ...conversationHistory,
+          { 
+            role: 'system', 
+            content: systemPrompt + buildContextualPrompt(contextAnalysis, conversationHistory)
+          },
+          ...conversationHistory.slice(-6), // Últimas 6 mensagens para contexto
           { role: 'user', content: userMessage }
         ],
         temperature: 0.7,
@@ -804,7 +812,107 @@ async function sendInstagramImage(recipientId: string, imageUrl: string, caption
             }
           }
         }),
+}
+
+// Função para analisar o contexto da conversa
+function analyzeConversationContext(conversationHistory: any[], currentMessage: string): any {
+  const lastMessages = conversationHistory.slice(-4); // Últimas 4 mensagens
+  
+  let contextType = 'initial';
+  let previousTopic = '';
+  let isFollowUp = false;
+  
+  if (lastMessages.length > 0) {
+    const lastBotMessage = lastMessages.find(msg => msg.role === 'assistant');
+    const lastUserMessages = lastMessages.filter(msg => msg.role === 'user').slice(-2);
+    
+    // Detectar se é continuação de conversa sobre produtos
+    if (lastBotMessage && lastBotMessage.content.includes('produto')) {
+      previousTopic = 'products';
+      isFollowUp = true;
+      
+      // Se usuário pergunta sobre tipos/modelos após ver produtos
+      if (currentMessage.toLowerCase().includes('qual') || 
+          currentMessage.toLowerCase().includes('tipo') ||
+          currentMessage.toLowerCase().includes('modelo') ||
+          currentMessage.toLowerCase().includes('existe')) {
+        contextType = 'specification_request';
       }
+      
+      // Se usuário menciona características específicas
+      if (currentMessage.toLowerCase().includes('c') || 
+          currentMessage.toLowerCase().includes('usb') ||
+          currentMessage.toLowerCase().includes('sem fio')) {
+        contextType = 'specific_variant';
+      }
+    }
+    
+    // Detectar sequência lógica de perguntas
+    if (lastUserMessages.length >= 2) {
+      const secondLastMsg = lastUserMessages[0]?.content?.toLowerCase() || '';
+      const lastMsg = currentMessage.toLowerCase();
+      
+      if (secondLastMsg.includes('artigo') && lastMsg.includes('qual')) {
+        contextType = 'clarification_request';
+        previousTopic = 'product_inquiry';
+      }
+    }
+  }
+  
+  return {
+    type: contextType,
+    previousTopic,
+    isFollowUp,
+    messageCount: conversationHistory.length,
+    lastMessages: lastMessages.map(msg => ({
+      role: msg.role,
+      snippet: msg.content.substring(0, 50)
+    }))
+  };
+}
+
+// Função para construir prompt contextual baseado na análise
+function buildContextualPrompt(analysis: any, history: any[]): string {
+  let contextPrompt = '\n\n📋 CONTEXTO DA CONVERSA:\n';
+  
+  switch (analysis.type) {
+    case 'specification_request':
+      contextPrompt += `- O usuário estava vendo produtos e agora quer especificações/tipos
+- FOQUE em mostrar as variações disponíveis do produto mencionado
+- Use linguagem de continuação: "Dos produtos que mostrei..." ou "Temos estas opções..."`;
+      break;
+      
+    case 'specific_variant':
+      contextPrompt += `- O usuário está especificando uma característica (USB-C, sem fio, etc.)
+- FOQUE em produtos que atendem exatamente essa especificação
+- Seja direto e mostre produtos compatíveis`;
+      break;
+      
+    case 'clarification_request':
+      contextPrompt += `- O usuário está pedindo clarificação sobre produtos anteriores
+- EXPLIQUE as opções disponíveis de forma clara
+- Ajude a refinar a busca`;
+      break;
+      
+    default:
+      if (analysis.isFollowUp) {
+        contextPrompt += `- Esta é uma continuação de conversa anterior sobre ${analysis.previousTopic}
+- Mantenha o contexto e seja consistente com respostas anteriores`;
+      } else {
+        contextPrompt += `- Esta é uma nova conversa
+- Seja acolhedor e prestativo`;
+      }
+  }
+  
+  if (history.length > 2) {
+    contextPrompt += `
+- Histórico recente disponível - use para dar continuidade natural
+- Evite repetir informações já fornecidas
+- Construa em cima do que já foi discutido`;
+  }
+  
+  return contextPrompt;
+}
     );
     
     const result = await response.json();

@@ -520,7 +520,233 @@ export default function AdminAgentIA() {
         status: 'success' as const,
         message,
         details: { status: response.status, ok: response.ok }
+  };
+
+  const testInstagramDebug = async () => {
+    const testResult: TestResult = {
+      service: 'Instagram Debug',
+      status: 'testing',
+      message: 'Testando debug Instagram...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Debug'), testResult]);
+    
+    try {
+      // Testar webhook com parâmetros específicos
+      const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/instagram-webhook', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Debug-Test': 'true'
+        },
+        body: JSON.stringify({
+          object: 'instagram',
+          entry: [{
+            id: '123456789',
+            time: Date.now(),
+            messaging: [{
+              sender: { id: 'test_user_123' },
+              recipient: { id: '230190170178019' },
+              timestamp: Date.now(),
+              message: { text: 'teste debug' }
+            }]
+          }]
+        })
+      });
+      
+      let message = '';
+      let status: 'success' | 'error' = 'success';
+      
+      if (response.ok) {
+        message = '✅ Debug Instagram executado com sucesso! Verifique os logs.';
+      } else {
+        message = `❌ Debug falhou com status: ${response.status}`;
+        status = 'error';
+      }
+      
+      const result = {
+        service: 'Instagram Debug',
+        status,
+        message,
+        details: { status: response.status, timestamp: new Date().toISOString() }
       };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Debug'), result]);
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Instagram Debug',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Debug'), errorResult]);
+    }
+  };
+
+  const testInstagramToken = async () => {
+    if (!settings.instagram_page_token) {
+      toast.error('Configure o token Instagram primeiro');
+      return;
+    }
+
+    const testResult: TestResult = {
+      service: 'Instagram Token',
+      status: 'testing',
+      message: 'Validando token Instagram...'
+  };
+
+  const testInstagramDebug = async () => {
+    const testResult: TestResult = {
+      service: 'Instagram Debug',
+      status: 'testing',
+      message: 'Testando debug Instagram...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Debug'), testResult]);
+    
+    try {
+      // Testar webhook com parâmetros específicos
+      const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/instagram-webhook', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Debug-Test': 'true'
+        },
+        body: JSON.stringify({
+          object: 'instagram',
+          entry: [{
+            id: '123456789',
+            time: Date.now(),
+            messaging: [{
+              sender: { id: 'test_user_123' },
+              recipient: { id: '230190170178019' },
+              timestamp: Date.now(),
+              message: { text: 'teste debug' }
+            }]
+          }]
+        })
+      });
+      
+      let message = '';
+      let status: 'success' | 'error' = 'success';
+      
+      if (response.ok) {
+        message = '✅ Debug Instagram executado com sucesso! Verifique os logs.';
+      } else {
+        message = `❌ Debug falhou com status: ${response.status}`;
+        status = 'error';
+      }
+      
+      const result = {
+        service: 'Instagram Debug',
+        status,
+        message,
+        details: { status: response.status, timestamp: new Date().toISOString() }
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Debug'), result]);
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Instagram Debug',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Debug'), errorResult]);
+    }
+  };
+
+  const testInstagramToken = async () => {
+    if (!settings.instagram_page_token) {
+      toast.error('Configure o token Instagram primeiro');
+      return;
+    }
+
+    const testResult: TestResult = {
+      service: 'Instagram Token',
+      status: 'testing',
+      message: 'Validando token Instagram...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Token'), testResult]);
+    
+    try {
+      // Testar token do Instagram via Graph API
+      const response = await fetch(`https://graph.instagram.com/me?access_token=${settings.instagram_page_token}`);
+      const data = await response.json();
+      
+      let message = '';
+      let status: 'success' | 'error' = 'success';
+      
+      if (response.ok && data.id) {
+        message = `✅ Token Instagram válido! ID: ${data.id}`;
+      } else {
+        message = `❌ Token Instagram inválido: ${data.error?.message || 'Erro desconhecido'}`;
+        status = 'error';
+      }
+      
+      const result = {
+        service: 'Instagram Token',
+        status,
+        message,
+        details: data
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Token'), result]);
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Instagram Token',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Token'), errorResult]);
+    }
+  };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Token'), testResult]);
+    
+    try {
+      // Testar token do Instagram via Graph API
+      const response = await fetch(`https://graph.instagram.com/me?access_token=${settings.instagram_page_token}`);
+      const data = await response.json();
+      
+      let message = '';
+      let status: 'success' | 'error' = 'success';
+      
+      if (response.ok && data.id) {
+        message = `✅ Token Instagram válido! ID: ${data.id}`;
+      } else {
+        message = `❌ Token Instagram inválido: ${data.error?.message || 'Erro desconhecido'}`;
+        status = 'error';
+      }
+      
+      const result = {
+        service: 'Instagram Token',
+        status,
+        message,
+        details: data
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Token'), result]);
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Instagram Token',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Instagram Token'), errorResult]);
+    }
+  };
       
       setTestResults(prev => [...prev.filter(r => r.service !== 'Webhook'), successResult]);
       
@@ -1279,6 +1505,27 @@ export default function AdminAgentIA() {
                   className="flex items-center gap-2"
                 >
                   🔍 Teste Completo
+                </Button>
+                <Button 
+                  onClick={testInstagram} 
+                  variant="outline"
+                  className="flex items-center gap-2 border-purple-500 text-purple-600 hover:bg-purple-50"
+                >
+                  📸 Testar Instagram
+                </Button>
+                <Button 
+                  onClick={testInstagram} 
+                  variant="outline"
+                  className="flex items-center gap-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                >
+                  🔑 Validar Token
+                </Button>
+                <Button 
+                  onClick={testInstagram} 
+                  variant="outline"
+                  className="flex items-center gap-2 border-red-500 text-red-600 hover:bg-red-50"
+                >
+                  🐛 Debug Completo
                 </Button>
               </div>
               
