@@ -330,8 +330,11 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
       console.error('❌ Erro OpenAI:', response.status, response.statusText);
-      throw new Error('Erro na resposta da IA');
+      console.error('❌ Erro OpenAI detalhado:', errorText);
+      console.error('🔑 Chave OpenAI usada (primeiros 10 chars):', openaiApiKey.substring(0, 10) + '...');
+      throw new Error(`Erro OpenAI ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
