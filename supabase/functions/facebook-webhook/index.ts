@@ -465,16 +465,91 @@ async function searchKnowledgeBase(message: string, supabase: any): Promise<any>
   return null;
 }
 
-// Função para buscar produtos relevantes
+// Função para buscar produtos relevantes com detalhes completos
 async function getRelevantProducts(message: string, supabase: any): Promise<any[]> {
-  const { data: products } = await supabase
-    .from('products')
-    .select('name, price, description')
-    .eq('active', true)
-    .or(`name.ilike.%${message}%,description.ilike.%${message}%`)
-    .limit(3);
+  console.log('🔍 Buscando produtos para:', message);
+  
+  // Palavras-chave para busca mais inteligente
+  const keywords = extractProductKeywords(message);
+  console.log('🏷️ Palavras-chave extraídas:', keywords);
+  
+  let products = [];
+  
+  // Busca por palavras-chave específicas primeiro
+  if (keywords.length > 0) {
+    for (const keyword of keywords) {
+      const { data: keywordProducts } = await supabase
+        .from('products')
+        .select('id, name, price, original_price, description, image_url, images, in_stock, stock_quantity')
+        .eq('active', true)
+        .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%`)
+        .limit(2);
+      
+      if (keywordProducts && keywordProducts.length > 0) {
+        products.push(...keywordProducts);
+      }
+    }
+  }
+  
+  // Se não encontrou nada com keywords, busca geral
+  if (products.length === 0) {
+    const { data: generalProducts } = await supabase
+      .from('products')
+      .select('id, name, price, original_price, description, image_url, images, in_stock, stock_quantity')
+      .eq('active', true)
+      .or(`name.ilike.%${message}%,description.ilike.%${message}%`)
+      .limit(3);
+    
+    products = generalProducts || [];
+  }
+  
+  // Remover duplicados e limitar a 3
+  const uniqueProducts = products
+    .filter((product, index, self) => 
+      self.findIndex(p => p.id === product.id) === index
+    )
+    .slice(0, 3);
+  
+  console.log('📦 Produtos encontrados:', uniqueProducts.length);
+  
+  return uniqueProducts;
+}
 
-  return products || [];
+// Função para extrair palavras-chave de produtos
+function extractProductKeywords(message: string): string[] {
+  const messageLower = message.toLowerCase();
+  const keywords: string[] = [];
+  
+  // Categorias de produtos
+  const productCategories = {
+    'mouse': ['mouse', 'rato'],
+    'teclado': ['teclado', 'keyboard'],
+    'cabo': ['cabo', 'carregador', 'adaptador', 'fio'],
+    'organizador': ['organizador', 'organizar', 'arrumação'],
+    'sem fio': ['sem fio', 'wireless', 'bluetooth'],
+    'usb': ['usb', 'pendrive', 'pen drive'],
+    'fone': ['fone', 'headphone', 'earphone', 'ouvido'],
+    'carregador': ['carregador', 'charger', 'fonte']
+  };
+  
+  // Verificar cada categoria
+  for (const [category, terms] of Object.entries(productCategories)) {
+    if (terms.some(term => messageLower.includes(term))) {
+      keywords.push(category);
+      // Adicionar também os termos específicos
+      terms.forEach(term => {
+        if (messageLower.includes(term)) {
+          keywords.push(term);
+        }
+      });
+    }
+  }
+  
+  // Extrair palavras individuais relevantes
+  const words = messageLower.split(' ').filter(word => word.length > 3);
+  keywords.push(...words);
+  
+  return [...new Set(keywords)]; // Remove duplicatas
 }
 
 // Função para construir prompt inteligente
@@ -501,22 +576,59 @@ CONTEXTO DO USUÁRIO:
   }
 
   if (products.length > 0) {
-    contextualInfo += `\n\nPRODUTOS RELEVANTES:
-${products.map(p => `- ${p.name}: R$ ${p.price}`).join('\n')}
+    contextualInfo += `\n\n📦 PRODUTOS ENCONTRADOS:
+${products.map(p => {
+  const price = (parseFloat(p.price) / 100).toFixed(2);
+  const originalPrice = p.original_price ? ` (era R$ ${(parseFloat(p.original_price) / 100).toFixed(2)})` : '';
+  const stock = p.in_stock ? `✅ Em estoque` : `❌ Indisponível`;
+  const stockQty = p.stock_quantity > 0 ? ` (${p.stock_quantity} unidades)` : '';
+  
+  return `
+🛍️ **${p.name}**
+💰 Preço: R$ ${price}${originalPrice}
+📋 ${p.description || 'Descrição não disponível'}
+📦 Status: ${stock}${stockQty}
+🖼️ Imagem: ${p.image_url || 'Sem imagem'}`;
+}).join('\n')}
 
-Site da loja: https://superloja.vip`;
+🌐 Site completo: https://superloja.vip
+
+IMPORTANTE: 
+- Sempre mencione o preço e disponibilidade
+- Se tiver imagem, mencione que pode mostrar
+- Seja específico sobre cada produto
+- Ofereça mais informações se necessário`;
   }
 
   return basePrompt + contextualInfo + `
 
-INSTRUÇÕES:
+INSTRUÇÕES PARA APRESENTAR PRODUTOS:
+1. Quando encontrar produtos relevantes, SEMPRE apresente de forma detalhada
+2. Mencione NOME, PREÇO, DISPONIBILIDADE e DESCRIÇÃO
+3. Use emojis para destacar informações importantes
+4. Se houver imagem, mencione que pode mostrar/enviar
+5. Compare preços se houver preço original
+6. Informe sobre estoque disponível
+7. Seja empolgante mas honesto sobre os produtos
+8. Ofereça ajuda adicional (especificações, dúvidas, etc.)
+
+EXEMPLO DE RESPOSTA PARA PRODUTOS:
+"Encontrei ótimas opções para você! 🛍️
+
+🖱️ **Mouse Sem-Fio** - R$ 75,00
+📦 Em estoque (5 unidades)
+Perfeito para trabalho e jogos!
+
+📸 Posso te mostrar as imagens! Quer mais detalhes sobre algum produto específico?"
+
+INSTRUÇÕES GERAIS:
 1. Responda de forma natural e conversacional
-2. Use as informações acima quando relevante
+2. Use as informações de produtos quando disponível
 3. Seja específico e útil
-4. Mantenha respostas entre 1-3 frases
-5. Encoraje mais perguntas quando apropriado
+4. Mantenha respostas entre 2-4 frases para produtos
+5. Encoraje mais perguntas
 6. NUNCA repita sempre a mesma resposta genérica
-7. Seja único em cada resposta`;
+7. Seja único e entusiasmado em cada resposta`;
 }
 
 // Função para obter histórico recente
