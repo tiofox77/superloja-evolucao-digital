@@ -74,6 +74,8 @@ export default function AdminAgentIA() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testMessage, setTestMessage] = useState('');
+  const [learningInsights, setLearningInsights] = useState<any[]>([]);
+  const [conversationPatterns, setConversationPatterns] = useState<any[]>([]);
   
   // Estados para formulários
   const [newKnowledge, setNewKnowledge] = useState({
@@ -762,6 +764,45 @@ export default function AdminAgentIA() {
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Carregar insights de aprendizado
+  const loadLearningInsights = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ai_learning_insights')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Erro ao carregar insights:', error);
+        return;
+      }
+
+      setLearningInsights(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar insights:', error);
+    }
+  };
+
+  // Carregar padrões de conversas
+  const loadConversationPatterns = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ai_conversation_patterns')
+        .select('*')
+        .order('priority', { ascending: false });
+
+      if (error) {
+        console.error('Erro ao carregar padrões:', error);
+        return;
+      }
+
+      setConversationPatterns(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar padrões:', error);
     }
   };
 

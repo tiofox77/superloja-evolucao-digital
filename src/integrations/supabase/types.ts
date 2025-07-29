@@ -14,6 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversation_context: {
+        Row: {
+          context_data: Json
+          conversation_summary: string | null
+          created_at: string
+          id: string
+          last_interaction: string
+          message_count: number
+          platform: string
+          updated_at: string
+          user_id: string
+          user_preferences: Json | null
+        }
+        Insert: {
+          context_data?: Json
+          conversation_summary?: string | null
+          created_at?: string
+          id?: string
+          last_interaction?: string
+          message_count?: number
+          platform?: string
+          updated_at?: string
+          user_id: string
+          user_preferences?: Json | null
+        }
+        Update: {
+          context_data?: Json
+          conversation_summary?: string | null
+          created_at?: string
+          id?: string
+          last_interaction?: string
+          message_count?: number
+          platform?: string
+          updated_at?: string
+          user_id?: string
+          user_preferences?: Json | null
+        }
+        Relationships: []
+      }
+      ai_conversation_patterns: {
+        Row: {
+          context_requirements: Json | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          pattern_name: string
+          priority: number | null
+          response_template: string
+          success_rate: number | null
+          trigger_keywords: string[] | null
+          updated_at: string
+          usage_count: number | null
+        }
+        Insert: {
+          context_requirements?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          pattern_name: string
+          priority?: number | null
+          response_template: string
+          success_rate?: number | null
+          trigger_keywords?: string[] | null
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Update: {
+          context_requirements?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          pattern_name?: string
+          priority?: number | null
+          response_template?: string
+          success_rate?: number | null
+          trigger_keywords?: string[] | null
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           id: string
@@ -77,6 +158,45 @@ export type Database = {
           priority?: number | null
           question?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_learning_insights: {
+        Row: {
+          confidence_score: number | null
+          content: string
+          created_at: string
+          effectiveness_score: number | null
+          id: string
+          insight_type: string
+          is_active: boolean | null
+          metadata: Json | null
+          updated_at: string
+          usage_count: number | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          content: string
+          created_at?: string
+          effectiveness_score?: number | null
+          id?: string
+          insight_type: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Update: {
+          confidence_score?: number | null
+          content?: string
+          created_at?: string
+          effectiveness_score?: number | null
+          id?: string
+          insight_type?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          updated_at?: string
+          usage_count?: number | null
         }
         Relationships: []
       }

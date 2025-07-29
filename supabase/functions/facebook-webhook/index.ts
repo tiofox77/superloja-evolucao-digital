@@ -253,88 +253,370 @@ async function handleMessage(messaging: any, supabase: any) {
   }
 }
 
-async function processWithAI(message: string, userId: string, supabase: any): Promise<string> {
-  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-  
-  if (!OPENAI_API_KEY) {
-    return `Olá! Sou o assistente da SuperLoja 🛒 
-
-Como posso ajudá-lo hoje? Temos produtos incríveis disponíveis! 
-
-Para ver nosso catálogo: https://superloja.vip`;
-  }
-  
-  // Buscar modelo preferido
-  const { data: modelSetting } = await supabase
-    .from('ai_settings')
-    .select('value')
-    .eq('key', 'preferred_model')
-    .single();
-  
-  const preferredModel = modelSetting?.value || 'gpt-4o-mini';
-  
-  // Buscar produtos relevantes
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .or(`name.ilike.%${message}%,description.ilike.%${message}%`)
-    .limit(5);
-  
-  const systemPrompt = `
-Você é o assistente IA da SuperLoja, uma loja online em Angola.
-
-INFORMAÇÕES DA EMPRESA:
-- Nome: SuperLoja  
-- Website: https://superloja.vip
-- Foco: Eletrônicos, gadgets, acessórios
-- Localização: Angola
-- Entrega: Todo o país
-
-SUA MISSÃO:
-1. Ajudar clientes a encontrar produtos
-2. Explicar como comprar no site
-3. Responder dúvidas sobre produtos
-4. Ser amigável e útil
-
-PRODUTOS DISPONÍVEIS:
-${products?.map(p => `${p.name} - ${p.price}AOA - ${p.description}`).join('\n') || 'Catálogo em atualização'}
-
-Responda em português de Angola, seja amigável. Máximo 160 caracteres.
-`;
+async function processWithAI(userMessage: string, senderId: string, supabase: any): Promise<string> {
+  console.log('🤖 === PROCESSAMENTO IA AVANÇADO ===');
+  console.log('👤 Usuário:', senderId);
+  console.log('💬 Mensagem:', userMessage);
   
   try {
+    // 1. BUSCAR OU CRIAR CONTEXTO DO USUÁRIO
+    let userContext = await getOrCreateUserContext(senderId, supabase);
+    console.log('📋 Contexto do usuário:', { 
+      messageCount: userContext.message_count,
+      hasPreferences: !!userContext.user_preferences 
+    });
+
+    // 2. VERIFICAR PADRÕES DE CONVERSAS PREDEFINIDOS
+    const patternResponse = await checkConversationPatterns(userMessage, userContext, supabase);
+    if (patternResponse) {
+      console.log('🎯 Resposta por padrão encontrada');
+      await updateUserContext(senderId, userMessage, patternResponse, supabase);
+      return patternResponse;
+    }
+
+    // 3. BUSCAR NA BASE DE CONHECIMENTO
+    const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
+    
+    // 4. BUSCAR PRODUTOS RELEVANTES
+    const relevantProducts = await getRelevantProducts(userMessage, supabase);
+
+    // 5. BUSCAR CONFIGURAÇÕES DE IA
+    const { data: aiSettings } = await supabase
+      .from('ai_settings')
+      .select('key, value')
+      .in('key', ['openai_api_key', 'preferred_model']);
+
+    const settingsMap = aiSettings?.reduce((acc: any, setting: any) => {
+      acc[setting.key] = setting.value;
+      return acc;
+    }, {}) || {};
+
+    const openaiApiKey = settingsMap.openai_api_key || Deno.env.get('OPENAI_API_KEY');
+    const model = settingsMap.preferred_model || 'gpt-4o-mini';
+
+    if (!openaiApiKey) {
+      console.error('❌ OpenAI API key não configurada');
+      return getFallbackResponse(userMessage, senderId, supabase);
+    }
+
+    // 6. CONSTRUIR PROMPT INTELIGENTE E CONTEXTUAL
+    const systemPrompt = buildIntelligentSystemPrompt(userContext, knowledgeResponse, relevantProducts);
+    const conversationHistory = await getRecentConversationHistory(senderId, supabase);
+
+    console.log('🧠 Chamando OpenAI com contexto avançado...');
+    console.log('📊 Histórico:', conversationHistory.length, 'mensagens');
+    console.log('🔍 Produtos relevantes:', relevantProducts.length);
+    console.log('📚 Base conhecimento:', knowledgeResponse ? 'encontrada' : 'não encontrada');
+
+    // 7. CHAMAR OPENAI COM CONTEXTO COMPLETO
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: preferredModel,
+        model: model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
+          ...conversationHistory,
+          { role: 'user', content: userMessage }
         ],
-        max_tokens: 150,
         temperature: 0.7,
+        max_tokens: 300,
+        presence_penalty: 0.3,
+        frequency_penalty: 0.2
       }),
     });
-    
-    const data = await response.json();
-    
-    if (response.ok && data.choices && data.choices[0]) {
-      return data.choices[0].message.content.trim();
-    } else {
+
+    if (!response.ok) {
+      console.error('❌ Erro OpenAI:', response.status, response.statusText);
       throw new Error('Erro na resposta da IA');
     }
-    
+
+    const data = await response.json();
+    let aiResponse = data.choices[0]?.message?.content?.trim();
+
+    if (!aiResponse) {
+      throw new Error('Resposta vazia da IA');
+    }
+
+    console.log('✅ Resposta IA gerada:', aiResponse.substring(0, 100) + '...');
+
+    // 8. ATUALIZAR CONTEXTO E APRENDER
+    await updateUserContext(senderId, userMessage, aiResponse, supabase);
+    await learnFromInteraction(userMessage, aiResponse, userContext, supabase);
+
+    return aiResponse;
+
   } catch (error) {
-    console.error('Erro na API OpenAI:', error);
-    return `Olá! Sou o assistente da SuperLoja 🛒 
+    console.error('❌ Erro no processamento IA:', error);
+    
+    // FALLBACK INTELIGENTE
+    const fallbackResponse = await getFallbackResponse(userMessage, senderId, supabase);
+    return fallbackResponse;
+  }
+}
 
-Como posso ajudá-lo hoje? Temos produtos incríveis disponíveis! 
+// Função para buscar ou criar contexto do usuário
+async function getOrCreateUserContext(userId: string, supabase: any): Promise<any> {
+  const { data: existingContext } = await supabase
+    .from('ai_conversation_context')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('platform', 'facebook')
+    .maybeSingle();
 
-Para ver nosso catálogo: https://superloja.vip`;
+  if (existingContext) {
+    return existingContext;
+  }
+
+  // Criar novo contexto
+  const { data: newContext } = await supabase
+    .from('ai_conversation_context')
+    .insert({
+      user_id: userId,
+      platform: 'facebook',
+      context_data: {},
+      message_count: 0,
+      user_preferences: {}
+    })
+    .select()
+    .maybeSingle();
+
+  return newContext || { user_id: userId, message_count: 0, context_data: {}, user_preferences: {} };
+}
+
+// Função para verificar padrões de conversas
+async function checkConversationPatterns(message: string, userContext: any, supabase: any): Promise<string | null> {
+  const { data: patterns } = await supabase
+    .from('ai_conversation_patterns')
+    .select('*')
+    .eq('is_active', true)
+    .order('priority', { ascending: false });
+
+  if (!patterns) return null;
+
+  const messageLower = message.toLowerCase();
+  
+  for (const pattern of patterns) {
+    const hasMatchingKeyword = pattern.trigger_keywords.some((keyword: string) => 
+      messageLower.includes(keyword.toLowerCase())
+    );
+
+    if (hasMatchingKeyword) {
+      // Atualizar estatísticas do padrão
+      await supabase
+        .from('ai_conversation_patterns')
+        .update({ 
+          usage_count: pattern.usage_count + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', pattern.id);
+
+      return personalizeResponse(pattern.response_template, userContext);
+    }
+  }
+
+  return null;
+}
+
+// Função para personalizar resposta baseada no contexto
+function personalizeResponse(template: string, userContext: any): string {
+  let response = template;
+  
+  // Personalização baseada no histórico
+  if (userContext.message_count > 5) {
+    response = response.replace('😊', '😊✨');
+  }
+  
+  if (userContext.message_count === 0) {
+    response = `Seja bem-vindo(a)! ${response}`;
+  }
+
+  return response;
+}
+
+// Função para buscar na base de conhecimento
+async function searchKnowledgeBase(message: string, supabase: any): Promise<any> {
+  const { data: knowledge } = await supabase
+    .from('ai_knowledge_base')
+    .select('*')
+    .eq('active', true)
+    .order('priority', { ascending: false });
+
+  if (!knowledge) return null;
+
+  const messageLower = message.toLowerCase();
+  
+  for (const item of knowledge) {
+    const hasMatchingKeyword = item.keywords.some((keyword: string) => 
+      messageLower.includes(keyword.toLowerCase())
+    );
+
+    if (hasMatchingKeyword || messageLower.includes(item.question.toLowerCase())) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
+// Função para buscar produtos relevantes
+async function getRelevantProducts(message: string, supabase: any): Promise<any[]> {
+  const { data: products } = await supabase
+    .from('products')
+    .select('name, price, description')
+    .eq('active', true)
+    .or(`name.ilike.%${message}%,description.ilike.%${message}%`)
+    .limit(3);
+
+  return products || [];
+}
+
+// Função para construir prompt inteligente
+function buildIntelligentSystemPrompt(userContext: any, knowledgeResponse: any, products: any[]): string {
+  const basePrompt = `Você é Alex, o assistente virtual da SuperLoja, uma loja de tecnologia moderna. 
+
+PERSONALIDADE:
+- Seja natural, amigável e empático
+- Use emojis moderadamente (1-2 por resposta)
+- Responda de forma conversacional, não robótica
+- Seja proativo em oferecer ajuda
+- Lembre-se do contexto da conversa
+
+CONTEXTO DO USUÁRIO:
+- Mensagens anteriores: ${userContext.message_count}
+- É cliente ${userContext.message_count > 3 ? 'frequente' : 'novo'}`;
+
+  let contextualInfo = '';
+
+  if (knowledgeResponse) {
+    contextualInfo += `\n\nINFORMAÇÃO RELEVANTE:
+- Pergunta: ${knowledgeResponse.question}
+- Resposta: ${knowledgeResponse.answer}`;
+  }
+
+  if (products.length > 0) {
+    contextualInfo += `\n\nPRODUTOS RELEVANTES:
+${products.map(p => `- ${p.name}: R$ ${p.price}`).join('\n')}
+
+Site da loja: https://superloja.vip`;
+  }
+
+  return basePrompt + contextualInfo + `
+
+INSTRUÇÕES:
+1. Responda de forma natural e conversacional
+2. Use as informações acima quando relevante
+3. Seja específico e útil
+4. Mantenha respostas entre 1-3 frases
+5. Encoraje mais perguntas quando apropriado
+6. NUNCA repita sempre a mesma resposta genérica
+7. Seja único em cada resposta`;
+}
+
+// Função para obter histórico recente
+async function getRecentConversationHistory(userId: string, supabase: any): Promise<any[]> {
+  const { data: conversations } = await supabase
+    .from('ai_conversations')
+    .select('message, type')
+    .eq('user_id', userId)
+    .eq('platform', 'facebook')
+    .order('timestamp', { ascending: false })
+    .limit(6);
+
+  if (!conversations) return [];
+
+  return conversations
+    .reverse()
+    .map((conv: any) => ({
+      role: conv.type === 'received' ? 'user' : 'assistant',
+      content: conv.message
+    }));
+}
+
+// Função para atualizar contexto do usuário
+async function updateUserContext(userId: string, userMessage: string, aiResponse: string, supabase: any): Promise<void> {
+  try {
+    await supabase
+      .from('ai_conversation_context')
+      .upsert({
+        user_id: userId,
+        platform: 'facebook',
+        message_count: supabase.raw('COALESCE(message_count, 0) + 1'),
+        last_interaction: new Date().toISOString(),
+        conversation_summary: `Última pergunta: ${userMessage.substring(0, 100)}...`,
+        updated_at: new Date().toISOString()
+      });
+  } catch (error) {
+    console.log('⚠️ Erro ao atualizar contexto:', error);
+  }
+}
+
+// Função para aprendizado automático
+async function learnFromInteraction(userMessage: string, aiResponse: string, userContext: any, supabase: any): Promise<void> {
+  try {
+    // Detectar padrões frequentes
+    const messageLower = userMessage.toLowerCase();
+    
+    // Aprender palavras-chave frequentes
+    if (messageLower.includes('preço') || messageLower.includes('valor') || messageLower.includes('custa')) {
+      await recordLearningInsight(
+        'frequent_question',
+        'Usuário pergunta sobre preços frequentemente',
+        { keyword: 'preço', context: userMessage.substring(0, 50) },
+        supabase
+      );
+    }
+
+    // Detectar satisfação através de palavras positivas
+    if (messageLower.includes('obrigado') || messageLower.includes('valeu') || messageLower.includes('perfeito')) {
+      await recordLearningInsight(
+        'positive_feedback',
+        'Resposta bem recebida pelo usuário',
+        { response: aiResponse.substring(0, 100), userReaction: userMessage },
+        supabase
+      );
+    }
+  } catch (error) {
+    console.log('⚠️ Erro no aprendizado:', error);
+  }
+}
+
+// Função para registrar insights de aprendizado
+async function recordLearningInsight(type: string, content: string, metadata: any, supabase: any): Promise<void> {
+  try {
+    await supabase
+      .from('ai_learning_insights')
+      .insert({
+        insight_type: type,
+        content: content,
+        metadata: metadata,
+        usage_count: 1
+      });
+  } catch (error) {
+    console.log('⚠️ Erro ao salvar insight:', error);
+  }
+}
+
+// Função para resposta de fallback inteligente
+async function getFallbackResponse(userMessage: string, userId: string, supabase: any): Promise<string> {
+  const fallbacks = [
+    'Desculpe, não entendi completamente. Pode reformular sua pergunta? 🤔',
+    'Hmm, deixe-me pensar... Pode me dar mais detalhes? 💭',
+    'Não tenho certeza sobre isso, mas posso te ajudar de outra forma! 😊',
+    'Ops! Parece que preciso de mais informações. Me conta melhor! 🙂',
+    'Que interessante! Me explica um pouco mais sobre isso? 🤗',
+    'Não captei direito, mas estou aqui para ajudar! Reformula pra mim? 😄'
+  ];
+
+  try {
+    const userContext = await getOrCreateUserContext(userId, supabase);
+    const randomIndex = userContext.message_count % fallbacks.length;
+    return fallbacks[randomIndex];
+  } catch {
+    return fallbacks[0];
   }
 }
 
