@@ -8,15 +8,29 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Log inicial para verificar se a função está sendo chamada
+  // LOGS DETALHADOS PARA DEBUG FACEBOOK
   console.log('🚀 === WEBHOOK CHAMADO ===');
+  console.log('Timestamp:', new Date().toISOString());
   console.log('Método:', req.method);
-  console.log('URL:', req.url);
-  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  console.log('URL completa:', req.url);
+  
+  // CAPTURAR TODOS OS HEADERS (especialmente do Facebook)
+  console.log('📋 === TODOS OS HEADERS ===');
+  const headers = Object.fromEntries(req.headers.entries());
+  console.log('Headers completos:', JSON.stringify(headers, null, 2));
+  
+  // HEADERS ESPECÍFICOS DO FACEBOOK
+  console.log('🔍 === HEADERS FACEBOOK ESPECÍFICOS ===');
+  console.log('X-Hub-Signature-256:', req.headers.get('X-Hub-Signature-256'));
+  console.log('X-Hub-Signature:', req.headers.get('X-Hub-Signature'));
+  console.log('X-Forwarded-For:', req.headers.get('X-Forwarded-For'));
+  console.log('User-Agent:', req.headers.get('User-Agent'));
+  console.log('Content-Type:', req.headers.get('Content-Type'));
+  console.log('Content-Length:', req.headers.get('Content-Length'));
   
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('⚡ Processando request OPTIONS');
+    console.log('⚡ Processando request OPTIONS (CORS preflight)');
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -75,37 +89,100 @@ serve(async (req) => {
 
     // Handle incoming messages (POST request)
     if (req.method === 'POST') {
-      console.log('📨 Recebendo mensagem via POST');
-      const body = await req.text();
-      console.log('Body recebido:', body);
+      console.log('📨 === PROCESSANDO POST REQUEST ===');
       
+      // CAPTURAR CORPO DA REQUISIÇÃO
+      const body = await req.text();
+      console.log('📦 Body tamanho:', body.length, 'bytes');
+      console.log('📦 Body conteúdo RAW:', body);
+      
+      // VERIFICAR SE É JSON VÁLIDO
+      let data;
       try {
-        const data = JSON.parse(body);
-        console.log('Dados parseados:', JSON.stringify(data, null, 2));
+        data = JSON.parse(body);
+        console.log('✅ JSON válido');
+        console.log('📊 Dados parseados (estrutura completa):');
+        console.log(JSON.stringify(data, null, 2));
         
-        if (data.entry && data.entry.length > 0) {
-          for (const entry of data.entry) {
-            if (entry.messaging && entry.messaging.length > 0) {
-              for (const messaging of entry.messaging) {
-                if (messaging.message && messaging.message.text) {
-                  await handleMessage(messaging, supabase);
-                }
-              }
-            }
-          }
+        // ANÁLISE DETALHADA DA ESTRUTURA
+        console.log('🔍 === ANÁLISE DA ESTRUTURA ===');
+        console.log('Tipo do objeto:', typeof data);
+        console.log('Propriedades do objeto:', Object.keys(data));
+        
+        if (data.object) {
+          console.log('Object type:', data.object);
         }
         
-        return new Response('OK', { 
-          status: 200,
-          headers: corsHeaders
-        });
+        if (data.entry) {
+          console.log('Entry array length:', data.entry.length);
+          data.entry.forEach((entry, index) => {
+            console.log(`Entry ${index}:`, Object.keys(entry));
+            if (entry.messaging) {
+              console.log(`Entry ${index} messaging length:`, entry.messaging.length);
+              entry.messaging.forEach((msg, msgIndex) => {
+                console.log(`Messaging ${msgIndex}:`, Object.keys(msg));
+                if (msg.message) {
+                  console.log(`Message fields:`, Object.keys(msg.message));
+                }
+                if (msg.postback) {
+                  console.log(`Postback fields:`, Object.keys(msg.postback));
+                }
+              });
+            }
+          });
+        }
+        
       } catch (parseError) {
-        console.error('Erro ao fazer parse do JSON:', parseError);
+        console.error('❌ ERRO JSON PARSE:', parseError);
+        console.log('💡 Tentando processar como text/plain...');
+        
+        // Se não é JSON, pode ser outro formato
         return new Response('OK', { 
           status: 200,
           headers: corsHeaders
         });
       }
+      
+      // PROCESSAR MENSAGENS
+      console.log('🚀 === INICIANDO PROCESSAMENTO ===');
+      
+      if (data.entry && data.entry.length > 0) {
+        for (const entry of data.entry) {
+          console.log('📋 Processando entry:', entry.id);
+          
+          if (entry.messaging && entry.messaging.length > 0) {
+            for (const messaging of entry.messaging) {
+              console.log('💬 Processando messaging:', Object.keys(messaging));
+              
+              // MENSAGEM DE TEXTO
+              if (messaging.message && messaging.message.text) {
+                console.log('📝 Mensagem de texto encontrada');
+                await handleMessage(messaging, supabase);
+              }
+              
+              // POSTBACK (botões)
+              else if (messaging.postback) {
+                console.log('🔘 Postback encontrado:', messaging.postback);
+              }
+              
+              // OUTROS TIPOS
+              else {
+                console.log('❓ Tipo de messaging não reconhecido:', messaging);
+              }
+            }
+          } else {
+            console.log('⚠️ Entry sem messaging ou messaging vazio');
+          }
+        }
+      } else {
+        console.log('⚠️ Dados sem entry ou entry vazio');
+      }
+      
+      console.log('✅ === PROCESSAMENTO COMPLETO ===');
+      return new Response('OK', { 
+        status: 200,
+        headers: corsHeaders
+      });
     }
     
     return new Response('Method not allowed', { 
