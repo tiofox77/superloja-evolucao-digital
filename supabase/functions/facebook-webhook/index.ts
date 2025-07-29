@@ -234,7 +234,7 @@ async function handleMessage(messaging: any, supabase: any) {
     console.log(`🤖 Resposta IA: ${aiResponse}`);
     
     // Enviar resposta
-    await sendFacebookMessage(senderId, aiResponse);
+    await sendFacebookMessage(senderId, aiResponse, supabase);
     
     // Salvar resposta enviada
     await supabase.from('ai_conversations').insert({
@@ -249,7 +249,7 @@ async function handleMessage(messaging: any, supabase: any) {
     
   } catch (error) {
     console.error('❌ Erro ao processar mensagem:', error);
-    await sendFacebookMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente!');
+    await sendFacebookMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente!', supabase);
   }
 }
 
@@ -338,11 +338,33 @@ Para ver nosso catálogo: https://superloja.vip`;
   }
 }
 
-async function sendFacebookMessage(recipientId: string, message: string) {
-  const PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+async function sendFacebookMessage(recipientId: string, message: string, supabase: any) {
+  // Primeiro tenta buscar token das configurações Meta
+  let PAGE_ACCESS_TOKEN = null;
+  
+  try {
+    const { data: metaSettings } = await supabase
+      .from('meta_settings')
+      .select('access_token')
+      .limit(1)
+      .maybeSingle();
+    
+    if (metaSettings?.access_token) {
+      PAGE_ACCESS_TOKEN = metaSettings.access_token;
+      console.log('✅ Usando token das configurações Meta');
+    }
+  } catch (error) {
+    console.log('⚠️ Erro ao buscar token Meta, tentando fallback');
+  }
+  
+  // Fallback para o token das secrets se não encontrar nas configurações Meta
+  if (!PAGE_ACCESS_TOKEN) {
+    PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+    console.log('⚠️ Usando token das secrets como fallback');
+  }
   
   if (!PAGE_ACCESS_TOKEN) {
-    console.error('❌ FACEBOOK_PAGE_ACCESS_TOKEN não configurado');
+    console.error('❌ Nenhum token Facebook encontrado');
     return;
   }
   
