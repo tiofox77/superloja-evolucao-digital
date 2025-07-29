@@ -77,44 +77,40 @@ const SaudeBemEstar = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Buscar categoria principal
-        const { data: mainCategory, error: mainError } = await supabase
+        // IDs específicos das categorias de Saúde e Bem Estar
+        const mainCategoryId = 'ba6f3316-9070-4a78-b309-faafac8d4b79'; // Saúde e Bem Estar
+        const subcategoryIds = [
+          'b93367f1-4246-438e-be7d-ce756f67c040', // Higiene Pessoal
+          '17eb9e09-b023-4b7d-a70c-e4a6252e4aff'  // Cuidados com o Corpo
+        ];
+        
+        const allCategoryIds = [mainCategoryId, ...subcategoryIds];
+        console.log('Using category IDs:', allCategoryIds);
+
+        // Buscar categoria principal e subcategorias
+        const { data: allCategoriesData } = await supabase
           .from('categories')
           .select('*')
-          .eq('slug', 'saude-bem-estar')
-          .single();
+          .in('id', allCategoryIds);
 
-        if (mainError) throw mainError;
-
-        // Buscar subcategorias
-        const { data: subcategories, error: subError } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('parent_id', mainCategory.id);
-
-        if (subError) throw subError;
-
-        // Coletar todos os IDs de categorias (principal + subcategorias)
-        const allCategoryIds = [mainCategory.id];
-        if (subcategories && subcategories.length > 0) {
-          allCategoryIds.push(...subcategories.map(cat => cat.id));
-        }
+        console.log('Categories loaded:', allCategoriesData);
 
         // Buscar produtos que estão em qualquer uma dessas categorias
         // Inclui produtos com category_id OU subcategory_id nas categorias relacionadas
+        console.log('Searching for category IDs:', allCategoryIds);
+        
         const { data: productsData, error: productsError } = await supabase
           .from('products')
           .select('*')
           .or(`category_id.in.(${allCategoryIds.join(',')}),subcategory_id.in.(${allCategoryIds.join(',')})`)
           .eq('active', true);
 
-        if (productsError) throw productsError;
-
-        // Buscar informações das categorias separadamente
-        const { data: allCategoriesData } = await supabase
-          .from('categories')
-          .select('id, name, slug')
-          .in('id', allCategoryIds);
+        if (productsError) {
+          console.error('Products error:', productsError);
+          throw productsError;
+        }
+        
+        console.log('Products found:', productsData?.length || 0);
 
         const categoriesMap = new Map(allCategoriesData?.map(cat => [cat.id, cat]) || []);
 
@@ -132,9 +128,12 @@ const SaudeBemEstar = () => {
         setProducts(formattedProducts);
         setFilteredProducts(formattedProducts);
 
+        // Usar as subcategorias carregadas anteriormente para contagem
+        const subcategoriesData = allCategoriesData?.filter(cat => cat.id !== mainCategoryId) || [];
+        
         // Contar produtos para cada subcategoria
         const categoriesWithCount = await Promise.all(
-          (subcategories || []).map(async (category) => {
+          subcategoriesData.map(async (category) => {
             const { count } = await supabase
               .from('products')
               .select('*', { count: 'exact', head: true })
