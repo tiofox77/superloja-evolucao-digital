@@ -105,6 +105,7 @@ export default function AdminAgentIA() {
 
   useEffect(() => {
     loadDashboardData();
+    loadLearningData();
   }, []);
 
   const loadDashboardData = async () => {
@@ -121,6 +122,41 @@ export default function AdminAgentIA() {
       toast.error('Erro ao carregar dados do dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadLearningData = async () => {
+    try {
+      // Carregar insights de aprendizado
+      const { data: insights, error: insightsError } = await supabase
+        .from('ai_learning_insights')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (insightsError) {
+        console.error('Erro ao carregar insights:', insightsError);
+      } else {
+        setLearningInsights(insights || []);
+      }
+
+      // Carregar padrões de conversa
+      const { data: patterns, error: patternsError } = await supabase
+        .from('ai_conversation_patterns')
+        .select('*')
+        .eq('is_active', true)
+        .order('success_rate', { ascending: false })
+        .limit(15);
+
+      if (patternsError) {
+        console.error('Erro ao carregar padrões:', patternsError);
+      } else {
+        setConversationPatterns(patterns || []);
+      }
+
+    } catch (error) {
+      console.error('Erro ao carregar dados de aprendizado:', error);
     }
   };
 
@@ -2037,6 +2073,156 @@ export default function AdminAgentIA() {
                     '💾 Salvar Configurações'
                   )}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Aba de Aprendizado */}
+        <TabsContent value="learning" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Insights de Aprendizado */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Insights de Aprendizado
+                </CardTitle>
+                <CardDescription>
+                  Conhecimento que o agente adquiriu através das conversas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {learningInsights.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      Nenhum insight de aprendizado ainda
+                    </p>
+                  ) : (
+                    learningInsights.map((insight, index) => (
+                      <div key={insight.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline">{insight.insight_type}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(insight.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm">{insight.content}</p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>Confiança: {(insight.confidence_score * 100).toFixed(0)}%</span>
+                          <span>Efetividade: {(insight.effectiveness_score * 100).toFixed(0)}%</span>
+                          <span>Usado {insight.usage_count}x</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Padrões de Conversa */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  Padrões de Conversa
+                </CardTitle>
+                <CardDescription>
+                  Padrões de resposta que o agente aprendeu a usar
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {conversationPatterns.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      Nenhum padrão de conversa ainda
+                    </p>
+                  ) : (
+                    conversationPatterns.map((pattern, index) => (
+                      <div key={pattern.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">{pattern.pattern_name}</h4>
+                          <Badge variant={pattern.is_active ? 'default' : 'secondary'}>
+                            {pattern.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{pattern.response_template}</p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>Prioridade: {pattern.priority}</span>
+                          <span>Taxa de sucesso: {(pattern.success_rate * 100).toFixed(0)}%</span>
+                          <span>Usado {pattern.usage_count}x</span>
+                        </div>
+                        {pattern.trigger_keywords && pattern.trigger_keywords.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {pattern.trigger_keywords.map((keyword, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {keyword}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="mt-4 pt-4 border-t">
+                  <Button 
+                    onClick={loadLearningData}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Atualizar Dados de Aprendizado
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Estatísticas de Aprendizado */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Estatísticas de Aprendizado</CardTitle>
+              <CardDescription>
+                Resumo do conhecimento acumulado pelo agente
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {learningInsights.length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Insights Totais
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {conversationPatterns.length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Padrões Aprendidos
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {learningInsights.reduce((acc, insight) => acc + insight.usage_count, 0)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Aplicações do Conhecimento
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">
+                    {learningInsights.length > 0 
+                      ? ((learningInsights.reduce((acc, insight) => acc + insight.effectiveness_score, 0) / learningInsights.length) * 100).toFixed(0)
+                      : 0}%
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Efetividade Média
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

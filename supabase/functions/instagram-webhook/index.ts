@@ -80,11 +80,15 @@ serve(async (req) => {
     // Handle incoming Instagram messages (POST request)
     if (req.method === 'POST') {
       console.log('📨 === PROCESSANDO INSTAGRAM POST REQUEST ===');
+      console.log('🕒 Timestamp completo:', new Date().toISOString());
+      console.log('🌐 User-Agent:', req.headers.get('user-agent') || 'N/A');
+      console.log('📍 Origin IP:', req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'N/A');
       
       // Capturar corpo da requisição
       const body = await req.text();
       console.log('📦 Body tamanho:', body.length, 'bytes');
       console.log('📦 Body conteúdo RAW:', body);
+      console.log('📋 Headers Instagram completos:', JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2));
       
       // Verificar se é JSON válido
       let data;
@@ -147,7 +151,24 @@ serve(async (req) => {
               }
               // Outros tipos de messaging podem ser adicionados aqui
               else {
-                console.log('❓ Tipo de messaging Instagram não reconhecido:', messaging);
+                console.log('❓ Tipo de messaging Instagram não reconhecido:', {
+                  sender: messaging.sender,
+                  recipient: messaging.recipient,
+                  timestamp: messaging.timestamp,
+                  keys: Object.keys(messaging),
+                  full_object: JSON.stringify(messaging, null, 2)
+                });
+                
+                // Log específico para diferentes tipos
+                if (messaging.read) {
+                  console.log('📖 Mensagem de confirmação de leitura - ignorando');
+                } else if (messaging.delivery) {
+                  console.log('📮 Confirmação de entrega - ignorando');
+                } else if (messaging.postback) {
+                  console.log('🔘 Postback recebido - pode ser implementado futuramente');
+                } else {
+                  console.log('🚨 Tipo de evento Instagram completamente desconhecido');
+                }
               }
             }
           } else {
@@ -244,6 +265,15 @@ async function handleInstagramMessage(messaging: any, supabase: any) {
     
   } catch (error) {
     console.error('❌ Erro ao processar mensagem Instagram:', error);
+    console.error('💥 Stack trace completo:', error.stack);
+    console.error('📊 Detalhes do erro:', {
+      name: error.name,
+      message: error.message,
+      senderId,
+      messageText,
+      timestamp: new Date().toISOString()
+    });
+    
     await sendInstagramMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente!', supabase);
   }
 }
@@ -487,6 +517,15 @@ ${products.length === 1
   ? `🔗 Ver produto: https://superloja.vip/produto/${products[0].slug || products[0].id}`
   : `🛒 Ver catálogo completo: https://superloja.vip/produtos`
 }`;
+  } else {
+    contextualInfo += `\n\n❌ PRODUTO NÃO ENCONTRADO:
+O produto solicitado não está disponível no momento.
+
+📱 SUGESTÃO IMPORTANTE:
+Recomende ao cliente acessar nosso catálogo completo no site:
+🌐 https://superloja.vip/produtos
+
+Lá encontrará todos os nossos produtos disponíveis com preços atualizados e opções de entrega!`;
   }
 
   return basePrompt + contextualInfo + `
@@ -643,12 +682,21 @@ async function sendInstagramMessage(recipientId: string, message: string, supaba
     if (response.ok) {
       console.log('✅ Mensagem Instagram enviada com sucesso!');
       console.log('📨 Message ID:', result.message_id);
+      console.log('📊 Dados de resposta Instagram:', JSON.stringify(result, null, 2));
     } else {
-      console.error('❌ Erro Instagram API:', result);
+      console.error('❌ Erro Instagram API (detalhado):', result);
+      console.error('📊 Status da resposta:', response?.status);
+      console.error('📋 Headers da resposta:', response?.headers);
+      console.error('🔧 Debugging Instagram Send:');
+      console.error('- Recipient ID usado:', recipientId);
+      console.error('- Token usado:', pageToken ? `${pageToken.substring(0, 20)}...` : 'NENHUM');
+      console.error('- URL da API:', `https://graph.instagram.com/v18.0/me/messages`);
     }
     
   } catch (error) {
-    console.error('❌ Erro de rede ao enviar mensagem Instagram:', error);
+    console.error('❌ ERRO COMPLETO ao enviar mensagem Instagram:', error);
+    console.error('📝 Mensagem que falhou:', message);
+    console.error('👤 Recipient que falhou:', recipientId);
   }
 }
 
