@@ -14,6 +14,135 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          id: string
+          message: string
+          metadata: Json | null
+          platform: string
+          timestamp: string | null
+          type: string
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          message: string
+          metadata?: Json | null
+          platform: string
+          timestamp?: string | null
+          type: string
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          message?: string
+          metadata?: Json | null
+          platform?: string
+          timestamp?: string | null
+          type?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      ai_knowledge_base: {
+        Row: {
+          active: boolean | null
+          answer: string
+          category: string
+          created_at: string | null
+          id: string
+          keywords: string[] | null
+          priority: number | null
+          question: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          answer: string
+          category: string
+          created_at?: string | null
+          id?: string
+          keywords?: string[] | null
+          priority?: number | null
+          question: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          answer?: string
+          category?: string
+          created_at?: string | null
+          id?: string
+          keywords?: string[] | null
+          priority?: number | null
+          question?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_metrics: {
+        Row: {
+          average_response_time: number | null
+          created_at: string | null
+          date: string
+          failed_responses: number | null
+          id: string
+          platform_breakdown: Json | null
+          successful_responses: number | null
+          total_messages: number | null
+          updated_at: string | null
+          user_satisfaction_score: number | null
+        }
+        Insert: {
+          average_response_time?: number | null
+          created_at?: string | null
+          date: string
+          failed_responses?: number | null
+          id?: string
+          platform_breakdown?: Json | null
+          successful_responses?: number | null
+          total_messages?: number | null
+          updated_at?: string | null
+          user_satisfaction_score?: number | null
+        }
+        Update: {
+          average_response_time?: number | null
+          created_at?: string | null
+          date?: string
+          failed_responses?: number | null
+          id?: string
+          platform_breakdown?: Json | null
+          successful_responses?: number | null
+          total_messages?: number | null
+          updated_at?: string | null
+          user_satisfaction_score?: number | null
+        }
+        Relationships: []
+      }
+      ai_settings: {
+        Row: {
+          description: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          value: string | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          value?: string | null
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: string | null
+        }
+        Relationships: []
+      }
       analytics_events: {
         Row: {
           event_data: Json | null
