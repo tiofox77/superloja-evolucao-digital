@@ -820,7 +820,25 @@ async function sendInstagramImage(recipientId: string, imageUrl: string, caption
               }
             }
           }
-        }),
+        });
+      }
+    );
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log('✅ Imagem Instagram enviada com sucesso!');
+      console.log('📨 Message ID:', result.message_id);
+      await sendInstagramMessage(recipientId, caption, supabase);
+    } else {
+      console.error('❌ Erro ao enviar imagem Instagram:', result);
+      await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Imagem: ${imageUrl}`, supabase);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro de rede ao enviar imagem Instagram:', error);
+    await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
+  }
 }
 
 // Função para analisar o contexto da conversa
@@ -921,27 +939,6 @@ function buildContextualPrompt(analysis: any, history: any[]): string {
   }
   
   return contextPrompt;
-}
-    );
-    
-    const result = await response.json();
-    
-    if (response.ok) {
-      console.log('✅ Imagem Instagram enviada com sucesso!');
-      
-      // Enviar legenda separadamente
-      if (caption && caption.trim()) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        await sendInstagramMessage(recipientId, caption, supabase);
-      }
-    } else {
-      console.error('❌ Erro ao enviar imagem Instagram:', result);
-      await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Imagem: ${imageUrl}`, supabase);
-    }
-    
-  } catch (error) {
-    console.error('❌ Erro de rede ao enviar imagem Instagram:', error);
-    await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
 }
 
 // Função para verificar se precisa escalar para humano
@@ -1100,5 +1097,4 @@ async function notifyAdminForEscalation(userId: string, userMessage: string, rea
   } catch (error) {
     console.error('❌ Erro completo na notificação do admin:', error);
   }
-}
 }
