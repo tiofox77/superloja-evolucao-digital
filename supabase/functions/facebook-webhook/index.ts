@@ -43,13 +43,24 @@ serve(async (req) => {
       
       const VERIFY_TOKEN = Deno.env.get('FACEBOOK_VERIFY_TOKEN') || 'minha_superloja_webhook_token_2024';
       
-      console.log(`🔍 Verificação webhook: mode=${mode}, token=${token}, VERIFY_TOKEN=${VERIFY_TOKEN}`);
+      console.log(`🔍 Verificação webhook:`);
+      console.log(`  Mode: ${mode}`);
+      console.log(`  Token recebido: ${token}`);
+      console.log(`  Token esperado: ${VERIFY_TOKEN}`);
+      console.log(`  Challenge: ${challenge}`);
       
       if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        console.log('Facebook webhook verified');
-        return new Response(challenge, { status: 200 });
+        console.log('✅ Facebook webhook verified successfully');
+        return new Response(challenge, { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+        });
       } else {
-        return new Response('Verification failed', { status: 403 });
+        console.log('❌ Verification failed - token mismatch');
+        return new Response('Verification failed', { 
+          status: 403,
+          headers: corsHeaders
+        });
       }
     }
 
