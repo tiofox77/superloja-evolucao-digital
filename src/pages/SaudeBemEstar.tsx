@@ -94,8 +94,11 @@ const SaudeBemEstar = () => {
 
         if (subError) throw subError;
 
-        // Buscar produtos das subcategorias
+        // Buscar produtos das subcategorias E da categoria principal
         const categoryIds = subcategories?.map(cat => cat.id) || [];
+        // Adicionar também a categoria principal
+        categoryIds.push(mainCategory.id);
+        
         if (categoryIds.length > 0) {
           const { data: productsData, error: productsError } = await supabase
             .from('products')
