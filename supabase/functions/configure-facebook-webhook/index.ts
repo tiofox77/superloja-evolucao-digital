@@ -43,28 +43,49 @@ serve(async (req) => {
     
     console.log('🔗 Subscrições atuais:', subscriptions);
 
-    // 4. Subscrever a página aos webhooks se não estiver
+    // 4. Subscrever a página aos webhooks para nossa aplicação
     let subscriptionResult = null;
     
-    if (subscriptions.data && subscriptions.data.length === 0) {
-      console.log('📝 Subscrevendo página aos webhooks...');
+    console.log('📝 Adicionando subscrição de mensagens...');
+    
+    const subscribeResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${page_id}/subscribed_apps`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_token: page_token,
+          subscribed_fields: 'messages,messaging_postbacks,messaging_optins,message_deliveries,message_reads'
+        })
+      }
+    );
+    
+    subscriptionResult = await subscribeResponse.json();
+    console.log('✅ Resultado da subscrição:', subscriptionResult);
+    
+    // Verificar se deu erro e tentar configuração alternativa
+    if (subscriptionResult.error) {
+      console.log('⚠️ Erro na subscrição, tentando método alternativo...');
       
-      const subscribeResponse = await fetch(
-        `https://graph.facebook.com/v18.0/${page_id}/subscribed_apps`,
+      // Tentar configurar via app settings
+      const appSubscribeResponse = await fetch(
+        `https://graph.facebook.com/v18.0/me/subscriptions`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             access_token: page_token,
-            subscribed_fields: 'messages,messaging_postbacks,messaging_optins,message_deliveries,message_reads'
+            object: 'page',
+            callback_url: 'https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook',
+            verify_token: 'minha_superloja_webhook_token_2024',
+            fields: 'messages,messaging_postbacks'
           })
         }
       );
       
-      subscriptionResult = await subscribeResponse.json();
-      console.log('✅ Resultado da subscrição:', subscriptionResult);
-    } else {
-      console.log('✅ Página já subscrita aos webhooks');
+      const appSubscribeResult = await appSubscribeResponse.json();
+      console.log('🔄 Resultado subscrição alternativa:', appSubscribeResult);
+      subscriptionResult = appSubscribeResult;
     }
 
     // 5. Verificar webhook settings novamente
