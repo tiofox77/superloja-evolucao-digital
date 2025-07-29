@@ -38,11 +38,12 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Token não encontrado nas configurações Meta'
+          error: 'Token não encontrado nas configurações Meta. Configure primeiro o token Facebook na página de Meta Settings.',
+          help: 'Vá para a página Meta/Facebook Settings e configure seu token de acesso primeiro.'
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
+          status: 404
         }
       );
     }

@@ -248,7 +248,34 @@ export default function AdminAgentIA() {
 
       if (error) {
         console.error('❌ Erro sync Meta:', error);
-        throw error;
+        
+        // Tentar extrair mensagem mais específica do erro
+        let errorMessage = error.message || 'Falha na sincronização';
+        
+        // Se for um erro de função edge com status específico, tentar obter detalhes
+        if (error.message?.includes('non-2xx status code')) {
+          try {
+            // Tentar fazer uma nova chamada para obter a resposta detalhada
+            const response = await fetch(`https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/sync-meta-token`, {
+              method: 'POST',
+              headers: {
+                'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpamJ2aWhpbmh1ZWRrdmt4d2lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE3MDY0NzksImV4cCI6MjA2NzI4MjQ3OX0.gmxFrRj6UqY_VIvdZmsst1DdPBpWnWRCBqBKR-PemvE',
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (!response.ok) {
+              const errorDetails = await response.json();
+              errorMessage = errorDetails.error || errorDetails.message || errorMessage;
+            }
+          } catch (fetchError) {
+            console.log('Não foi possível obter detalhes do erro');
+          }
+        }
+        
+        toast.dismiss(toastId);
+        toast.error(`❌ ${errorMessage}`);
+        return;
       }
       
       toast.dismiss(toastId);
@@ -1641,9 +1668,15 @@ export default function AdminAgentIA() {
                     onClick={syncMetaToken} 
                     variant="outline"
                     className="flex items-center gap-2"
+                    disabled={!settings.facebook_page_token}
                   >
                     🔗 Usar Token Meta
                   </Button>
+                  {!settings.facebook_page_token && (
+                    <p className="text-sm text-muted-foreground ml-2">
+                      ⚠️ Configure primeiro o token Facebook acima para usar esta função
+                    </p>
+                  )}
                   <Button 
                     onClick={testTables} 
                     variant="outline"
