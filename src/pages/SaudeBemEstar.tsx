@@ -104,20 +104,30 @@ const SaudeBemEstar = () => {
         // Inclui produtos com category_id OU subcategory_id nas categorias relacionadas
         const { data: productsData, error: productsError } = await supabase
           .from('products')
-          .select(`
-            *,
-            categories!inner(name, slug)
-          `)
+          .select('*')
           .or(`category_id.in.(${allCategoryIds.join(',')}),subcategory_id.in.(${allCategoryIds.join(',')})`)
           .eq('active', true);
 
         if (productsError) throw productsError;
 
-        const formattedProducts = productsData?.map(product => ({
-          ...product,
-          category_name: product.categories.name,
-          category_slug: product.categories.slug
-        })) || [];
+        // Buscar informações das categorias separadamente
+        const { data: allCategoriesData } = await supabase
+          .from('categories')
+          .select('id, name, slug')
+          .in('id', allCategoryIds);
+
+        const categoriesMap = new Map(allCategoriesData?.map(cat => [cat.id, cat]) || []);
+
+        const formattedProducts = productsData?.map(product => {
+          const productCategory = categoriesMap.get(product.category_id) || categoriesMap.get(product.subcategory_id);
+          return {
+            ...product,
+            category_name: productCategory?.name || 'Saúde e Bem Estar',
+            category_slug: productCategory?.slug || 'saude-bem-estar'
+          };
+        }) || [];
+
+        console.log('Formatted Products:', formattedProducts);
 
         setProducts(formattedProducts);
         setFilteredProducts(formattedProducts);
