@@ -81,33 +81,61 @@ async function handleMessage(messaging: FacebookMessage, supabase: any) {
   const senderId = messaging.sender.id;
   const messageText = messaging.message.text;
   
-  if (!messageText) return;
+  if (!messageText) {
+    console.log('Mensagem sem texto recebida, ignorando');
+    return;
+  }
   
-  console.log(`Mensagem de ${senderId}: ${messageText}`);
+  console.log(`📨 Mensagem de ${senderId}: ${messageText}`);
   
-  // Salvar conversa no banco
-  await supabase.from('ai_conversations').insert({
-    platform: 'facebook',
-    user_id: senderId,
-    message: messageText,
-    type: 'received',
-    timestamp: new Date().toISOString()
-  });
-  
-  // Processar com IA
-  const aiResponse = await processWithAI(messageText, senderId, supabase);
-  
-  // Enviar resposta
-  await sendFacebookMessage(senderId, aiResponse);
-  
-  // Salvar resposta no banco
-  await supabase.from('ai_conversations').insert({
-    platform: 'facebook',
-    user_id: senderId,
-    message: aiResponse,
-    type: 'sent',
-    timestamp: new Date().toISOString()
-  });
+  try {
+    // Verificar se o bot está habilitado
+    const { data: botSettings } = await supabase
+      .from('ai_settings')
+      .select('value')
+      .eq('key', 'bot_enabled')
+      .single();
+    
+    if (botSettings?.value !== 'true') {
+      console.log('🚫 Bot desabilitado nas configurações');
+      return;
+    }
+    
+    // Salvar conversa no banco
+    await supabase.from('ai_conversations').insert({
+      platform: 'facebook',
+      user_id: senderId,
+      message: messageText,
+      type: 'received',
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('💾 Mensagem salva no banco');
+    
+    // Processar com IA
+    const aiResponse = await processWithAI(messageText, senderId, supabase);
+    console.log(`🤖 Resposta gerada: ${aiResponse}`);
+    
+    // Enviar resposta
+    await sendFacebookMessage(senderId, aiResponse);
+    console.log('📤 Resposta enviada para Facebook');
+    
+    // Salvar resposta no banco
+    await supabase.from('ai_conversations').insert({
+      platform: 'facebook',
+      user_id: senderId,
+      message: aiResponse,
+      type: 'sent',
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('✅ Processamento completo');
+    
+  } catch (error) {
+    console.error('❌ Erro ao processar mensagem:', error);
+    // Enviar mensagem de erro amigável
+    await sendFacebookMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente em alguns minutos!');
+  }
 }
 
 async function processWithAI(message: string, userId: string, supabase: any): Promise<string> {
@@ -176,7 +204,7 @@ Responda em português de Angola, seja amigável e útil. Máximo 160 caracteres
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
@@ -202,6 +230,13 @@ Para ver nosso catálogo completo: https://superloja.vip`;
 async function sendFacebookMessage(recipientId: string, message: string) {
   const PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
   
+  if (!PAGE_ACCESS_TOKEN) {
+    console.error('❌ FACEBOOK_PAGE_ACCESS_TOKEN não configurado');
+    throw new Error('Facebook Page Access Token não configurado');
+  }
+  
+  console.log(`📤 Enviando mensagem para ${recipientId}: ${message.substring(0, 50)}...`);
+  
   const messageData = {
     recipient: { id: recipientId },
     message: { text: message }
@@ -218,10 +253,17 @@ async function sendFacebookMessage(recipientId: string, message: string) {
     );
     
     const result = await response.json();
-    console.log('Mensagem enviada:', result);
+    
+    if (response.ok) {
+      console.log('✅ Mensagem enviada com sucesso:', result.message_id);
+    } else {
+      console.error('❌ Erro na API Facebook:', result);
+      throw new Error(`Facebook API error: ${result.error?.message || 'Unknown error'}`);
+    }
     
   } catch (error) {
-    console.error('Erro ao enviar mensagem:', error);
+    console.error('❌ Erro ao enviar mensagem:', error);
+    throw error;
   }
 }
 
