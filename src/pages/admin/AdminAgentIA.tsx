@@ -1225,6 +1225,7 @@ export default function AdminAgentIA() {
           <TabsTrigger value="realtime">🔴 Tempo Real</TabsTrigger>
           <TabsTrigger value="conversations">Conversas</TabsTrigger>
           <TabsTrigger value="knowledge">Base de Conhecimento</TabsTrigger>
+          <TabsTrigger value="learning">📚 Aprendizado</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
 
@@ -1475,6 +1476,127 @@ export default function AdminAgentIA() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        </TabsContent>
+
+        {/* Aba Aprendizado */}
+        <TabsContent value="learning" className="space-y-6">
+          <div className="grid gap-6">
+            {/* Insights de Aprendizado */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  🧠 Insights de Aprendizado
+                </CardTitle>
+                <CardDescription>
+                  Padrões identificados e melhorias sugeridas pelo sistema
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {learningInsights.length > 0 ? (
+                    learningInsights.map((insight, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold">{insight.category}</h4>
+                          <Badge variant={insight.priority === 'high' ? 'destructive' : insight.priority === 'medium' ? 'default' : 'secondary'}>
+                            {insight.priority}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-2">{insight.insight}</p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>Confiança: {(insight.confidence * 100).toFixed(0)}%</span>
+                          <span>Impacto: {insight.impact}</span>
+                          <span>Identificado em: {new Date(insight.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <Bot className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>Nenhum insight disponível ainda.</p>
+                      <p className="text-sm">O sistema aprenderá com as interações e gerará insights automaticamente.</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Padrões de Conversação */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  📊 Padrões de Conversação
+                </CardTitle>
+                <CardDescription>
+                  Análise de tendências e comportamentos dos usuários
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {conversationPatterns.length > 0 ? (
+                    conversationPatterns.map((pattern, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <h4 className="font-semibold mb-2">{pattern.pattern_type}</h4>
+                        <p className="text-sm text-muted-foreground mb-2">{pattern.description}</p>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Frequência: {pattern.frequency}</span>
+                          <Badge variant="outline">{pattern.trend}</Badge>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center text-muted-foreground py-8">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>Coletando dados de padrões...</p>
+                      <p className="text-sm">Os padrões aparecerão conforme mais conversas forem processadas.</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sugestões de Melhoria */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  💡 Sugestões de Melhoria
+                </CardTitle>
+                <CardDescription>
+                  Recomendações baseadas na análise de performance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20">
+                    <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                      📈 Otimização de Respostas
+                    </h4>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      Adicione mais variações de respostas para perguntas frequentes para tornar as conversas mais naturais.
+                    </p>
+                  </div>
+                  
+                  <div className="border rounded-lg p-4 bg-green-50 dark:bg-green-950/20">
+                    <h4 className="font-semibold text-green-900 dark:text-green-100 mb-2">
+                      🎯 Personalização
+                    </h4>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      Implemente respostas personalizadas baseadas no histórico de cada usuário.
+                    </p>
+                  </div>
+                  
+                  <div className="border rounded-lg p-4 bg-orange-50 dark:bg-orange-950/20">
+                    <h4 className="font-semibold text-orange-900 dark:text-orange-100 mb-2">
+                      ⚡ Performance
+                    </h4>
+                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                      Otimize o tempo de resposta implementando cache para respostas frequentes.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
