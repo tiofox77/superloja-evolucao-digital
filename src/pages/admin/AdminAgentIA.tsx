@@ -1250,10 +1250,60 @@ export default function AdminAgentIA() {
                       📡 Testar Webhook
                     </Button>
                   </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  
+                  {/* Guia de configuração Facebook */}
+                  <div className="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <h3 className="font-semibold text-orange-800 mb-3">🔧 Sistema funcionando! Configuração Facebook necessária:</h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex items-start gap-2">
+                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">1</span>
+                        <div>
+                          <p className="font-medium">Verificar Aplicação Facebook</p>
+                          <p className="text-gray-600">Acesse Facebook Developer Console → Sua App → Status da Revisão</p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open('https://developers.facebook.com/apps', '_blank')}
+                            className="mt-1"
+                          >
+                            Abrir Facebook Apps
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-2">
+                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">2</span>
+                        <div>
+                          <p className="font-medium">Configurar Webhooks na App</p>
+                          <p className="text-gray-600">Produtos → Messenger → Configurações → Webhooks</p>
+                          <div className="mt-1 p-2 bg-gray-50 rounded text-xs font-mono">
+                            <p><strong>URL:</strong> https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook</p>
+                            <p><strong>Token:</strong> minha_superloja_webhook_token_2024</p>
+                            <p><strong>Campos:</strong> messages, messaging_postbacks</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-2">
+                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">3</span>
+                        <div>
+                          <p className="font-medium">Adicionar Página aos Webhooks</p>
+                          <p className="text-gray-600">Webhooks → Subscrições → Adicionar página Superloja</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start gap-2">
+                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-medium">4</span>
+                        <div>
+                          <p className="font-medium">Solicitar Permissões</p>
+                          <p className="text-gray-600">App Review → Solicitar pages_messaging permission</p>
+                        </div>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
 
           {/* Configurações Principais */}
           <Card>
