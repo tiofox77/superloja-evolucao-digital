@@ -46,6 +46,14 @@ interface AISettings {
   fallback_to_human: boolean;
   response_tone: string;
   auto_response_enabled: string;
+  preferred_model: string;
+}
+
+interface TestResult {
+  service: string;
+  status: 'success' | 'error' | 'testing';
+  message: string;
+  details?: any;
 }
 
 export default function AdminAgentIA() {
@@ -71,8 +79,11 @@ export default function AdminAgentIA() {
     max_response_length: 200,
     fallback_to_human: true,
     response_tone: '',
-    auto_response_enabled: ''
+    auto_response_enabled: '',
+    preferred_model: 'gpt-4o-mini'
   });
+
+  const [testResults, setTestResults] = useState<TestResult[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -156,7 +167,6 @@ export default function AdminAgentIA() {
       
     if (error) {
       console.error('Erro ao carregar configurações:', error);
-      // Se as tabelas não existem ainda, manter valores padrão
       return;
     }
     
@@ -169,7 +179,8 @@ export default function AdminAgentIA() {
       max_response_length: '200',
       fallback_to_human: 'true',
       response_tone: 'amigavel',
-      auto_response_enabled: 'true'
+      auto_response_enabled: 'true',
+      preferred_model: 'gpt-4o-mini'
     };
     
     // Sobrescrever com dados do banco
@@ -178,9 +189,121 @@ export default function AdminAgentIA() {
     });
     
     console.log('Settings processados:', settingsObj);
-    
-    // Forçar atualização completa do estado
     setSettings(settingsObj);
+  };
+
+  const syncWithSecrets = async () => {
+    const toastId = toast.loading('Sincronizando com secrets do Supabase...');
+    
+    try {
+      // Chamar edge function para sincronizar
+      const { data, error } = await supabase.functions.invoke('sync-ai-secrets', {
+        body: {
+          openai_api_key: settings.openai_api_key,
+          facebook_page_token: settings.facebook_page_token
+        }
+      });
+
+      if (error) throw error;
+      
+      toast.dismiss(toastId);
+      toast.success('✅ Secrets sincronizados com sucesso!');
+      
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      toast.error(`❌ Erro na sincronização: ${error.message}`);
+    }
+  };
+
+  const testOpenAI = async () => {
+    const testResult: TestResult = {
+      service: 'OpenAI',
+      status: 'testing',
+      message: 'Testando conexão...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'OpenAI'), testResult]);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('test-openai', {
+        body: {
+          api_key: settings.openai_api_key,
+          model: settings.preferred_model
+        }
+      });
+
+      if (error) throw error;
+      
+      const successResult = {
+        service: 'OpenAI',
+        status: 'success' as const,
+        message: `✅ Modelo ${settings.preferred_model} funcionando`,
+        details: data
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'OpenAI'), successResult]);
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'OpenAI',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'OpenAI'), errorResult]);
+    }
+  };
+
+  const testFacebook = async () => {
+    const testResult: TestResult = {
+      service: 'Facebook',
+      status: 'testing',
+      message: 'Testando token...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook'), testResult]);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('test-facebook', {
+        body: {
+          page_token: settings.facebook_page_token
+        }
+      });
+
+      if (error) throw error;
+      
+      const successResult = {
+        service: 'Facebook',
+        status: 'success' as const,
+        message: `✅ Token válido - Página: ${data.page_name}`,
+        details: data
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook'), successResult]);
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Facebook',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook'), errorResult]);
+    }
+  };
+
+  const testCompleteSystem = async () => {
+    toast.loading('Executando teste completo do sistema...');
+    
+    await Promise.all([
+      testOpenAI(),
+      testFacebook()
+    ]);
+    
+    toast.dismiss();
+    toast.success('🔍 Teste completo finalizado!');
   };
 
   const handleAddKnowledge = async () => {
@@ -266,6 +389,20 @@ export default function AdminAgentIA() {
     }
   };
 
+  const getSettingDescription = (key: string): string => {
+    const descriptions: { [key: string]: string } = {
+      'openai_api_key': 'Chave da API OpenAI para GPT models',
+      'facebook_page_token': 'Token da página Facebook para Messenger',
+      'bot_enabled': 'Bot habilitado/desabilitado',
+      'max_response_length': 'Tamanho máximo das respostas',
+      'fallback_to_human': 'Transferir para humano quando não entender',
+      'response_tone': 'Tom das respostas: profissional, amigavel, casual',
+      'auto_response_enabled': 'Respostas automáticas ativadas',
+      'preferred_model': 'Modelo OpenAI preferido para respostas'
+    };
+    return descriptions[key] || `Configuração: ${key}`;
+  };
+
   const handleSaveSettings = async () => {
     console.log('handleSaveSettings iniciado');
     console.log('Settings atuais:', settings);
@@ -280,6 +417,7 @@ export default function AdminAgentIA() {
       const updates = Object.entries(settings).map(([key, value]) => ({
         key,
         value: String(value || ''),
+        description: getSettingDescription(key),
         updated_at: new Date().toISOString()
       }));
       
@@ -572,6 +710,78 @@ export default function AdminAgentIA() {
 
         {/* Aba Configurações */}
         <TabsContent value="settings" className="space-y-6">
+          {/* Área de Testes */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🧪 Centro de Testes
+              </CardTitle>
+              <CardDescription>
+                Teste todas as APIs e funcionalidades do agente IA
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button 
+                  onClick={testOpenAI} 
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  🤖 Testar OpenAI
+                </Button>
+                <Button 
+                  onClick={testFacebook} 
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  📘 Testar Facebook
+                </Button>
+                <Button 
+                  onClick={testCompleteSystem} 
+                  variant="default"
+                  className="flex items-center gap-2"
+                >
+                  🔍 Teste Completo
+                </Button>
+              </div>
+              
+              {/* Resultados dos Testes */}
+              {testResults.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-medium">Resultados dos Testes:</h4>
+                  {testResults.map((result, index) => (
+                    <div key={index} className={`
+                      p-3 rounded-lg border
+                      ${result.status === 'success' ? 'bg-green-50 border-green-200' : 
+                        result.status === 'error' ? 'bg-red-50 border-red-200' : 
+                        'bg-blue-50 border-blue-200'}
+                    `}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{result.service}</span>
+                        <Badge variant={result.status === 'success' ? 'default' : 
+                                     result.status === 'error' ? 'destructive' : 'secondary'}>
+                          {result.status}
+                        </Badge>
+                      </div>
+                      <p className="text-sm mt-1">{result.message}</p>
+                      {result.details && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-xs text-muted-foreground">
+                            Ver detalhes
+                          </summary>
+                          <pre className="text-xs mt-1 p-2 bg-muted rounded">
+                            {JSON.stringify(result.details, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Configurações Principais */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -579,70 +789,31 @@ export default function AdminAgentIA() {
                 Configurações da IA
               </CardTitle>
               <CardDescription>
-                Configure APIs e comportamento do bot
+                Configure APIs, modelo preferido e comportamento do bot
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Migration Notice */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-2">
-                    <div className="text-yellow-600">⚠️</div>
-                    <div>
-                      <h4 className="font-medium text-yellow-800">Primeiro Uso do Agente IA</h4>
-                      <p className="text-sm text-yellow-700 mt-1">
-                        Para usar o Agente IA, primeiro execute a migração das tabelas no Supabase.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => window.open('/ai-agent-migration.sql', '_blank')}
-                    >
-                      📄 Ver SQL
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => window.open('/migrate-ai-tables.html', '_blank')}
-                    >
-                      🚀 Executar Migração
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={testTables}
-                    >
-                      🔍 Testar
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={async () => {
-                        try {
-                          const { data } = await (supabase as any)
-                            .from('ai_settings')
-                            .select('*')
-                            .order('key');
-                          console.log('Dados atuais no banco:', data);
-                          toast.success(`📊 ${data?.length || 0} configurações no banco`);
-                        } catch (error) {
-                          toast.error('❌ Erro ao verificar banco');
-                        }
-                      }}
-                    >
-                      📊 Ver Banco
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* API Configuration */}
+              {/* Modelo OpenAI */}
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">APIs Necessárias</h3>
+                <h3 className="text-lg font-medium">Modelo OpenAI</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="preferred-model">Modelo Preferido</Label>
+                    <select
+                      id="preferred-model"
+                      className="w-full p-2 border rounded-md"
+                      value={settings.preferred_model || 'gpt-4o-mini'}
+                      onChange={(e) => setSettings(prev => ({...prev, preferred_model: e.target.value}))}
+                    >
+                      <option value="gpt-4.1-2025-04-14">GPT-4.1 (Flagship) - Mais Poderoso</option>
+                      <option value="gpt-4o-mini">GPT-4o Mini - Rápido e Econômico</option>
+                      <option value="o3-2025-04-16">O3 - Raciocínio Avançado</option>
+                      <option value="o4-mini-2025-04-16">O4 Mini - Raciocínio Rápido</option>
+                    </select>
+                    <p className="text-sm text-muted-foreground">
+                      GPT-4o Mini é recomendado para chatbot por ser rápido e econômico
+                    </p>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="openai-key">Chave API OpenAI</Label>
                     <Input
@@ -663,33 +834,38 @@ export default function AdminAgentIA() {
                       </a>
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="facebook-token">Token Página Facebook</Label>
-                    <Input
-                      id="facebook-token"
-                      type="password"
-                      value={settings.facebook_page_token || ''}
-                      onChange={(e) => setSettings(prev => ({...prev, facebook_page_token: e.target.value}))}
-                      placeholder="EAA..."
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      <a 
-                        href="https://developers.facebook.com/tools/explorer/" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-blue-600 hover:underline"
-                      >
-                        → Obter token Facebook
-                      </a>
-                    </p>
-                  </div>
+                </div>
+              </div>
+
+              {/* Facebook Integration */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Integração Facebook</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="facebook-token">Token Página Facebook</Label>
+                  <Input
+                    id="facebook-token"
+                    type="password"
+                    value={settings.facebook_page_token || ''}
+                    onChange={(e) => setSettings(prev => ({...prev, facebook_page_token: e.target.value}))}
+                    placeholder="EAA..."
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    <a 
+                      href="https://developers.facebook.com/tools/explorer/" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-blue-600 hover:underline"
+                    >
+                      → Obter token Facebook
+                    </a>
+                  </p>
                 </div>
               </div>
 
               {/* Bot Behavior */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Comportamento do Bot</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="response-tone">Tom das Respostas</Label>
                     <select
@@ -703,7 +879,18 @@ export default function AdminAgentIA() {
                       <option value="casual">Casual</option>
                     </select>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div>
+                    <Label htmlFor="max-response">Tamanho Máximo</Label>
+                    <Input
+                      id="max-response"
+                      type="number"
+                      min="50"
+                      max="500"
+                      value={settings.max_response_length || 200}
+                      onChange={(e) => setSettings(prev => ({...prev, max_response_length: parseInt(e.target.value)}))}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2 pt-6">
                     <Switch
                       id="auto-response"
                       checked={settings.auto_response_enabled === 'true'}
@@ -714,21 +901,48 @@ export default function AdminAgentIA() {
                 </div>
               </div>
 
+              {/* Sincronização */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Sincronização</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button 
+                    onClick={syncWithSecrets} 
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    🔄 Sincronizar com Secrets
+                  </Button>
+                  <Button 
+                    onClick={testTables} 
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    🔍 Verificar Tabelas
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  A sincronização copia as chaves para os secrets do Supabase automaticamente
+                </p>
+              </div>
+
               {/* Quick Setup Links */}
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Links Úteis</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Card className="p-4">
-                    <h4 className="font-medium mb-2">Guia Completo</h4>
+                    <h4 className="font-medium mb-2">Webhook Facebook</h4>
                     <p className="text-sm text-muted-foreground mb-2">
-                      Instruções detalhadas de setup
+                      URL para configurar no Facebook
                     </p>
+                    <code className="text-xs bg-muted p-1 rounded block mb-2">
+                      https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook
+                    </code>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => window.open('/GUIA_CONFIGURACAO_APIS.md', '_blank')}
+                      onClick={() => navigator.clipboard.writeText('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook')}
                     >
-                      Ver Guia
+                      📋 Copiar URL
                     </Button>
                   </Card>
                   <Card className="p-4">
@@ -760,20 +974,22 @@ export default function AdminAgentIA() {
                 </div>
               </div>
               
-              <Button 
-                onClick={handleSaveSettings} 
-                className="w-full" 
-                disabled={saving}
-              >
-                {saving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Salvando...
-                  </>
-                ) : (
-                  'Salvar Configurações'
-                )}
-              </Button>
+              <div className="flex gap-4">
+                <Button 
+                  onClick={handleSaveSettings} 
+                  className="flex-1" 
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Salvando...
+                    </>
+                  ) : (
+                    '💾 Salvar Configurações'
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -44,3 +44,12 @@ verify_jwt = false
 
 [functions.create-backup]
 verify_jwt = false
+
+[functions.test-openai]
+verify_jwt = false
+
+[functions.test-facebook]
+verify_jwt = false
+
+[functions.sync-ai-secrets]
+verify_jwt = false

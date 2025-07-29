@@ -141,6 +141,16 @@ async function handleMessage(messaging: FacebookMessage, supabase: any) {
 async function processWithAI(message: string, userId: string, supabase: any): Promise<string> {
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
   
+  // Buscar modelo preferido das configurações
+  const { data: modelSetting } = await supabase
+    .from('ai_settings')
+    .select('value')
+    .eq('key', 'preferred_model')
+    .single();
+  
+  const preferredModel = modelSetting?.value || 'gpt-4o-mini';
+  console.log(`🤖 Usando modelo: ${preferredModel}`);
+  
   // Buscar contexto do usuário (produtos, pedidos anteriores)
   const { data: userContext } = await supabase
     .from('users')
@@ -204,7 +214,7 @@ Responda em português de Angola, seja amigável e útil. Máximo 160 caracteres
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: preferredModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
@@ -215,6 +225,12 @@ Responda em português de Angola, seja amigável e útil. Máximo 160 caracteres
     });
     
     const data = await response.json();
+    
+    if (!response.ok) {
+      console.error('❌ Erro OpenAI:', data);
+      throw new Error(data.error?.message || 'Erro na API OpenAI');
+    }
+    
     return data.choices[0].message.content.trim();
     
   } catch (error) {
