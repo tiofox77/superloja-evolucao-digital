@@ -290,6 +290,71 @@ const AdminMeta = () => {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                🔧 Configuração do Webhook Facebook
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Para o bot responder automaticamente, configure o webhook no Facebook:
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">1. URL do Webhook</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input 
+                      readOnly 
+                      value="https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook"
+                      className="font-mono text-xs"
+                    />
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => navigator.clipboard.writeText("https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook")}
+                    >
+                      Copiar
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">2. Verify Token</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input 
+                      readOnly 
+                      value="minha_superloja_webhook_token_2024"
+                      className="font-mono text-xs"
+                    />
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => navigator.clipboard.writeText("minha_superloja_webhook_token_2024")}
+                    >
+                      Copiar
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="bg-muted p-4 rounded-lg">
+                  <h4 className="font-medium mb-2">3. Configurar no Facebook</h4>
+                  <ol className="text-sm space-y-1 list-decimal list-inside">
+                    <li>Acesse <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Facebook Developers</a></li>
+                    <li>Vá para sua aplicação → Produtos → Messenger → Configurações</li>
+                    <li>Na seção "Webhooks", clique em "Configurar Webhooks"</li>
+                    <li>Cole a URL do webhook acima</li>
+                    <li>Cole o Verify Token acima</li>
+                    <li>Selecione os eventos: <code className="bg-background px-1 rounded">messages</code>, <code className="bg-background px-1 rounded">messaging_postbacks</code></li>
+                    <li>Clique em "Verificar e Salvar"</li>
+                    <li>Depois, associe o webhook à sua página</li>
+                  </ol>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Alert>
             <AlertCircle className="w-4 h-4" />
             <AlertTitle>Como obter as credenciais</AlertTitle>
