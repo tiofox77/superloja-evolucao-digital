@@ -341,6 +341,7 @@ Para ver nosso catálogo: https://superloja.vip`;
 async function sendFacebookMessage(recipientId: string, message: string, supabase: any) {
   // Primeiro tenta buscar token das configurações Meta
   let PAGE_ACCESS_TOKEN = null;
+  let tokenSource = 'none';
   
   try {
     const { data: metaSettings } = await supabase
@@ -351,6 +352,7 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
     
     if (metaSettings?.access_token) {
       PAGE_ACCESS_TOKEN = metaSettings.access_token;
+      tokenSource = 'meta_settings';
       console.log('✅ Usando token das configurações Meta');
     }
   } catch (error) {
@@ -360,6 +362,7 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
   // Fallback para o token das secrets se não encontrar nas configurações Meta
   if (!PAGE_ACCESS_TOKEN) {
     PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+    tokenSource = 'secrets';
     console.log('⚠️ Usando token das secrets como fallback');
   }
   
@@ -369,6 +372,8 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
   }
   
   console.log(`📤 Enviando mensagem para ${recipientId}`);
+  console.log(`🔑 Token source: ${tokenSource}`);
+  console.log(`📝 Mensagem: ${message.substring(0, 50)}...`);
   
   try {
     const response = await fetch(
@@ -386,12 +391,29 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
     const result = await response.json();
     
     if (response.ok) {
-      console.log('✅ Mensagem enviada:', result.message_id);
+      console.log('✅ Mensagem enviada com sucesso!');
+      console.log('📨 Message ID:', result.message_id);
+      console.log('📱 Recipient ID:', result.recipient_id);
     } else {
-      console.error('❌ Erro Facebook API:', result);
+      console.error('❌ Erro Facebook API (detalhado):');
+      console.error('📊 Status:', response.status);
+      console.error('📋 Response headers:', Object.fromEntries(response.headers.entries()));
+      console.error('💥 Error details:', result);
+      
+      // Log específico para diferentes tipos de erro
+      if (result.error?.code === 190) {
+        console.error('🔑 ERRO DE TOKEN: Token inválido ou expirado');
+      } else if (result.error?.code === 200) {
+        console.error('🚫 ERRO DE PERMISSÃO: Sem permissão para enviar mensagens');
+      } else if (result.error?.code === 100) {
+        console.error('📝 ERRO DE PARÂMETRO: Parâmetros inválidos na requisição');
+      }
     }
     
   } catch (error) {
-    console.error('❌ Erro ao enviar mensagem:', error);
+    console.error('❌ Erro de rede/conexão ao enviar mensagem:');
+    console.error('🌐 Network error:', error.message);
+    console.error('🔗 URL tentativa:', `https://graph.facebook.com/v18.0/me/messages`);
+    console.error('🔑 Token usado (primeiros 20 chars):', PAGE_ACCESS_TOKEN.substring(0, 20) + '...');
   }
 }

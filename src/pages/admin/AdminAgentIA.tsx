@@ -409,6 +409,60 @@ export default function AdminAgentIA() {
     }
   };
 
+  const debugFacebookMessaging = async () => {
+    const testResult: TestResult = {
+      service: 'Debug Facebook',
+      status: 'testing',
+      message: 'Executando debug completo...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Debug Facebook'), testResult]);
+    
+    try {
+      console.log('🔍 Iniciando debug Facebook Messaging...');
+      
+      const { data, error } = await supabase.functions.invoke('debug-facebook-messaging');
+
+      console.log('📊 Resultado debug:', { data, error });
+
+      if (error) {
+        console.error('❌ Erro no debug:', error);
+        throw error;
+      }
+      
+      const result = {
+        service: 'Debug Facebook',
+        status: data.fully_functional ? 'success' as const : 'error' as const,
+        message: data.fully_functional 
+          ? '✅ Sistema funcionando perfeitamente!' 
+          : `❌ ${data.debug_results.summary.issues_found.length} problema(s) encontrado(s)`,
+        details: data,
+        timestamp: new Date().toLocaleString()
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Debug Facebook'), result]);
+      
+      // Mostrar recomendações se houver problemas
+      if (!data.fully_functional && data.recommendations?.length > 0) {
+        toast.error('Problemas encontrados! Veja os detalhes.');
+        console.log('📋 Recomendações:', data.recommendations);
+      } else if (data.fully_functional) {
+        toast.success('🎉 Sistema funcionando perfeitamente!');
+      }
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Debug Facebook',
+        status: 'error' as const,
+        message: `❌ Erro no debug: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Debug Facebook'), errorResult]);
+      toast.error('Erro ao executar debug');
+    }
+  };
+
   const testCompleteSystem = async () => {
     toast.loading('Executando teste completo do sistema...');
     
@@ -949,6 +1003,13 @@ export default function AdminAgentIA() {
                   className="flex items-center gap-2"
                 >
                   📘 Testar Facebook
+                </Button>
+                <Button 
+                  onClick={debugFacebookMessaging} 
+                  variant="outline"
+                  className="flex items-center gap-2 border-orange-500 text-orange-600 hover:bg-orange-50"
+                >
+                  🔍 Debug Mensagens
                 </Button>
                 <Button 
                   onClick={testCompleteSystem} 
