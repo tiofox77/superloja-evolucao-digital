@@ -504,77 +504,61 @@ function extractProductKeywords(message: string): string[] {
 
 function buildInstagramSystemPrompt(userContext: any, products: any[]): string {
   const basePrompt = `Você é Alex, o assistente virtual da SuperLoja no Instagram! 📱
-  
-PERSONALIDADE PARA INSTAGRAM:
-- Seja natural, amigável e use um tom moderno
-- Use emojis de forma estratégica (2-3 por resposta)
-- Responda de forma direta e visual
-- Seja entusiasmado sobre produtos
-- Adapte-se ao estilo visual do Instagram
 
-CONTEXTO DO USUÁRIO:
-- Mensagens anteriores: ${userContext.message_count}
-- É cliente ${userContext.message_count > 3 ? 'frequente' : 'novo'}
-- Plataforma: Instagram (respostas mais visuais)`;
+🧠 REGRAS FUNDAMENTAIS - PENSE ANTES DE RESPONDER:
+1. Analise EXATAMENTE o que o usuário perguntou
+2. Responda DIRETAMENTE à pergunta específica
+3. NUNCA envie produtos sem solicitação explícita
+4. NUNCA desvie do assunto da pergunta
 
+❌ NUNCA FAÇA:
+- Enviar produtos quando não foram solicitados
+- Dar respostas genéricas para perguntas específicas
+- Usar frases como "Me conte mais detalhes" quando a pergunta é clara
+- Distorcer a conversa para falar de outros assuntos
+
+✅ SEMPRE FAÇA:
+- Responda diretamente à pergunta feita
+- Seja específico e útil
+- Use informações relevantes sobre o que foi perguntado
+- Mantenha o foco no tópico da pergunta
+
+INFORMAÇÕES DA SUPERLOJA:
+🚚 ENTREGA: Entregamos em todo Brasil via Correios e transportadoras. Prazo: 3-7 dias úteis para capitais, 5-10 dias para interior. Frete grátis acima de R$ 200.
+💰 PAGAMENTO: PIX (5% desconto), cartão (até 12x), boleto
+🔒 GARANTIA: 12 meses de garantia em todos os produtos
+📞 CONTATO: WhatsApp (11) 9999-9999, Email: contato@superloja.vip
+⏰ FUNCIONAMENTO: Seg-Sex 8h-18h, Sáb 8h-14h
+
+PERSONALIDADE:
+- Natural, amigável e direto
+- Use 1-2 emojis estratégicos
+- Respostas concisas e objetivas
+- Não seja prolixo`;
+
+  // Só mencionar produtos se o usuário perguntar especificamente sobre eles
   let contextualInfo = '';
-
-  if (products.length > 0) {
-    contextualInfo += `\n\n📦 PRODUTOS ENCONTRADOS:
-${products.map(p => {
-  const price = parseFloat(p.price).toLocaleString('pt-AO');
-  const originalPrice = p.original_price ? ` (era ${parseFloat(p.original_price).toLocaleString('pt-AO')} Kz)` : '';
-  const stock = p.in_stock ? `✅ Em estoque` : `❌ Indisponível`;
-  const stockQty = p.stock_quantity > 0 ? ` (${p.stock_quantity} unidades)` : '';
-  const hasImage = p.image_url ? '📸 Imagem disponível' : '';
   
-  return `
-🛍️ **${p.name}**
-💰 Preço: ${price} Kz${originalPrice}
-📋 ${p.description || 'Descrição não disponível'}
-📦 Status: ${stock}${stockQty}
-${hasImage}`;
+  if (products.length > 0) {
+    contextualInfo = `\n\n📦 PRODUTOS DISPONÍVEIS (mencione APENAS se o usuário perguntar sobre produtos):
+${products.slice(0, 3).map(p => {
+  const price = parseFloat(p.price).toLocaleString('pt-BR');
+  const stock = p.in_stock ? `✅ Disponível` : `❌ Indisponível`;
+  return `• ${p.name}: R$ ${price} - ${stock}`;
 }).join('\n')}
 
-🌐 LINKS DIRETOS:
-${products.length === 1 
-  ? `🔗 Ver produto: https://superloja.vip/produto/${products[0].slug || products[0].id}`
-  : `🛒 Ver catálogo completo: https://superloja.vip/produtos`
-}`;
-  } else {
-    contextualInfo += `\n\n❌ PRODUTO NÃO ENCONTRADO:
-O produto solicitado não está disponível no momento.
-
-📱 SUGESTÃO IMPORTANTE:
-Recomende ao cliente acessar nosso catálogo completo no site:
-🌐 https://superloja.vip/produtos
-
-Lá encontrará todos os nossos produtos disponíveis com preços atualizados e opções de entrega!`;
+🌐 Catálogo completo: https://superloja.vip/produtos`;
   }
 
   return basePrompt + contextualInfo + `
 
-INSTRUÇÕES ESPECÍFICAS PARA INSTAGRAM:
-1. Respostas mais concisas e visuais
-2. Use emojis para destacar informações
-3. Sempre mencione preços em Kz (Kwanza)
-4. Seja direto e eficiente
-5. Convide para ver mais no site
-6. Mantenha o tom entusiasmado mas profissional
-7. Faça perguntas para engajar
-8. Lembre-se: no Instagram as pessoas gostam de visual
+EXEMPLOS DE RESPOSTAS DIRETAS:
+- Se perguntarem sobre entrega: "📦 Entregamos em todo Brasil! Prazo: 3-7 dias úteis para capitais..."
+- Se perguntarem sobre pagamento: "💳 Aceitamos PIX (5% desconto), cartão até 12x..."
+- Se perguntarem sobre funcionamento: "⚙️ Como funciona: [explicação específica]..."
+- Se perguntarem sobre horário: "⏰ Funcionamos Seg-Sex 8h-18h, Sáb 8h-14h"
 
-EXEMPLO DE RESPOSTA INSTAGRAM:
-"✨ Encontrei auriculares incríveis para você! 
-
-🎧 **Auricular Bluetooth Pro** 
-💰 750,00 Kz 
-📦 Em estoque ✅
-
-Perfeito para exercícios! 💪
-Quer ver a foto? 📸
-
-🔗 Todos os detalhes: superloja.vip"`;
+LEMBRE-SE: Responda APENAS o que foi perguntado!`;
 }
 
 async function getRecentConversationHistory(userId: string, supabase: any): Promise<any[]> {
@@ -851,44 +835,37 @@ async function sendInstagramImage(recipientId: string, imageUrl: string, caption
 // Função para analisar o contexto da conversa
 function analyzeConversationContext(conversationHistory: any[], currentMessage: string): any {
   const lastMessages = conversationHistory.slice(-4); // Últimas 4 mensagens
+  const messageLower = currentMessage.toLowerCase();
   
-  let contextType = 'initial';
+  let contextType = 'direct_question';
   let previousTopic = '';
   let isFollowUp = false;
+  
+  // Detectar tipos específicos de perguntas
+  if (messageLower.includes('entrega') || messageLower.includes('entregar')) {
+    contextType = 'delivery_question';
+  } else if (messageLower.includes('pagamento') || messageLower.includes('pagar') || messageLower.includes('preço')) {
+    contextType = 'payment_question';  
+  } else if (messageLower.includes('funciona') || messageLower.includes('como')) {
+    contextType = 'how_it_works';
+  } else if (messageLower.includes('horário') || messageLower.includes('quando') || messageLower.includes('aberto')) {
+    contextType = 'schedule_question';
+  } else if (messageLower.includes('produto') || messageLower.includes('comprar') || messageLower.includes('quero')) {
+    contextType = 'product_inquiry';
+  }
   
   if (lastMessages.length > 0) {
     const lastBotMessage = lastMessages.find(msg => msg.role === 'assistant');
     const lastUserMessages = lastMessages.filter(msg => msg.role === 'user').slice(-2);
     
-    // Detectar se é continuação de conversa sobre produtos
-    if (lastBotMessage && lastBotMessage.content.includes('produto')) {
-      previousTopic = 'products';
-      isFollowUp = true;
-      
-      // Se usuário pergunta sobre tipos/modelos após ver produtos
-      if (currentMessage.toLowerCase().includes('qual') || 
-          currentMessage.toLowerCase().includes('tipo') ||
-          currentMessage.toLowerCase().includes('modelo') ||
-          currentMessage.toLowerCase().includes('existe')) {
-        contextType = 'specification_request';
-      }
-      
-      // Se usuário menciona características específicas
-      if (currentMessage.toLowerCase().includes('c') || 
-          currentMessage.toLowerCase().includes('usb') ||
-          currentMessage.toLowerCase().includes('sem fio')) {
-        contextType = 'specific_variant';
-      }
-    }
-    
-    // Detectar sequência lógica de perguntas
-    if (lastUserMessages.length >= 2) {
-      const secondLastMsg = lastUserMessages[0]?.content?.toLowerCase() || '';
-      const lastMsg = currentMessage.toLowerCase();
-      
-      if (secondLastMsg.includes('artigo') && lastMsg.includes('qual')) {
-        contextType = 'clarification_request';
-        previousTopic = 'product_inquiry';
+    // Verificar se é continuação de conversa anterior
+    if (lastBotMessage) {
+      if (lastBotMessage.content.includes('produto') || lastBotMessage.content.includes('R$')) {
+        previousTopic = 'products';
+        isFollowUp = true;
+      } else if (lastBotMessage.content.includes('entrega')) {
+        previousTopic = 'delivery';
+        isFollowUp = true;
       }
     }
   }
@@ -898,6 +875,8 @@ function analyzeConversationContext(conversationHistory: any[], currentMessage: 
     previousTopic,
     isFollowUp,
     messageCount: conversationHistory.length,
+    requiresDirectAnswer: true, // Sempre responder diretamente
+    shouldMentionProducts: contextType === 'product_inquiry', // Só mencionar produtos se perguntou sobre produtos
     lastMessages: lastMessages.map(msg => ({
       role: msg.role,
       snippet: msg.content.substring(0, 50)
