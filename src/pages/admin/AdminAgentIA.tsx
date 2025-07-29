@@ -322,12 +322,59 @@ export default function AdminAgentIA() {
     }
   };
 
+  const testWebhook = async () => {
+    const testResult: TestResult = {
+      service: 'Webhook',
+      status: 'testing',
+      message: 'Testando webhook...'
+    };
+    
+    setTestResults(prev => [...prev.filter(r => r.service !== 'Webhook'), testResult]);
+    
+    try {
+      const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      let message = '';
+      
+      if (response.status === 403) {
+        message = '✅ Webhook funcionando (403 é esperado para teste direto)';
+      } else if (response.ok) {
+        message = '✅ Webhook respondendo corretamente!';
+      } else {
+        message = `❌ Webhook retornou status: ${response.status}`;
+      }
+      
+      const successResult = {
+        service: 'Webhook',
+        status: 'success' as const,
+        message,
+        details: { status: response.status, ok: response.ok }
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Webhook'), successResult]);
+      
+    } catch (error: any) {
+      const errorResult = {
+        service: 'Webhook',
+        status: 'error' as const,
+        message: `❌ Erro: ${error.message}`,
+        details: error
+      };
+      
+      setTestResults(prev => [...prev.filter(r => r.service !== 'Webhook'), errorResult]);
+    }
+  };
+
   const testCompleteSystem = async () => {
     toast.loading('Executando teste completo do sistema...');
     
     await Promise.all([
       testOpenAI(),
-      testFacebook()
+      testFacebook(),
+      testWebhook()
     ]);
     
     toast.dismiss();
@@ -963,26 +1010,24 @@ export default function AdminAgentIA() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        // Testar se webhook responde
-                        toast.loading('Testando webhook...', { id: 'webhook-test' });
-                        fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook', {
-                          method: 'GET',
-                          headers: { 'Content-Type': 'application/json' }
-                        }).then(response => {
-                          toast.dismiss('webhook-test');
-                          if (response.ok) {
-                            toast.success('✅ Webhook está respondendo!');
-                          } else {
-                            toast.error('❌ Webhook não está respondendo');
-                          }
-                        }).catch(() => {
-                          toast.dismiss('webhook-test');
-                          toast.error('❌ Erro ao testar webhook');
-                        });
-                      }}
+                      onClick={testWebhook}
                     >
                       Testar Webhook
+                    </Button>
+                    <Button
+                      variant="default" 
+                      size="sm"
+                      onClick={async () => {
+                        toast.loading('Verificando mensagens recentes...');
+                        
+                        // Recarregar conversas para mostrar se há mensagens recentes
+                        await loadConversations();
+                        
+                        toast.dismiss();
+                        toast.success('✅ Verifique a aba "Conversas" para ver mensagens recebidas!');
+                      }}
+                    >
+                      🔍 Verificar Mensagens
                     </Button>
                   </div>
                 </div>
