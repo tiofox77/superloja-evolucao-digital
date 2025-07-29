@@ -234,6 +234,9 @@ async function handleInstagramMessage(messaging: any, supabase: any) {
     const aiResponse = await processWithAI(messageText, senderId, supabase);
     console.log(`🤖 Resposta IA para Instagram: ${aiResponse}`);
     
+    // Verificar se precisa escalar para humano
+    const shouldEscalate = await checkEscalationNeeded(messageText, aiResponse, senderId, supabase);
+    
     // Verificar se encontrou produtos
     const products = await getRelevantProducts(messageText, supabase);
     const hasProductsWithImages = products.some(p => p.image_url);
@@ -250,6 +253,12 @@ async function handleInstagramMessage(messaging: any, supabase: any) {
       
       // Enviar imagens automaticamente no Instagram
       await handleInstagramImageRequest(senderId, messageText, supabase);
+    }
+    
+    // Se precisar escalar, notificar admin
+    if (shouldEscalate.shouldEscalate) {
+      console.log('🚨 Escalando para humano:', shouldEscalate.reason);
+      await notifyAdminForEscalation(senderId, messageText, shouldEscalate.reason, 'instagram', supabase);
     }
     
     // Salvar resposta enviada
@@ -933,5 +942,163 @@ function buildContextualPrompt(analysis: any, history: any[]): string {
   } catch (error) {
     console.error('❌ Erro de rede ao enviar imagem Instagram:', error);
     await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
+}
+
+// Função para verificar se precisa escalar para humano
+async function checkEscalationNeeded(userMessage: string, aiResponse: string, userId: string, supabase: any): Promise<{shouldEscalate: boolean, reason: string}> {
+  const messageLower = userMessage.toLowerCase();
+  const responseLower = aiResponse.toLowerCase();
+  
+  // Palavras-chave que indicam finalização de compra
+  const purchaseKeywords = [
+    'quero comprar', 'comprar', 'finalizar', 'pedido', 'encomendar',
+    'quanto custa envio', 'como pagar', 'formas de pagamento',
+    'endereço', 'entregar', 'entrega', 'valor total'
+  ];
+  
+  // Palavras-chave que indicam problemas/insatisfação
+  const problemKeywords = [
+    'não entendi', 'não funciona', 'problema', 'erro', 'help', 'ajuda urgente',
+    'falar com alguém', 'atendente', 'humano', 'pessoa'
+  ];
+  
+  // Verificar se usuário quer finalizar compra
+  const wantsToPurchase = purchaseKeywords.some(keyword => messageLower.includes(keyword));
+  
+  // Verificar se há problemas/insatisfação
+  const hasProblems = problemKeywords.some(keyword => messageLower.includes(keyword));
+  
+  // Verificar se a resposta da IA parece inadequada
+  const aiResponseSeemsPoor = responseLower.includes('desculpe') || 
+                               responseLower.includes('não encontrei') ||
+                               responseLower.includes('não sei') ||
+                               aiResponse.length < 50; // Resposta muito curta
+  
+  // Buscar histórico de conversas para verificar frustração
+  const { data: recentMessages } = await supabase
+    .from('ai_conversations')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('platform', 'instagram')
+    .order('timestamp', { ascending: false })
+    .limit(5);
+  
+  const recentUserMessages = recentMessages?.filter(m => m.type === 'received') || [];
+  const repeatedQuestions = recentUserMessages.length >= 3 && 
+    recentUserMessages.every(m => m.message.toLowerCase().includes(messageLower.substring(0, 10)));
+  
+  if (wantsToPurchase) {
+    return {
+      shouldEscalate: true,
+      reason: `Cliente quer finalizar compra. Mensagem: "${userMessage}"`
+    };
   }
+  
+  if (hasProblems) {
+    return {
+      shouldEscalate: true,
+      reason: `Cliente relatou problema. Mensagem: "${userMessage}"`
+    };
+  }
+  
+  if (aiResponseSeemsPoor) {
+    return {
+      shouldEscalate: true,
+      reason: `IA não conseguiu responder adequadamente. Resposta: "${aiResponse}"`
+    };
+  }
+  
+  if (repeatedQuestions) {
+    return {
+      shouldEscalate: true,
+      reason: `Cliente fazendo perguntas repetidas - possível frustração`
+    };
+  }
+  
+  return { shouldEscalate: false, reason: '' };
+}
+
+// Função para notificar admin sobre escalation
+async function notifyAdminForEscalation(userId: string, userMessage: string, reason: string, platform: string, supabase: any): Promise<void> {
+  console.log('📞 === NOTIFICANDO ADMIN PARA ESCALATION ===');
+  console.log('👤 User ID:', userId);
+  console.log('💬 Mensagem:', userMessage);
+  console.log('⚠️ Razão:', reason);
+  console.log('📱 Platform:', platform);
+  
+  try {
+    // ID do admin carlosfox - pode ser configurado nas settings
+    const ADMIN_FACEBOOK_ID = 'carlosfox'; // ou o ID numérico real
+    
+    // Buscar token da página para enviar mensagem
+    const { data: settings } = await supabase
+      .from('ai_settings')
+      .select('value')
+      .eq('key', 'facebook_page_token')
+      .single();
+    
+    if (!settings?.value) {
+      console.error('❌ Token Facebook não encontrado para notificação');
+      return;
+    }
+    
+    // Construir mensagem de notificação
+    const notificationMessage = `🚨 ESCALATION NECESSÁRIO
+
+👤 Usuário: ${userId}
+📱 Platform: ${platform.toUpperCase()}
+⚠️ Motivo: ${reason}
+
+💬 Última mensagem do cliente:
+"${userMessage}"
+
+🕒 ${new Date().toLocaleString('pt-AO')}
+
+👋 Por favor, entre em contato com este cliente para finalizar o atendimento.`;
+
+    console.log('📤 Enviando notificação para admin...');
+    console.log('📝 Mensagem:', notificationMessage);
+    
+    // Enviar mensagem para o admin via Facebook
+    const response = await fetch(`https://graph.facebook.com/v18.0/me/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${settings.value}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        recipient: { id: ADMIN_FACEBOOK_ID },
+        message: { text: notificationMessage }
+      }),
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log('✅ Admin notificado com sucesso!');
+      console.log('📨 Message ID:', result.message_id);
+      
+      // Registrar a escalation no banco
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: 'SYSTEM_ESCALATION',
+        message: `Escalation para admin: ${reason} | Cliente: ${userId}`,
+        type: 'escalation',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          original_user: userId,
+          reason: reason,
+          admin_notified: ADMIN_FACEBOOK_ID,
+          original_message: userMessage
+        }
+      });
+      
+    } else {
+      console.error('❌ Erro ao notificar admin:', result);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro completo na notificação do admin:', error);
+  }
+}
 }

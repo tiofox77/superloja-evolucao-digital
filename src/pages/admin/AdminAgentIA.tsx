@@ -101,6 +101,12 @@ export default function AdminAgentIA() {
     preferred_model: 'gpt-4o-mini'
   });
 
+  const [adminSettings, setAdminSettings] = useState({
+    admin_facebook_id: 'carlosfox',
+    escalation_enabled: 'true',
+    escalation_keywords: 'comprar,finalizar,problema,ajuda,atendente'
+  });
+
   const [testResults, setTestResults] = useState<TestResult[]>([]);
 
   useEffect(() => {
@@ -246,6 +252,21 @@ export default function AdminAgentIA() {
     
     console.log('Settings processados:', settingsObj);
     setSettings(settingsObj);
+    
+    // Carregar configurações do admin também
+    const adminObj: any = {
+      admin_facebook_id: 'carlosfox',
+      escalation_enabled: 'true',
+      escalation_keywords: 'comprar,finalizar,problema,ajuda,atendente'
+    };
+    
+    data?.forEach(setting => {
+      if (setting.key.startsWith('admin_')) {
+        adminObj[setting.key] = setting.value || '';
+      }
+    });
+    
+    setAdminSettings(adminObj);
   };
 
   const syncWithSecrets = async () => {
@@ -2215,6 +2236,59 @@ export default function AdminAgentIA() {
                       onCheckedChange={(checked) => setSettings(prev => ({...prev, auto_response_enabled: checked.toString()}))}
                     />
                     <Label htmlFor="auto-response">Respostas Automáticas</Label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Configurações de Escalation */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Escalation para Humano</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="escalation-enabled"
+                      checked={adminSettings.escalation_enabled === 'true'}
+                      onCheckedChange={(checked) => setAdminSettings(prev => ({...prev, escalation_enabled: checked.toString()}))}
+                    />
+                    <Label htmlFor="escalation-enabled">Habilitar Escalation Automático</Label>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-facebook-id">ID Facebook do Admin (carlosfox)</Label>
+                    <Input
+                      id="admin-facebook-id"
+                      value={adminSettings.admin_facebook_id || ''}
+                      onChange={(e) => setAdminSettings(prev => ({...prev, admin_facebook_id: e.target.value}))}
+                      placeholder="carlosfox ou ID numérico"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Este usuário receberá notificações quando clientes quiserem finalizar compras
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="escalation-keywords">Palavras-chave para Escalation</Label>
+                    <Textarea
+                      id="escalation-keywords"
+                      value={adminSettings.escalation_keywords || ''}
+                      onChange={(e) => setAdminSettings(prev => ({...prev, escalation_keywords: e.target.value}))}
+                      placeholder="comprar,finalizar,problema,ajuda,atendente"
+                      rows={3}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Separar palavras-chave por vírgula. Quando detectadas, admin será notificado.
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">🔔 Como Funciona o Escalation</h4>
+                    <ul className="list-disc list-inside text-sm text-blue-700 space-y-1">
+                      <li>Cliente menciona palavras como "comprar", "finalizar compra"</li>
+                      <li>IA não consegue responder adequadamente</li>
+                      <li>Cliente demonstra frustração ou faz perguntas repetidas</li>
+                      <li>Admin recebe mensagem automática no Facebook com detalhes</li>
+                      <li>Admin pode assumir o atendimento manualmente</li>
+                    </ul>
                   </div>
                 </div>
               </div>
