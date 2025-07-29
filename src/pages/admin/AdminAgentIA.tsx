@@ -1125,37 +1125,129 @@ export default function AdminAgentIA() {
                         toast.loading('Testando sistema completo...');
                         
                         try {
-                          const { data, error } = await supabase.functions.invoke('test-messaging-system');
-
-                          if (error) throw error;
-
-                          console.log('🧪 Resultado do teste:', data);
+                          console.log('🧪 Iniciando teste do sistema...');
                           
+                          // 1. Testar banco de dados diretamente
+                          const testMessage = {
+                            platform: 'facebook',
+                            user_id: 'test_user_123',
+                            message: 'Mensagem de teste do sistema',
+                            type: 'received',
+                            timestamp: new Date().toISOString()
+                          };
+
+                          console.log('📝 Testando inserção no banco...');
+                          const { data: insertData, error: insertError } = await (supabase as any)
+                            .from('ai_conversations')
+                            .insert(testMessage)
+                            .select();
+
+                          if (insertError) {
+                            console.error('❌ Erro inserção:', insertError);
+                            throw new Error(`Banco de dados: ${insertError.message}`);
+                          }
+
+                          console.log('✅ Mensagem inserida:', insertData);
+
+                          // 2. Testar leitura do banco
+                          const { data: messages, error: readError } = await (supabase as any)
+                            .from('ai_conversations')
+                            .select('*')
+                            .order('timestamp', { ascending: false })
+                            .limit(10);
+
+                          if (readError) {
+                            console.error('❌ Erro leitura:', readError);
+                            throw new Error(`Leitura: ${readError.message}`);
+                          }
+
+                          console.log('📋 Mensagens encontradas:', messages);
+
+                          // 3. Recarregar conversas na interface
+                          await loadConversations();
+
                           toast.dismiss();
                           
-                          if (data.success) {
-                            const issues = [];
-                            if (!data.troubleshooting.database_working) issues.push('Banco de dados');
-                            if (!data.troubleshooting.webhook_accessible) issues.push('Webhook inacessível');
-                            if (!data.troubleshooting.messages_processing) issues.push('Processamento de mensagens');
-                            
-                            if (issues.length === 0) {
-                              toast.success('✅ Sistema funcionando! Problema pode ser configuração do Facebook.');
-                            } else {
-                              toast.error(`❌ Problemas encontrados: ${issues.join(', ')}`);
-                            }
+                          if (messages && messages.length > 0) {
+                            toast.success(`✅ Sistema funcionando! ${messages.length} mensagem(s) no banco. Verifique aba "Conversas"`);
                           } else {
-                            toast.error(`❌ Erro no teste: ${data.error}`);
+                            toast.warning('⚠️ Sistema funciona mas não há mensagens. Problema pode ser configuração Facebook.');
                           }
                           
                         } catch (error: any) {
-                          console.error('❌ Erro ao testar:', error);
+                          console.error('❌ Erro no teste:', error);
                           toast.dismiss();
-                          toast.error(`Erro: ${error.message}`);
+                          toast.error(`❌ Erro: ${error.message}`);
                         }
                       }}
                     >
                       🧪 Testar Sistema
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        toast.loading('Testando webhook...');
+                        
+                        try {
+                          // Simular mensagem do Facebook
+                          const webhookData = {
+                            entry: [{
+                              id: '230190170178019',
+                              time: Date.now(),
+                              messaging: [{
+                                sender: { id: 'test_user_webhook' },
+                                recipient: { id: '230190170178019' },
+                                timestamp: Date.now(),
+                                message: {
+                                  mid: 'test_msg_' + Date.now(),
+                                  text: 'Teste webhook direto'
+                                }
+                              }]
+                            }]
+                          };
+
+                          console.log('🔄 Enviando para webhook...', webhookData);
+
+                          const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook', {
+                            method: 'POST',
+                            headers: { 
+                              'Content-Type': 'application/json',
+                              'User-Agent': 'facebookplatform/1.0 (+http://www.facebook.com/)'
+                            },
+                            body: JSON.stringify(webhookData)
+                          });
+
+                          const result = await response.text();
+                          console.log('📤 Resposta webhook:', response.status, result);
+
+                          // Verificar se mensagem apareceu no banco
+                          setTimeout(async () => {
+                            await loadConversations();
+                            const { data: messages } = await (supabase as any)
+                              .from('ai_conversations')
+                              .select('*')
+                              .eq('user_id', 'test_user_webhook')
+                              .order('timestamp', { ascending: false })
+                              .limit(1);
+
+                            toast.dismiss();
+
+                            if (messages && messages.length > 0) {
+                              toast.success('✅ Webhook funcionando! Mensagem processada.');
+                            } else {
+                              toast.error('❌ Webhook não processou mensagem. Verifique logs.');
+                            }
+                          }, 2000);
+
+                        } catch (error: any) {
+                          console.error('❌ Erro webhook:', error);
+                          toast.dismiss();
+                          toast.error(`Erro webhook: ${error.message}`);
+                        }
+                      }}
+                    >
+                      📡 Testar Webhook
                     </Button>
                   </div>
                 </div>
