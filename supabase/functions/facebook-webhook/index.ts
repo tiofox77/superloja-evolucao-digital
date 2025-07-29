@@ -229,29 +229,39 @@ async function handleMessage(messaging: any, supabase: any) {
     
     console.log('💾 Mensagem salva no banco');
     
-    // Verificar se usuário está pedindo fotos/imagens
+    // Verificar se usuário está pedindo fotos/imagens explicitamente
     const isRequestingImages = checkIfRequestingImages(messageText);
     
-    if (isRequestingImages) {
-      console.log('📸 Usuário está pedindo imagens');
+    // Processar com IA normal SEMPRE
+    const aiResponse = await processWithAI(messageText, senderId, supabase);
+    console.log(`🤖 Resposta IA: ${aiResponse}`);
+    
+    // Verificar se encontrou produtos na resposta da IA
+    const products = await getRelevantProducts(messageText, supabase);
+    const hasProductsWithImages = products.some(p => p.image_url);
+    
+    // Enviar resposta da IA primeiro
+    await sendFacebookMessage(senderId, aiResponse, supabase);
+    
+    // Se encontrou produtos com imagens E (usuário pediu explicitamente OU encontrou produtos relevantes), enviar automaticamente
+    if (hasProductsWithImages && (isRequestingImages || products.length > 0)) {
+      console.log('📸 Enviando imagens automaticamente dos produtos encontrados');
+      
+      // Pequeno delay para não sobrepor mensagens
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Enviar imagens automaticamente
       await handleImageRequest(senderId, messageText, supabase);
-    } else {
-      // Processar com IA normal
-      const aiResponse = await processWithAI(messageText, senderId, supabase);
-      console.log(`🤖 Resposta IA: ${aiResponse}`);
-      
-      // Enviar resposta
-      await sendFacebookMessage(senderId, aiResponse, supabase);
-      
-      // Salvar resposta enviada
-      await supabase.from('ai_conversations').insert({
-        platform: 'facebook',
-        user_id: senderId,
-        message: aiResponse,
-        type: 'sent',
-        timestamp: new Date().toISOString()
-      });
     }
+    
+    // Salvar resposta enviada
+    await supabase.from('ai_conversations').insert({
+      platform: 'facebook',
+      user_id: senderId,
+      message: aiResponse,
+      type: 'sent',
+      timestamp: new Date().toISOString()
+    });
     
     console.log('✅ Processamento completo');
     
