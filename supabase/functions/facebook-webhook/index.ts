@@ -8,8 +8,15 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Log inicial para verificar se a função está sendo chamada
+  console.log('🚀 === WEBHOOK CHAMADO ===');
+  console.log('Método:', req.method);
+  console.log('URL:', req.url);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('⚡ Processando request OPTIONS');
     return new Response(null, { headers: corsHeaders });
   }
 

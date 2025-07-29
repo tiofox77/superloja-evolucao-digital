@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.sync-ai-secrets]
 verify_jwt = false
+
+[functions.test-facebook-webhook]
+verify_jwt = false
