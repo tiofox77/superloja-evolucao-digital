@@ -196,6 +196,8 @@ export default function AdminAgentIA() {
     const toastId = toast.loading('Sincronizando com secrets do Supabase...');
     
     try {
+      console.log('🔄 Iniciando sincronização...');
+      
       // Chamar edge function para sincronizar
       const { data, error } = await supabase.functions.invoke('sync-ai-secrets', {
         body: {
@@ -204,14 +206,21 @@ export default function AdminAgentIA() {
         }
       });
 
-      if (error) throw error;
+      console.log('📤 Resposta da sincronização:', { data, error });
+
+      if (error) {
+        console.error('❌ Erro na sincronização:', error);
+        throw error;
+      }
       
       toast.dismiss(toastId);
       toast.success('✅ Secrets sincronizados com sucesso!');
+      console.log('✅ Sincronização completa:', data);
       
     } catch (error: any) {
+      console.error('💥 Erro completo:', error);
       toast.dismiss(toastId);
-      toast.error(`❌ Erro na sincronização: ${error.message}`);
+      toast.error(`❌ Erro: ${error.message || 'Falha na sincronização'}`);
     }
   };
 
@@ -265,13 +274,20 @@ export default function AdminAgentIA() {
     setTestResults(prev => [...prev.filter(r => r.service !== 'Facebook'), testResult]);
     
     try {
+      console.log('🧪 Testando Facebook...');
+      
       const { data, error } = await supabase.functions.invoke('test-facebook', {
         body: {
           page_token: settings.facebook_page_token
         }
       });
 
-      if (error) throw error;
+      console.log('📤 Resposta Facebook:', { data, error });
+
+      if (error) {
+        console.error('❌ Erro Facebook:', error);
+        throw error;
+      }
       
       const successResult = {
         service: 'Facebook',
