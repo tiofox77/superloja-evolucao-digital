@@ -41,7 +41,9 @@ serve(async (req) => {
       const token = url.searchParams.get('hub.verify_token');
       const challenge = url.searchParams.get('hub.challenge');
       
-      const VERIFY_TOKEN = Deno.env.get('FACEBOOK_VERIFY_TOKEN');
+      const VERIFY_TOKEN = Deno.env.get('FACEBOOK_VERIFY_TOKEN') || 'minha_superloja_webhook_token_2024';
+      
+      console.log(`🔍 Verificação webhook: mode=${mode}, token=${token}, VERIFY_TOKEN=${VERIFY_TOKEN}`);
       
       if (mode === 'subscribe' && token === VERIFY_TOKEN) {
         console.log('Facebook webhook verified');
