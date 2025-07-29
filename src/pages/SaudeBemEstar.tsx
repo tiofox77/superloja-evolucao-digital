@@ -381,7 +381,10 @@ const SaudeBemEstar = () => {
                   {/* Faixa de Preço */}
                   <div>
                     <label className="text-sm font-medium mb-3 block text-gray-700">
-                      Preço: <span className="text-pink-600 font-semibold">R$ {priceRange[0]} - R$ {priceRange[1]}</span>
+                      Preço: <span className="text-pink-600 font-semibold">
+                        {new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA', minimumFractionDigits: 0 }).format(priceRange[0])} - 
+                        {new Intl.NumberFormat('pt-AO', { style: 'currency', currency: 'AOA', minimumFractionDigits: 0 }).format(priceRange[1])}
+                      </span>
                     </label>
                     <div className="px-2">
                       <Slider
@@ -610,12 +613,20 @@ const SaudeBemEstar = () => {
 
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-lg font-bold text-primary">
-                                R$ {product.price.toFixed(2)}
+                               <div className="text-lg font-bold text-primary">
+                                {new Intl.NumberFormat('pt-AO', {
+                                  style: 'currency',
+                                  currency: 'AOA',
+                                  minimumFractionDigits: 0
+                                }).format(product.price)}
                               </div>
                               {product.original_price && product.original_price > product.price && (
                                 <div className="text-sm text-muted-foreground line-through">
-                                  R$ {product.original_price.toFixed(2)}
+                                  {new Intl.NumberFormat('pt-AO', {
+                                    style: 'currency',
+                                    currency: 'AOA',
+                                    minimumFractionDigits: 0
+                                  }).format(product.original_price)}
                                 </div>
                               )}
                             </div>
@@ -674,11 +685,19 @@ const SaudeBemEstar = () => {
 
                                 <div className="text-right ml-4">
                                   <div className="text-lg font-bold text-primary">
-                                    R$ {product.price.toFixed(2)}
+                                    {new Intl.NumberFormat('pt-AO', {
+                                      style: 'currency',
+                                      currency: 'AOA',
+                                      minimumFractionDigits: 0
+                                    }).format(product.price)}
                                   </div>
                                   {product.original_price && product.original_price > product.price && (
                                     <div className="text-sm text-muted-foreground line-through">
-                                      R$ {product.original_price.toFixed(2)}
+                                      {new Intl.NumberFormat('pt-AO', {
+                                        style: 'currency',
+                                        currency: 'AOA',
+                                        minimumFractionDigits: 0
+                                      }).format(product.original_price)}
                                     </div>
                                   )}
                                   

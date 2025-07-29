@@ -12,6 +12,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 
+interface Variant {
+  name: string;
+  price: number;
+  image_url?: string;
+  stock_quantity: number;
+  sku?: string;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -28,6 +36,7 @@ interface Product {
   seo_description?: string;
   seo_keywords?: string;
   og_image?: string;
+  variants?: Variant[];
   categories?: {
     name: string;
   };
@@ -61,7 +70,15 @@ const Produto = () => {
           .single();
 
         if (error) throw error;
-        setProduct(data);
+        
+        // Processar variantes se existirem
+        const processedData = {
+          ...data,
+          variants: Array.isArray(data.variants) ? data.variants : 
+                   (typeof data.variants === 'string' ? JSON.parse(data.variants) : [])
+        };
+        
+        setProduct(processedData);
       } catch (error) {
         console.error('Erro ao carregar produto:', error);
         toast({
@@ -305,6 +322,43 @@ const Produto = () => {
                 <p className="text-muted-foreground leading-relaxed">
                   {product.description}
                 </p>
+              </div>
+            )}
+
+            {/* Variantes */}
+            {product.variants && product.variants.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-3">Variantes disponíveis</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {product.variants.map((variant: any, index: number) => (
+                    <div 
+                      key={index}
+                      className="border rounded-lg p-3 hover:border-primary transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3">
+                        {variant.image_url && (
+                          <img 
+                            src={variant.image_url} 
+                            alt={variant.name}
+                            className="w-12 h-12 object-cover rounded"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h4 className="font-medium">{variant.name}</h4>
+                          <p className="text-sm text-primary font-semibold">
+                            {formatPrice(variant.price)}
+                          </p>
+                          {variant.sku && (
+                            <p className="text-xs text-muted-foreground">SKU: {variant.sku}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {variant.stock_quantity} em estoque
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
