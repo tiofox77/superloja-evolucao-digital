@@ -20,8 +20,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    console.log('🔍 === TESTE DE DEBUG DA BASE DE CONHECIMENTO ===');
+    console.log('🔍 === TESTE DE DEBUG DA BASE DE CONHECIMENTO (v2.0) ===');
     console.log('📝 Query para teste:', query);
+    console.log('🚀 Iniciando debug com algoritmo corrigido...');
 
     // 1. Verificar se a configuração da base de conhecimento está ativa
     const { data: knowledgeConfig, error: configError } = await supabase
