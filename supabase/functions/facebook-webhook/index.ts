@@ -583,13 +583,17 @@ INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}${kn
 
 🎯 REGRA ABSOLUTA - BASE DE CONHECIMENTO:
 ${knowledgeResponse ? `
-🚨 ATENÇÃO: FOI ENCONTRADA INFORMAÇÃO ESPECÍFICA NA BASE DE CONHECIMENTO!
-📝 PERGUNTA: ${knowledgeResponse.question}
-📋 RESPOSTA OBRIGATÓRIA: ${knowledgeResponse.answer}
+🚨🚨🚨 ATENÇÃO MÁXIMA: FOI ENCONTRADA INFORMAÇÃO ESPECÍFICA NA BASE DE CONHECIMENTO! 🚨🚨🚨
 
-⚠️ VOCÊ DEVE USAR EXATAMENTE ESTA RESPOSTA ACIMA - NÃO INVENTE NADA DIFERENTE!
-⚠️ NÃO ADICIONE INFORMAÇÕES QUE NÃO ESTÃO NA BASE DE CONHECIMENTO!
-⚠️ USE APENAS O CONTEÚDO DA BASE DE CONHECIMENTO PARA ESTA PERGUNTA!
+📝 PERGUNTA EXATA: ${knowledgeResponse.question}
+📋 RESPOSTA OBRIGATÓRIA A USAR: "${knowledgeResponse.answer}"
+
+🔴 REGRAS INVIOLÁVEIS:
+- COPIE E COLE EXATAMENTE a resposta acima
+- NÃO modifique, NÃO adicione, NÃO invente nada
+- NÃO use seu conhecimento geral - USE APENAS esta resposta
+- Esta resposta tem 100% de prioridade sobre qualquer outra informação
+- IGNORE qualquer informação conflitante - USE APENAS A BASE DE CONHECIMENTO
 ` : ''}
 
 🎯 INSTRUÇÕES CRÍTICAS DE VENDAS:
@@ -750,7 +754,8 @@ async function searchKnowledgeBase(query: string, supabase: any): Promise<any> {
     });
     
     if (exactMatch) {
-      console.log('🎯 CORRESPONDÊNCIA EXATA encontrada:', exactMatch.question);
+      console.log('🎯 CORRESPONDÊNCIA EXATA encontrada (v2.0):', exactMatch.question);
+      console.log('📋 Resposta da base:', exactMatch.answer.substring(0, 50) + '...');
       return exactMatch;
     }
     
