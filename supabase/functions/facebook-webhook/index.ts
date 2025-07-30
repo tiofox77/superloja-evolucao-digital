@@ -1102,3 +1102,6 @@ Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
     console.error('❌ Erro geral ao notificar administrador:', error);
   }
 }
+
+// Export da função principal
+export default serve;
