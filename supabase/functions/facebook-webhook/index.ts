@@ -246,7 +246,7 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
     const { data: pageTokenData } = await supabase
       .from('ai_settings')
       .select('value')
-      .eq('key', 'facebook_page_access_token')
+      .eq('key', 'facebook_page_token')
       .single();
 
     const pageAccessToken = pageTokenData?.value || Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
