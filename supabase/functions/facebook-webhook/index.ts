@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // LOGS DETALHADOS PARA DEBUG FACEBOOK
+  // LOGS DETALHADOS PARA DEBUG FACEBOOK v3.0 - Detecção inteligente de produtos
   console.log('🚀 === WEBHOOK CHAMADO ===');
   console.log('Timestamp:', new Date().toISOString());
   console.log('Método:', req.method);
@@ -218,6 +218,112 @@ serve(async (req) => {
 
 // FUNÇÕES AUXILIARES FORA DO SERVE
 
+// NOVA FUNÇÃO: Encontrar produto específico por nome/modelo mencionado
+async function findSpecificProductByName(userMessage: string, supabase: any) {
+  console.log('🎯 === BUSCANDO PRODUTO ESPECÍFICO ===');
+  console.log('🔍 Mensagem do usuário:', userMessage);
+  
+  try {
+    // Buscar todos os produtos disponíveis
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, name, slug, price, original_price, description, image_url, in_stock')
+      .eq('active', true)
+      .eq('in_stock', true);
+
+    if (!products || products.length === 0) return null;
+
+    const userMsgLower = userMessage.toLowerCase().replace(/[^\w\s]/gi, ' ');
+    const userWords = userMsgLower.split(/\s+/).filter(word => word.length > 0);
+    
+    console.log('🔍 Palavras extraídas:', userWords);
+
+    // Procurar por correspondências exatas de modelos/nomes
+    for (const product of products) {
+      const productNameLower = product.name.toLowerCase();
+      const productWords = productNameLower.replace(/[^\w\s]/gi, ' ').split(/\s+/).filter(word => word.length > 0);
+      
+      console.log('🔍 Comparando com produto:', product.name, '| Palavras:', productWords);
+
+      // Verificar se alguma palavra do usuário corresponde a palavras-chave do produto
+      for (const userWord of userWords) {
+        // Correspondência exata de modelo (ex: "t19", "tws", etc.)
+        if (productWords.some(pWord => pWord === userWord && userWord.length >= 2)) {
+          console.log('✅ Correspondência exata encontrada:', userWord, 'em', product.name);
+          return product;
+        }
+        
+        // Correspondência de código/modelo (ex: "t19" em "Disney T19")
+        if (productNameLower.includes(userWord) && userWord.length >= 2) {
+          console.log('✅ Correspondência de modelo encontrada:', userWord, 'em', product.name);
+          return product;
+        }
+      }
+
+      // Verificar menções específicas de interesse (ex: "quero", "gostaria", "interesse")
+      const interestWords = ['quero', 'gostaria', 'interesse', 'comprar', 'ver', 'mostrar'];
+      const hasInterest = userWords.some(word => interestWords.includes(word));
+      
+      if (hasInterest) {
+        for (const userWord of userWords) {
+          if (productWords.some(pWord => pWord.includes(userWord) || userWord.includes(pWord)) && userWord.length >= 2) {
+            console.log('✅ Correspondência com interesse encontrada:', userWord, 'em', product.name);
+            return product;
+          }
+        }
+      }
+    }
+
+    console.log('❌ Nenhum produto específico encontrado');
+    return null;
+  } catch (error) {
+    console.error('❌ Erro ao buscar produto específico:', error);
+    return null;
+  }
+}
+
+// NOVA FUNÇÃO: Construir resposta específica para produto encontrado
+function buildSpecificProductResponse(product: any, userMessage: string): string {
+  console.log('🎯 Construindo resposta específica para:', product.name);
+  
+  const price = parseFloat(product.price).toLocaleString('pt-AO');
+  const originalPrice = product.original_price ? 
+    ` (antes: ${parseFloat(product.original_price).toLocaleString('pt-AO')} Kz)` : '';
+  
+  const isInterestMessage = ['quero', 'gostaria', 'interesse', 'comprar'].some(word => 
+    userMessage.toLowerCase().includes(word)
+  );
+
+  if (isInterestMessage) {
+    return `🎯 Perfeito! Você quer o **${product.name}** - ${price} Kz${originalPrice}
+
+✨ Este é um ótimo produto! 
+
+🔗 **Ver detalhes**: https://superloja.vip/produto/${product.slug}
+
+${product.description ? `📝 **Sobre o produto**: ${product.description.substring(0, 150)}...` : ''}
+
+💬 Quer que eu mostre mais detalhes ou tem alguma pergunta específica sobre este produto? 
+
+📞 Para finalizar a compra, entre em contato: +244 930 000 000`;
+  } else {
+    return `✅ Encontrei o **${product.name}** que você mencionou!
+
+💰 **Preço**: ${price} Kz${originalPrice}
+🔗 **Ver detalhes**: https://superloja.vip/produto/${product.slug}
+
+${product.description ? `📝 **Descrição**: ${product.description.substring(0, 150)}...\n\n` : ''}
+
+💡 **Quer saber mais?**
+• Detalhes técnicos
+• Fotos do produto  
+• Como comprar
+• Prazo de entrega
+
+📞 **Contato direto**: +244 930 000 000`;
+  }
+}
+
 async function handleMessage(messaging: any, supabase: any) {
   const senderId = messaging.sender.id;
   const messageText = messaging.message.text;
@@ -291,26 +397,33 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
   console.log('💬 Mensagem:', userMessage);
   
   try {
-    // 1. Verificar se é feedback negativo ou correção do usuário
+    // 1. NOVA: Detectar produto específico mencionado pelo nome/modelo
+    const specificProduct = await findSpecificProductByName(userMessage, supabase);
+    if (specificProduct) {
+      console.log('🎯 Produto específico encontrado:', specificProduct.name);
+      return buildSpecificProductResponse(specificProduct, userMessage);
+    }
+
+    // 2. Verificar se é feedback negativo ou correção do usuário
     const feedbackDetected = await detectUserFeedback(userMessage, senderId, supabase);
     if (feedbackDetected) {
       return await handleUserFeedback(userMessage, senderId, supabase);
     }
 
-    // 2. Buscar contexto do usuário 
+    // 3. Buscar contexto do usuário 
     let userContext = await getOrCreateUserContext(senderId, supabase);
     console.log('📋 Contexto:', { messageCount: userContext.message_count });
 
-    // 3. Verificar se há aprendizado aplicável
+    // 4. Verificar se há aprendizado aplicável
     const learnedResponse = await improveProductSearch(userMessage, supabase);
     if (learnedResponse) {
       return learnedResponse;
     }
 
-    // 4. Buscar TODOS os produtos disponíveis (com stock) com categorização melhorada
+    // 5. Buscar TODOS os produtos disponíveis (com stock) com categorização melhorada
     const availableProducts = await getAllAvailableProductsImproved(supabase);
     
-    // 3. Buscar na base de conhecimento PRIMEIRO - PRIORIDADE ABSOLUTA
+    // 6. Buscar na base de conhecimento PRIMEIRO - PRIORIDADE ABSOLUTA
     console.log('🔍 === BUSCANDO BASE DE CONHECIMENTO (PRIORIDADE MÁXIMA) ===');
     const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
     console.log('📚 Resultado da busca:', knowledgeResponse ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
@@ -319,7 +432,7 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
       console.log('🎯 BASE DE CONHECIMENTO TEM PRIORIDADE - IA deve usar exatamente esta resposta');
     }
 
-    // 4. Buscar configurações de IA
+    // 7. Buscar configurações de IA
     const { data: aiSettings } = await supabase
       .from('ai_settings')
       .select('key, value')
@@ -338,7 +451,7 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
       return getFallbackResponse(userMessage, senderId, supabase);
     }
 
-    // 5. Construir prompt 100% IA com todos os produtos
+    // 8. Construir prompt 100% IA com todos os produtos
     const systemPrompt = buildAdvancedAIPrompt(userContext, knowledgeResponse, availableProducts);
     const conversationHistory = await getRecentConversationHistory(senderId, supabase);
 
@@ -346,7 +459,7 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
     console.log('📊 Histórico:', conversationHistory.length, 'mensagens');
     console.log('🗃️ Produtos disponíveis:', availableProducts.length);
 
-    // 6. Chamar OpenAI - IA decide tudo
+    // 9. Chamar OpenAI - IA decide tudo
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -596,8 +709,15 @@ ${knowledgeResponse ? `
 - IGNORE qualquer informação conflitante - USE APENAS A BASE DE CONHECIMENTO
 ` : ''}
 
-🎯 INSTRUÇÕES CRÍTICAS DE VENDAS:
-- **PRIORIDADE MÁXIMA: SEMPRE usar informações da base de conhecimento quando disponíveis**
+🎯 INSTRUÇÕES CRÍTICAS PARA RECONHECIMENTO DE PRODUTOS:
+- **DETECTAR MODELOS ESPECÍFICOS**: Se usuário mencionar códigos como "T19", "TWS", números ou letras, procure produto exato
+- **PALAVRAS-CHAVE ESPECÍFICAS**: "quero T19" = mostrar especificamente o T19, não uma lista genérica
+- **PRIORIDADE DE BUSCA**: 1º produto específico mencionado, 2º categoria, 3º lista geral
+- **EVITAR LISTAS GENÉRICAS**: Se usuário pediu produto específico por nome/modelo, mostre só esse produto
+- **CÓDIGOS E MODELOS**: T19, Disney T19, Bluetooth T19, etc. = mesmo produto específico
+- **INTERESSE EXPLÍCITO**: "quero", "gostaria", "interesse" + nome produto = mostrar esse produto diretamente
+- **CORRESPONDÊNCIA EXATA**: Se encontrar produto que corresponde ao mencionado, responda sobre ELE especificamente
+- **NÃO CONFUNDIR**: Se pediram "T19", não mostrar lista de "fones" genérica - mostrar o T19!
 - Se há informação na base de conhecimento acima, USE-A EXATAMENTE - não invente nada
 - NÃO adicione informações extras quando há conhecimento específico disponível
 - A base de conhecimento tem prioridade sobre qualquer outra informação
