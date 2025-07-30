@@ -373,9 +373,15 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
     const images = [];
     let match;
     
+    console.log('🔍 Verificando imagens na mensagem...');
+    console.log('📝 Texto da mensagem:', messageText.substring(0, 500));
+    
     while ((match = imageRegex.exec(messageText)) !== null) {
       images.push(match[1]);
+      console.log('📸 Imagem encontrada:', match[1]);
     }
+    
+    console.log(`📊 Total de imagens encontradas: ${images.length}`);
     
     // Remover markdown de imagem do texto
     const cleanText = messageText.replace(/📸 !\[Imagem\]\([^)]+\)/g, '').trim();
@@ -403,7 +409,9 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
     }
     
     // Enviar imagens como attachments
+    console.log(`🚀 Enviando ${images.length} imagens como anexos...`);
     for (const imageUrl of images) {
+      console.log('📤 Enviando imagem:', imageUrl);
       const imagePayload = {
         recipient: { id: recipientId },
         message: {
@@ -426,9 +434,13 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
 
       if (!imageResponse.ok) {
         const errorText = await imageResponse.text();
-        console.error('❌ Erro ao enviar imagem Facebook:', imageResponse.status, errorText);
+        console.error('❌ Erro ao enviar imagem Facebook:', {
+          status: imageResponse.status,
+          error: errorText,
+          imageUrl: imageUrl
+        });
       } else {
-        console.log('✅ Imagem enviada para Facebook');
+        console.log('✅ Imagem enviada com sucesso para Facebook:', imageUrl);
       }
       
       // Pausa entre envios
