@@ -335,13 +335,13 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
       hasPreferences: !!userContext.user_preferences 
     });
 
-    // 2. VERIFICAR PADRÕES DE CONVERSAS PREDEFINIDOS
-    const patternResponse = await checkConversationPatterns(userMessage, userContext, supabase);
-    if (patternResponse) {
-      console.log('🎯 Resposta por padrão encontrada');
-      await updateUserContext(senderId, userMessage, patternResponse, supabase);
-      return patternResponse;
-    }
+    // 2. COMENTADO: Verificar padrões de conversas predefinidos (USAR APENAS OPENAI)
+    // const patternResponse = await checkConversationPatterns(userMessage, userContext, supabase);
+    // if (patternResponse) {
+    //   console.log('🎯 Resposta por padrão encontrada');
+    //   await updateUserContext(senderId, userMessage, patternResponse, supabase);
+    //   return patternResponse;
+    // }
 
     // 3. BUSCAR NA BASE DE CONHECIMENTO
     const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
@@ -707,12 +707,22 @@ async function getRecentConversationHistory(userId: string, supabase: any): Prom
 // Função para atualizar contexto do usuário
 async function updateUserContext(userId: string, userMessage: string, aiResponse: string, supabase: any): Promise<void> {
   try {
+    // CORRIGIDO: Usar incremento direto sem supabase.raw
+    const { data: existingContext } = await supabase
+      .from('ai_conversation_context')
+      .select('message_count')
+      .eq('user_id', userId)
+      .eq('platform', 'facebook')
+      .maybeSingle();
+
+    const newMessageCount = (existingContext?.message_count || 0) + 1;
+
     await supabase
       .from('ai_conversation_context')
       .upsert({
         user_id: userId,
         platform: 'facebook',
-        message_count: supabase.raw('COALESCE(message_count, 0) + 1'),
+        message_count: newMessageCount,
         last_interaction: new Date().toISOString(),
         conversation_summary: `Última pergunta: ${userMessage.substring(0, 100)}...`,
         updated_at: new Date().toISOString()
