@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
+// Declarar EdgeRuntime para background tasks
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<any>): void;
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -186,9 +191,17 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
       sentiment_label: sentiment.label
     });
     
-    // Verificar se é uma mensagem de compra
-    if (detectedIntent.intent === 'purchase_confirmation') {
-      await notifyAdmin(senderId, message, personalizedProducts, supabase);
+    // Verificar se é uma mensagem de compra/confirmação
+    const lowerMessage = message.toLowerCase();
+    if (detectedIntent.intent === 'purchase_confirmation' || 
+        lowerMessage.includes('nome:') || 
+        lowerMessage.includes('contacto:') || 
+        lowerMessage.includes('endereço:') || 
+        lowerMessage.includes('kilamba') ||
+        lowerMessage.includes('confirmar') ||
+        lowerMessage.includes('dados:')) {
+      // Usar background task para não bloquear resposta
+      EdgeRuntime.waitUntil(notifyAdmin(senderId, message, personalizedProducts, supabase));
     }
     
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
@@ -301,13 +314,20 @@ REGRAS CRÍTICAS:
 function detectUserIntent(message: string, sentiment: any): any {
   const lowerMessage = message.toLowerCase();
   
-  // Intenções de compra
+  // Detectar confirmação de compra baseado em padrões mais específicos
   if (lowerMessage.includes('comprei') || lowerMessage.includes('comprado') || lowerMessage.includes('pagou') || 
-      lowerMessage.includes('paguei') || lowerMessage.includes('finalizei') || lowerMessage.includes('pedido feito')) {
+      lowerMessage.includes('paguei') || lowerMessage.includes('finalizei') || lowerMessage.includes('pedido feito') ||
+      lowerMessage.includes('nome:') || lowerMessage.includes('contacto:') || lowerMessage.includes('endereço:') ||
+      lowerMessage.includes('kilamba') || lowerMessage.includes('dados:') || lowerMessage.includes('confirmar')) {
     return {
       intent: 'purchase_confirmation',
       confidence: 0.9,
-      entities: { action: 'purchase_made' }
+      entities: { 
+        action: 'purchase_made',
+        has_contact_info: lowerMessage.includes('contacto:') || lowerMessage.includes('939729902'),
+        has_address: lowerMessage.includes('endereço:') || lowerMessage.includes('kilamba'),
+        has_name: lowerMessage.includes('nome:') || lowerMessage.includes('carlos')
+      }
     };
   }
   
@@ -440,14 +460,18 @@ async function notifyAdmin(userId: string, message: string, products: any[], sup
   console.log(`🔔 INICIANDO NOTIFICAÇÃO ADMIN - Usuario: ${userId}, Mensagem: "${message}"`);
   
   try {
+    // Extrair dados do cliente da mensagem
+    const customerData = extractCustomerData(message);
+    
     // Salvar notificação no banco
     const { data: notificationData, error: notificationError } = await supabase.from('admin_notifications').insert({
       admin_user_id: 'carlosfox2',
       notification_type: 'purchase_confirmation',
-      message: `🛒 COMPRA CONFIRMADA!\n\nUsuário: ${userId}\nMensagem: "${message}"\n\nProdutos visualizados recentemente:\n${products.slice(0, 3).map(p => `- ${p.name} (${p.price} Kz)`).join('\n')}`,
+      message: `🛒 COMPRA CONFIRMADA!\n\nUsuário Facebook: ${userId}\nMensagem: "${message}"\n\nDados do Cliente:\n${customerData.summary}\n\nProdutos visualizados:\n${products.slice(0, 3).map(p => `- ${p.name} (${p.price} Kz)`).join('\n')}`,
       metadata: {
         user_id: userId,
         original_message: message,
+        customer_data: customerData,
         products_count: products.length,
         timestamp: new Date().toISOString()
       }
@@ -479,14 +503,47 @@ async function notifyAdmin(userId: string, message: string, products: any[], sup
     console.log(`🔑 Token disponível: ${pageToken ? 'SIM' : 'NÃO'}`);
     
     // Tentar enviar notificação diretamente para carlosfox2
-    await sendAdminFacebookNotification(adminId, userId, message, products, supabase);
+    await sendAdminFacebookNotification(adminId, userId, message, products, customerData, supabase);
+    
   } catch (error) {
     console.error('❌ Erro geral na notificação admin:', error);
   }
 }
 
+// Função para extrair dados do cliente da mensagem
+function extractCustomerData(message: string): any {
+  const data = {
+    name: '',
+    phone: '',
+    address: '',
+    summary: ''
+  };
+  
+  // Extrair nome
+  const nameMatch = message.match(/nome[:\s]+([^\n\r,]+)/i);
+  if (nameMatch) data.name = nameMatch[1].trim();
+  
+  // Extrair telefone/contacto
+  const phoneMatch = message.match(/contacto[:\s]+([0-9\s\+\-\(\)]+)/i) || message.match(/([0-9]{9,})/);
+  if (phoneMatch) data.phone = phoneMatch[1].trim();
+  
+  // Extrair endereço
+  const addressMatch = message.match(/endereço[:\s]+([^\n\r,]+)/i) || message.match(/(kilamba[^,\n\r]*)/i);
+  if (addressMatch) data.address = addressMatch[1].trim();
+  
+  // Criar resumo
+  const parts = [];
+  if (data.name) parts.push(`👤 Nome: ${data.name}`);
+  if (data.phone) parts.push(`📞 Contacto: ${data.phone}`);
+  if (data.address) parts.push(`📍 Endereço: ${data.address}`);
+  
+  data.summary = parts.length > 0 ? parts.join('\n') : '❗ Dados do cliente não identificados na mensagem';
+  
+  return data;
+}
+
 // Função específica para enviar notificação ao admin
-async function sendAdminFacebookNotification(adminId: string, customerId: string, customerMessage: string, products: any[], supabase: any) {
+async function sendAdminFacebookNotification(adminId: string, customerId: string, customerMessage: string, products: any[], customerData: any, supabase: any) {
   console.log(`📤 ENVIANDO NOTIFICAÇÃO ADMIN - Admin: ${adminId}, Cliente: ${customerId}`);
   
   try {
@@ -511,9 +568,23 @@ async function sendAdminFacebookNotification(adminId: string, customerId: string
 
     const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
     
-    const notificationMessage = `🚨 ESCALATION AUTOMÁTICO! 🚨\n\n👤 Cliente: ${customerId}\n💬 Mensagem: "${customerMessage}"\n\n📦 Produtos de interesse:\n${products.slice(0, 3).map(p => `• ${p.name} - ${p.price} Kz`).join('\n')}\n\n🕐 ${new Date().toLocaleString('pt-AO')}\n\n⚡ Responda rapidamente para manter o engajamento!`;
+    // Mensagem detalhada para admin
+    const notificationMessage = `🚨 NOVA COMPRA CONFIRMADA! 🚨
+
+👤 Cliente Facebook: ${customerId}
+💬 Mensagem completa: "${customerMessage}"
+
+📋 DADOS EXTRAÍDOS:
+${customerData.summary}
+
+📦 PRODUTOS DE INTERESSE:
+${products.slice(0, 5).map((p: any) => `• ${p.name} - ${p.price} Kz\n  🔗 https://superloja.vip/produto/${p.slug}`).join('\n\n')}
+
+🕐 Recebido em: ${new Date().toLocaleString('pt-AO')}
+
+⚡ AÇÃO NECESSÁRIA: Entre em contacto com o cliente para finalizar a venda!`;
     
-    console.log('📝 Mensagem preparada:', notificationMessage.substring(0, 100) + '...');
+    console.log('📝 Mensagem preparada para admin');
     console.log('🎯 Enviando para ID:', adminId);
     console.log('🌐 URL da API:', url.substring(0, 50) + '...');
     
