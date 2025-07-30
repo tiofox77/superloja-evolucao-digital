@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.instagram-webhook]
 verify_jwt = false
+
+[functions.notify-admin-purchase]
+verify_jwt = false

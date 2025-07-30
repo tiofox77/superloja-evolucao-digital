@@ -144,13 +144,26 @@ async function handleMessage(messaging: any, supabase: any) {
 
 async function callOpenAIDirectly(message: string, senderId: string, supabase: any): Promise<string> {
   try {
-    // Buscar produtos em stock
+    // Analisar sentimento da mensagem
+    const sentimentResult = await supabase.rpc('analyze_sentiment', { message_text: message });
+    const sentiment = sentimentResult.data || { score: 0.5, label: 'neutral' };
+    
+    // Detectar intenção do usuário
+    const detectedIntent = await detectUserIntent(message, sentiment);
+    
+    // Buscar ou criar preferências do usuário
+    const userPrefs = await getUserPreferences(senderId, supabase);
+    
+    // Buscar produtos em stock com personalização
     const { data: products } = await supabase
       .from('products')
       .select('id, name, slug, price, description, image_url')
       .eq('active', true)
       .eq('in_stock', true)
       .limit(20);
+    
+    // Filtrar produtos baseado nas preferências do usuário
+    const personalizedProducts = personalizeProductSelection(products || [], userPrefs, detectedIntent);
     
     // Buscar histórico da conversa
     const { data: history } = await supabase
@@ -161,17 +174,34 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
       .order('timestamp', { ascending: false })
       .limit(6);
     
+    // Salvar intenção detectada
+    await supabase.from('detected_intentions').insert({
+      user_id: senderId,
+      platform: 'facebook',
+      message: message,
+      detected_intent: detectedIntent.intent,
+      confidence_score: detectedIntent.confidence,
+      entities: detectedIntent.entities,
+      sentiment_score: sentiment.score,
+      sentiment_label: sentiment.label
+    });
+    
+    // Verificar se é uma mensagem de compra
+    if (detectedIntent.intent === 'purchase_confirmation') {
+      await notifyAdmin(senderId, message, personalizedProducts, supabase);
+    }
+    
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
-      return getFallbackResponse(message, products || []);
+      return getFallbackResponse(message, personalizedProducts, userPrefs, sentiment);
     }
 
-    // Construir lista de produtos formatada para a IA
+    // Construir lista de produtos personalizada
     let productsInfo = '';
-    if (products && products.length > 0) {
-      productsInfo = '\n\nPRODUTOS DISPONÍVEIS:\n';
-      products.forEach((product, index) => {
+    if (personalizedProducts && personalizedProducts.length > 0) {
+      productsInfo = '\n\nPRODUTOS RECOMENDADOS PARA VOCÊ:\n';
+      personalizedProducts.forEach((product, index) => {
         const price = parseFloat(product.price).toLocaleString('pt-AO');
         productsInfo += `${index + 1}. ${product.name} - ${price} Kz\n`;
         productsInfo += `   Link: https://superloja.vip/produto/${product.slug}\n`;
@@ -184,33 +214,33 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
       });
     }
 
-    const systemPrompt = `Você é um vendedor angolano simpático da SuperLoja (https://superloja.vip).
+    const systemPrompt = `Você é um vendedor angolano inteligente da SuperLoja (https://superloja.vip).
 
-PERSONALIDADE: Amigável, direto, conhece bem os produtos, fala como um angolano real.
+PERSONALIDADE: ${userPrefs.communication_style || 'amigável'}, direto, conhece bem os produtos, fala como um angolano real.
+
+ANÁLISE DO CLIENTE:
+- Sentimento atual: ${sentiment.label} (${(sentiment.score * 100).toFixed(1)}%)
+- Intenção detectada: ${detectedIntent.intent}
+- Estilo preferido: ${userPrefs.communication_style || 'amigável'}
+- Categorias de interesse: ${userPrefs.preferred_categories?.join(', ') || 'geral'}
 
 ${productsInfo}
 
 CONVERSA ANTERIOR:
 ${(history || []).reverse().map(h => `${h.type === 'received' ? 'Cliente' : 'Você'}: ${h.message}`).join('\n')}
 
-INSTRUÇÕES CRÍTICAS:
-- Quando cliente perguntar sobre produtos, liste os produtos disponíveis no formato EXATO abaixo:
+INSTRUÇÕES INTELIGENTES:
+- Adapte sua resposta ao sentimento do cliente (${sentiment.label})
+- Se detectou intenção de compra, seja mais persuasivo e forneça detalhes
+- Se detectou dúvida, seja mais explicativo
 - Use SEMPRE este formato para produtos:
 
 FORMATO OBRIGATÓRIO PARA PRODUTOS:
-Olá! Tudo bem? 😊 Temos os seguintes [CATEGORIA] em stock:
+Olá! Com base no seu interesse, temos estas opções perfeitas:
 
 1. *[NOME DO PRODUTO]* - [PREÇO] Kz
    🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
    📸 ![Imagem]([URL_DA_IMAGEM])
-
-2. *[NOME DO PRODUTO]* - [PREÇO] Kz
-   🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
-   📸 ![Imagem]([URL_DA_IMAGEM])
-
-[Continue para todos os produtos relevantes]
-
-Se algum deles te interessar, avise-me! 😊
 
 REGRAS CRÍTICAS:
 - Use * para texto em negrito (*produto*)
@@ -220,7 +250,7 @@ REGRAS CRÍTICAS:
 - Use preços EXATOS da lista acima
 - SÓ mencione produtos da lista disponível
 - Máximo 5 produtos por resposta
-- Se não for sobre produtos, responda normalmente e de forma amigável`;
+- Personalize baseado no perfil do cliente`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -234,26 +264,203 @@ REGRAS CRÍTICAS:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 800,
-        temperature: 0.7,
+        max_tokens: 1000,
+        temperature: 0.6,
       }),
     });
 
     const data = await response.json();
     
     if (data.choices && data.choices[0]) {
-      return data.choices[0].message.content.trim();
+      const aiResponse = data.choices[0].message.content.trim();
+      
+      // Atualizar preferências do usuário baseado na interação
+      await updateUserPreferences(senderId, message, detectedIntent, sentiment, supabase);
+      
+      // Salvar feedback para auto-melhoria
+      await supabase.from('ai_response_feedback').insert({
+        user_id: senderId,
+        platform: 'facebook',
+        original_message: message,
+        ai_response: aiResponse,
+        effectiveness_score: calculateEffectivenessScore(detectedIntent, sentiment)
+      });
+      
+      return aiResponse;
     } else {
       throw new Error('Resposta inválida da OpenAI');
     }
 
   } catch (error) {
     console.error('Erro OpenAI:', error);
-    return getFallbackResponse(message, []);
+    return getFallbackResponse(message, [], {}, { score: 0.5, label: 'neutral' });
   }
 }
 
-function getFallbackResponse(message: string, products: any[]): string {
+// Função para detectar intenção do usuário
+function detectUserIntent(message: string, sentiment: any): any {
+  const lowerMessage = message.toLowerCase();
+  
+  // Intenções de compra
+  if (lowerMessage.includes('comprei') || lowerMessage.includes('comprado') || lowerMessage.includes('pagou') || 
+      lowerMessage.includes('paguei') || lowerMessage.includes('finalizei') || lowerMessage.includes('pedido feito')) {
+    return {
+      intent: 'purchase_confirmation',
+      confidence: 0.9,
+      entities: { action: 'purchase_made' }
+    };
+  }
+  
+  // Intenções de produto
+  if (lowerMessage.includes('quero') || lowerMessage.includes('preciso') || lowerMessage.includes('gostaria')) {
+    return {
+      intent: 'product_interest',
+      confidence: 0.8,
+      entities: { action: 'seeking_product' }
+    };
+  }
+  
+  // Intenções de dúvida
+  if (lowerMessage.includes('como') || lowerMessage.includes('onde') || lowerMessage.includes('quando') || 
+      lowerMessage.includes('?')) {
+    return {
+      intent: 'question',
+      confidence: 0.7,
+      entities: { action: 'seeking_information' }
+    };
+  }
+  
+  return {
+    intent: 'general_conversation',
+    confidence: 0.5,
+    entities: {}
+  };
+}
+
+// Função para buscar preferências do usuário
+async function getUserPreferences(userId: string, supabase: any): Promise<any> {
+  const { data } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('platform', 'facebook')
+    .single();
+    
+  return data || {
+    communication_style: 'friendly',
+    preferred_categories: [],
+    purchase_intent: 0.5
+  };
+}
+
+// Função para personalizar seleção de produtos
+function personalizeProductSelection(products: any[], userPrefs: any, intent: any): any[] {
+  if (!products.length) return products;
+  
+  // Se o usuário tem categorias preferidas, priorizar esses produtos
+  if (userPrefs.preferred_categories && userPrefs.preferred_categories.length > 0) {
+    const preferred = products.filter(p => 
+      userPrefs.preferred_categories.some((cat: string) => 
+        p.name.toLowerCase().includes(cat.toLowerCase())
+      )
+    );
+    const others = products.filter(p => 
+      !userPrefs.preferred_categories.some((cat: string) => 
+        p.name.toLowerCase().includes(cat.toLowerCase())
+      )
+    );
+    return [...preferred, ...others].slice(0, 8);
+  }
+  
+  return products.slice(0, 8);
+}
+
+// Função para atualizar preferências do usuário
+async function updateUserPreferences(userId: string, message: string, intent: any, sentiment: any, supabase: any) {
+  const { data: existing } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('platform', 'facebook')
+    .single();
+    
+  const preferences = existing || {};
+  
+  // Atualizar histórico de interação
+  if (!preferences.interaction_history) preferences.interaction_history = {};
+  preferences.interaction_history[new Date().toISOString()] = {
+    message_length: message.length,
+    intent: intent.intent,
+    sentiment: sentiment.label
+  };
+  
+  // Atualizar perfil de sentimento
+  if (!preferences.sentiment_profile) preferences.sentiment_profile = {};
+  preferences.sentiment_profile.last_sentiment = sentiment.label;
+  preferences.sentiment_profile.average_score = sentiment.score;
+  
+  if (existing) {
+    await supabase
+      .from('user_preferences')
+      .update({
+        preferences,
+        interaction_history: preferences.interaction_history,
+        sentiment_profile: preferences.sentiment_profile,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('platform', 'facebook');
+  } else {
+    await supabase
+      .from('user_preferences')
+      .insert({
+        user_id: userId,
+        platform: 'facebook',
+        preferences,
+        interaction_history: preferences.interaction_history,
+        sentiment_profile: preferences.sentiment_profile
+      });
+  }
+}
+
+// Função para calcular score de efetividade
+function calculateEffectivenessScore(intent: any, sentiment: any): number {
+  let baseScore = 0.5;
+  
+  if (sentiment.label === 'positive') baseScore += 0.3;
+  if (sentiment.label === 'negative') baseScore -= 0.2;
+  
+  if (intent.confidence > 0.8) baseScore += 0.2;
+  
+  return Math.max(0, Math.min(1, baseScore));
+}
+
+// Função para notificar admin sobre compras
+async function notifyAdmin(userId: string, message: string, products: any[], supabase: any) {
+  await supabase.from('admin_notifications').insert({
+    admin_user_id: 'carlosfox2',
+    notification_type: 'purchase_confirmation',
+    message: `🛒 COMPRA CONFIRMADA!\n\nUsuário: ${userId}\nMensagem: "${message}"\n\nProdutos visualizados recentemente:\n${products.slice(0, 3).map(p => `- ${p.name} (${p.price} Kz)`).join('\n')}`,
+    metadata: {
+      user_id: userId,
+      original_message: message,
+      products_count: products.length,
+      timestamp: new Date().toISOString()
+    }
+  });
+  
+  // Tentar enviar notificação diretamente para carlosfox2
+  try {
+    await sendFacebookMessage('carlosfox2', 
+      `🛒 NOVA COMPRA CONFIRMADA!\n\nCliente ${userId} confirmou uma compra!\nMensagem: "${message}"\n\nVerifique o admin para mais detalhes.`, 
+      supabase
+    );
+  } catch (error) {
+    console.log('Não foi possível enviar notificação direta para carlosfox2');
+  }
+}
+
+function getFallbackResponse(message: string, products: any[], userPrefs: any = {}, sentiment: any = {}): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('fone') || lowerMessage.includes('auricular')) {
