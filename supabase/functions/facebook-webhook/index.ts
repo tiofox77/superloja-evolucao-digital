@@ -743,21 +743,63 @@ async function searchKnowledgeBase(query: string, supabase: any): Promise<any> {
     
     console.log('📚 Total de conhecimentos ativos:', knowledge.length);
     
-    // Filtrar por relevância usando busca flexível
+    // Primeiro, buscar correspondência EXATA na pergunta
+    const exactMatch = knowledge.find(item => {
+      const normalizedQuestion = normalizeText(item.question);
+      return normalizedQuestion === normalizedQuery;
+    });
+    
+    if (exactMatch) {
+      console.log('🎯 CORRESPONDÊNCIA EXATA encontrada:', exactMatch.question);
+      return exactMatch;
+    }
+    
+    // Se não encontrou correspondência exata, buscar por palavras-chave
     const relevantKnowledge = knowledge.filter(item => {
       const itemText = normalizeText(`${item.question} ${item.answer} ${item.keywords.join(' ')}`);
       
+      // Calcular score de relevância
+      let score = 0;
+      
       // Verificar se alguma palavra-chave da query aparece no texto do item
       const hasMatch = keywords.some(keyword => {
-        return itemText.includes(keyword) || 
-               keyword.includes('devoluc') && itemText.includes('devoluc') ||
-               keyword.includes('troca') && itemText.includes('troca') ||
-               keyword.includes('trocar') && itemText.includes('troca') ||
-               keyword.includes('devolver') && itemText.includes('devoluc');
+        if (itemText.includes(keyword)) {
+          score += 1;
+          return true;
+        }
+        
+        // Verificações especiais para palavras relacionadas
+        if (keyword.includes('devoluc') && itemText.includes('devoluc')) {
+          score += 1;
+          return true;
+        }
+        if (keyword.includes('troca') && itemText.includes('troca')) {
+          score += 1;
+          return true;
+        }
+        if (keyword.includes('trocar') && itemText.includes('troca')) {
+          score += 1;
+          return true;
+        }
+        if (keyword.includes('devolver') && itemText.includes('devoluc')) {
+          score += 1;
+          return true;
+        }
+        if (keyword.includes('entrega') && itemText.includes('entrega')) {
+          score += 2; // Prioridade extra para entrega
+          return true;
+        }
+        if (keyword.includes('pagamento') && itemText.includes('pagamento')) {
+          score += 2; // Prioridade extra para pagamento
+          return true;
+        }
+        
+        return false;
       });
       
       if (hasMatch) {
-        console.log(`✅ Match encontrado em: ${item.question}`);
+        console.log(`✅ Match encontrado em: ${item.question} (score: ${score})`);
+        item.relevanceScore = score;
       }
       
       return hasMatch;
@@ -766,9 +808,15 @@ async function searchKnowledgeBase(query: string, supabase: any): Promise<any> {
     console.log('🎯 Conhecimentos relevantes encontrados:', relevantKnowledge.length);
     
     if (relevantKnowledge.length > 0) {
-      // Ordenar por prioridade e retornar o primeiro
-      const bestMatch = relevantKnowledge.sort((a, b) => b.priority - a.priority)[0];
-      console.log('✅ Melhor conhecimento encontrado:', bestMatch.question);
+      // Ordenar por score de relevância primeiro, depois por prioridade
+      const bestMatch = relevantKnowledge.sort((a, b) => {
+        if (a.relevanceScore !== b.relevanceScore) {
+          return b.relevanceScore - a.relevanceScore; // Score maior primeiro
+        }
+        return b.priority - a.priority; // Se empate, prioridade maior
+      })[0];
+      
+      console.log('✅ Melhor conhecimento encontrado:', bestMatch.question, 'Score:', bestMatch.relevanceScore);
       return bestMatch;
     }
     
