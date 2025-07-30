@@ -23,9 +23,18 @@ import {
   Activity,
   Eye,
   User,
-  Key
+  Key,
+  Bell,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { 
+  sendAdminNotification,
+  notifyConfigurationChanged,
+  notifySystemError,
+  performSystemHealthCheck,
+  notifyAILearningFeedback
+} from '@/utils/notifications';
 
 // Tipos para as interfaces
 interface Metrics {
@@ -105,6 +114,7 @@ const AdminAgentIA = () => {
     loadConversations();
     loadKnowledgeBase();
     loadLearningInsights();
+    loadInitialSettings();
     
     // Configurar polling para mensagens em tempo real
     const interval = setInterval(() => {
@@ -232,8 +242,32 @@ const AdminAgentIA = () => {
     }
   };
 
+  // Carregar configurações iniciais
+  const loadInitialSettings = async () => {
+    try {
+      // Carregar configurações do bot
+      const { data: settings } = await supabase
+        .from('ai_settings')
+        .select('key, value')
+        .in('key', ['bot_enabled', 'knowledge_base_enabled']);
+
+      if (settings) {
+        const settingsMap = settings.reduce((acc: any, setting: any) => {
+          acc[setting.key] = setting.value;
+          return acc;
+        }, {});
+
+        setBotEnabled(settingsMap.bot_enabled === 'true');
+        setKnowledgeBaseEnabled(settingsMap.knowledge_base_enabled === 'true');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
+    }
+  };
+
   // Funções de manipulação
   const handleBotToggle = async (enabled: boolean) => {
+    const oldValue = botEnabled;
     setBotEnabled(enabled);
     
     try {
@@ -247,15 +281,25 @@ const AdminAgentIA = () => {
       
       if (error) throw error;
       
+      // Notificar mudança de configuração
+      await notifyConfigurationChanged(
+        'Status do Bot',
+        `Bot ${enabled ? 'habilitado' : 'desabilitado'} com sucesso`,
+        oldValue,
+        enabled
+      );
+      
       toast.success(enabled ? 'Bot habilitado!' : 'Bot desabilitado!');
     } catch (error) {
       console.error('Erro ao alterar status do bot:', error);
+      await notifySystemError('Erro ao alterar bot', error.message, { action: 'toggle_bot', enabled });
       toast.error('Erro ao salvar configuração');
       setBotEnabled(!enabled); // Reverter
     }
   };
 
   const handleKnowledgeBaseToggle = async (enabled: boolean) => {
+    const oldValue = knowledgeBaseEnabled;
     setKnowledgeBaseEnabled(enabled);
     
     try {
@@ -269,9 +313,18 @@ const AdminAgentIA = () => {
       
       if (error) throw error;
       
+      // Notificar mudança de configuração
+      await notifyConfigurationChanged(
+        'Base de Conhecimento',
+        `Base de conhecimento ${enabled ? 'ativada' : 'desativada'} com sucesso`,
+        oldValue,
+        enabled
+      );
+      
       toast.success(enabled ? 'Base de conhecimento ativada!' : 'Base de conhecimento desativada!');
     } catch (error) {
       console.error('Erro ao alterar base de conhecimento:', error);
+      await notifySystemError('Erro na base de conhecimento', error.message, { action: 'toggle_knowledge_base', enabled });
       toast.error('Erro ao salvar configuração');
       setKnowledgeBaseEnabled(!enabled); // Reverter
     }
@@ -281,14 +334,86 @@ const AdminAgentIA = () => {
     setSettingsLoading(true);
     
     try {
-      // Simular salvamento
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Salvar configurações no Supabase
+      const settingsToSave = [
+        { key: 'bot_enabled', value: botEnabled.toString(), description: 'Bot habilitado/desabilitado' },
+        { key: 'knowledge_base_enabled', value: knowledgeBaseEnabled.toString(), description: 'Base de conhecimento ativa' }
+      ];
+
+      // Salvar todas as configurações
+      for (const setting of settingsToSave) {
+        const { error } = await supabase
+          .from('ai_settings')
+          .upsert(setting);
+        
+        if (error) throw error;
+      }
+
+      // Notificar salvamento bem-sucedido
+      await notifyConfigurationChanged(
+        'Configurações Gerais',
+        'Todas as configurações do agente IA foram salvas com sucesso',
+        null,
+        { bot_enabled: botEnabled, knowledge_base_enabled: knowledgeBaseEnabled }
+      );
+      
       toast.success('Configurações salvas com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
+      await notifySystemError('Erro ao salvar configurações', error.message, { bot_enabled: botEnabled, knowledge_base_enabled: knowledgeBaseEnabled });
       toast.error('Erro ao salvar configurações');
     } finally {
       setSettingsLoading(false);
+    }
+  };
+
+  // Função para criar notificações no sistema
+  const createNotification = async (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    try {
+      await supabase.from('notifications').insert({
+        title,
+        message,
+        type,
+        user_id: null // Notificação do sistema
+      });
+    } catch (error) {
+      console.error('Erro ao criar notificação:', error);
+    }
+  };
+
+  // Verificar status dos componentes do sistema
+  const checkSystemHealth = async () => {
+    try {
+      const healthCheck = await performSystemHealthCheck();
+      
+      if (healthCheck.healthy) {
+        toast.success('Sistema funcionando perfeitamente!');
+      } else {
+        toast.warning(`${healthCheck.issues.length} problema(s) detectado(s)`);
+      }
+      
+      console.log('📊 Relatório de saúde:', healthCheck.report);
+      
+    } catch (error) {
+      console.error('Erro na verificação do sistema:', error);
+      await notifySystemError('Erro na verificação de saúde', error.message, error);
+      toast.error('Erro ao verificar sistema');
+    }
+  };
+
+  // Enviar notificação de teste
+  const sendTestNotification = async () => {
+    try {
+      await sendAdminNotification({
+        type: 'system_health_report',
+        title: 'Teste de Notificação IA',
+        message: 'Sistema de notificações funcionando corretamente!',
+        priority: 'normal',
+        data: { test: true, timestamp: new Date().toISOString() }
+      });
+    } catch (error) {
+      console.error('Erro ao enviar notificação de teste:', error);
+      toast.error('Erro ao enviar notificação');
     }
   };
 
@@ -1087,19 +1212,73 @@ const AdminAgentIA = () => {
 
                 {/* Validação e Debug */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Button variant="outline" className="h-16 border-blue-500 text-blue-600">
+                  <Button 
+                    variant="outline" 
+                    className="h-16 border-blue-500 text-blue-600"
+                    onClick={checkSystemHealth}
+                  >
                     <div className="text-center">
                       <Key className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Validar Token</div>
+                      <div className="text-sm font-medium">Verificar Sistema</div>
                     </div>
                   </Button>
                   
-                  <Button variant="outline" className="h-16 border-red-500 text-red-600">
+                  <Button 
+                    variant="outline" 
+                    className="h-16 border-green-500 text-green-600"
+                    onClick={sendTestNotification}
+                  >
                     <div className="text-center">
-                      <Settings className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Debug Completo</div>
+                      <Send className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Teste Notificação</div>
                     </div>
                   </Button>
+                </div>
+
+                {/* Nova seção: Sistema de Notificações */}
+                <div className="border-t pt-6 space-y-4">
+                  <h3 className="text-lg font-semibold">🔔 Sistema de Notificações</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Button 
+                      variant="outline" 
+                      className="h-16"
+                      onClick={sendTestNotification}
+                    >
+                      <div className="text-center">
+                        <Send className="h-6 w-6 mx-auto mb-1 text-blue-500" />
+                        <div className="text-sm font-medium">Enviar Teste</div>
+                      </div>
+                    </Button>
+                    
+                    <Button 
+                      variant="outline" 
+                      className="h-16"
+                      onClick={checkSystemHealth}
+                    >
+                      <div className="text-center">
+                        <CheckCircle className="h-6 w-6 mx-auto mb-1 text-green-500" />
+                        <div className="text-sm font-medium">Status Sistema</div>
+                      </div>
+                    </Button>
+                    
+                    <Button variant="outline" className="h-16">
+                      <div className="text-center">
+                        <Settings className="h-6 w-6 mx-auto mb-1 text-orange-500" />
+                        <div className="text-sm font-medium">Config Alertas</div>
+                      </div>
+                    </Button>
+                  </div>
+                  
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">Sistema de Notificações Ativo</h4>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• ✅ Notificações de configurações salvas</li>
+                      <li>• ✅ Alertas de erro no sistema</li>
+                      <li>• ✅ Verificação automática de saúde</li>
+                      <li>• ✅ Feedback de aprendizado IA</li>
+                      <li>• ✅ Notificações de pedidos pendentes</li>
+                    </ul>
+                  </div>
                 </div>
 
                 {/* Configuração do Webhook Facebook */}
