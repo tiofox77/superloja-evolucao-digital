@@ -241,17 +241,20 @@ export const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({
                     size="sm"
                     onClick={async () => {
                       try {
-                        const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/add-missing-knowledge', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' }
-                        });
-                        const result = await response.json();
-                        console.log('✅ Conhecimentos adicionados:', result);
-                        toast.success(`Conhecimentos verificados! Total: ${result.totalKnowledge}`);
-                        onReload();
+                        toast.info('🤖 Adicionando conhecimentos essenciais...');
+                        
+                        const { data, error } = await supabase.functions.invoke('add-missing-knowledge');
+                        
+                        if (error) {
+                          toast.error('Erro ao adicionar conhecimentos: ' + error.message);
+                        } else {
+                          console.log('✅ Conhecimentos adicionados:', data);
+                          toast.success(`✅ Conhecimentos verificados! Total: ${data.totalKnowledge || 'N/A'}`);
+                          onReload();
+                        }
                       } catch (error) {
                         console.error('❌ Erro:', error);
-                        toast.error('Erro ao adicionar conhecimentos');
+                        toast.error('Erro ao adicionar conhecimentos: ' + error.message);
                       }
                     }}
                   >
@@ -263,17 +266,26 @@ export const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({
                     size="sm"
                     onClick={async () => {
                       try {
-                        const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/debug-knowledge-base', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ query: 'teste debug completo' })
+                        toast.info('🔍 Testando base de conhecimento...');
+                        
+                        const { data, error } = await supabase.functions.invoke('debug-knowledge-base', {
+                          body: { query: 'Como funciona a entrega?' }
                         });
-                        const result = await response.json();
-                        console.log('🔍 Debug completo:', result);
-                        toast.info(`Debug: ${result.totalKnowledge} conhecimentos ativos`);
+                        
+                        if (error) {
+                          toast.error('Erro no debug: ' + error.message);
+                        } else {
+                          console.log('🔍 Debug completo:', data);
+                          
+                          if (data.foundKnowledge) {
+                            toast.success(`✅ Base funcionando! Encontrou: "${data.foundKnowledge.question}"`);
+                          } else {
+                            toast.warning(`⚠️ Debug OK - ${data.totalKnowledge} conhecimentos ativos, mas nenhum relevante para teste`);
+                          }
+                        }
                       } catch (error) {
                         console.error('❌ Erro:', error);
-                        toast.error('Erro no debug');
+                        toast.error('Erro no debug: ' + error.message);
                       }
                     }}
                   >
