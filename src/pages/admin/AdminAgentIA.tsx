@@ -40,8 +40,7 @@ import {
   updateKnowledge,
   deleteKnowledge,
   toggleKnowledgeActive,
-  saveAdminSettings,
-  type KnowledgeItem
+  saveAdminSettings
 } from '@/utils/knowledgeBase';
 
 // Tipos para as interfaces
@@ -573,12 +572,39 @@ const AdminAgentIA = () => {
       console.error('❌ Erro ao alterar status:', error);
     }
   };
+
+  const sendTestMessage = async (message: string) => {
+    try {
+      const newMessage = {
+        id: Date.now().toString(),
+        platform: 'test',
+        user_id: 'admin_test',
+        message,
+        type: 'sent' as const,
+        timestamp: new Date().toISOString()
+      };
       
       setRealtimeMessages(prev => [newMessage, ...prev]);
       toast.success('Mensagem de teste enviada!');
     } catch (error) {
       console.error('Erro ao enviar mensagem de teste:', error);
       toast.error('Erro ao enviar mensagem');
+    }
+  };
+
+  // Enviar notificação de teste
+  const sendTestNotification = async () => {
+    try {
+      await sendAdminNotification({
+        type: 'system_health_report',
+        title: 'Teste de Notificação IA',
+        message: 'Sistema de notificações funcionando corretamente!',
+        priority: 'normal',
+        data: { test: true, timestamp: new Date().toISOString() }
+      });
+    } catch (error) {
+      console.error('Erro ao enviar notificação de teste:', error);
+      toast.error('Erro ao enviar notificação');
     }
   };
 
