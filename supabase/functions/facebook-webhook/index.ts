@@ -264,8 +264,8 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
     let userContext = await getOrCreateUserContext(senderId, supabase);
     console.log('📋 Contexto:', { messageCount: userContext.message_count });
 
-    // 2. Buscar produtos (para IA ter conhecimento disponível)
-    const availableProducts = await getProductsForAI(supabase);
+    // 2. Buscar TODOS os produtos disponíveis (com stock)
+    const availableProducts = await getAllAvailableProducts(supabase);
     
     // 3. Buscar na base de conhecimento
     const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
@@ -289,8 +289,8 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
       return getFallbackResponse(userMessage, senderId, supabase);
     }
 
-    // 5. Construir prompt 100% IA
-    const systemPrompt = buildPureAIPrompt(userContext, knowledgeResponse, availableProducts);
+    // 5. Construir prompt 100% IA com todos os produtos
+    const systemPrompt = buildAdvancedAIPrompt(userContext, knowledgeResponse, availableProducts);
     const conversationHistory = await getRecentConversationHistory(senderId, supabase);
 
     console.log('🧠 Chamando OpenAI (100% IA)...');
@@ -311,8 +311,8 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
           ...conversationHistory,
           { role: 'user', content: userMessage }
         ],
-        temperature: 0.8,
-        max_tokens: 500,
+        temperature: 0.7,
+        max_tokens: 600,
         presence_penalty: 0.3,
         frequency_penalty: 0.2
       }),
@@ -344,7 +344,28 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
   }
 }
 
-// Função simples para buscar produtos (sem filtros automáticos)
+// NOVA FUNÇÃO: Buscar TODOS os produtos disponíveis
+async function getAllAvailableProducts(supabase: any) {
+  try {
+    const { data: products } = await supabase
+      .from('products')
+      .select(`
+        id, name, slug, price, original_price, description, 
+        image_url, in_stock, stock_quantity, featured,
+        category_id, categories(name), variants, colors, sizes
+      `)
+      .eq('active', true)
+      .order('name', { ascending: true });
+    
+    console.log('📦 Total de produtos carregados:', products?.length || 0);
+    return products || [];
+  } catch (error) {
+    console.error('❌ Erro ao buscar produtos:', error);
+    return [];
+  }
+}
+
+// Função simples para buscar produtos (manter para compatibilidade)
 async function getProductsForAI(supabase: any) {
   try {
     const { data: products } = await supabase
@@ -360,7 +381,105 @@ async function getProductsForAI(supabase: any) {
   }
 }
 
-// Função para construir prompt 100% IA
+// NOVA FUNÇÃO: Prompt avançado com todos os produtos
+function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, products: any[]): string {
+  
+  // INFORMAÇÕES DA EMPRESA
+  const companyInfo = `
+📍 LOCALIZAÇÃO: Angola, Luanda
+💰 MOEDA: Kz (Kwanza Angolano)
+🚚 ENTREGA: Grátis em toda Angola
+📞 CONTATO: WhatsApp/Telegram: +244 930 000 000
+🌐 SITE: https://superloja.vip
+⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h`;
+
+  // CATÁLOGO COMPLETO DE PRODUTOS - CRÍTICO PARA PRECISÃO
+  let productsInfo = '';
+  if (products.length > 0) {
+    productsInfo = '\n\n📦 ===== CATÁLOGO COMPLETO SUPERLOJA =====\n';
+    
+    // Produtos em stock
+    const inStockProducts = products.filter(p => p.in_stock);
+    const outOfStockProducts = products.filter(p => !p.in_stock);
+    
+    if (inStockProducts.length > 0) {
+      productsInfo += '\n✅ PRODUTOS DISPONÍVEIS (EM STOCK):\n';
+      inStockProducts.forEach((product, index) => {
+        const price = parseFloat(product.price).toLocaleString('pt-AO');
+        const originalPrice = product.original_price ? 
+          ` (antes: ${parseFloat(product.original_price).toLocaleString('pt-AO')} Kz)` : '';
+        const category = product.categories?.name ? ` | ${product.categories.name}` : '';
+        
+        productsInfo += `${index + 1}. ${product.name} - ${price} Kz${originalPrice}${category}\n`;
+        if (product.description) {
+          productsInfo += `   📝 ${product.description.substring(0, 80)}...\n`;
+        }
+      });
+    }
+    
+    if (outOfStockProducts.length > 0) {
+      productsInfo += '\n❌ PRODUTOS SEM STOCK (NÃO MENCIONAR):\n';
+      outOfStockProducts.forEach((product, index) => {
+        productsInfo += `${index + 1}. ${product.name} - INDISPONÍVEL\n`;
+      });
+    }
+    
+    productsInfo += '\n🎯 REGRAS CRÍTICAS SOBRE PRODUTOS:';
+    productsInfo += '\n• SÓ mencione produtos que estão EM STOCK (✅)';
+    productsInfo += '\n• NUNCA mencione produtos sem stock (❌)';
+    productsInfo += '\n• Use os preços EXATOS da lista acima';
+    productsInfo += '\n• Só fale de produtos se o cliente perguntar';
+    productsInfo += '\n• Para ver imagens, direcione para: https://superloja.vip';
+  }
+
+  // CONTEXTO DA CONVERSA
+  let conversationContext = '';
+  if (userContext.message_count > 0) {
+    conversationContext = `\n\n📋 CONTEXTO: Esta conversa tem ${userContext.message_count} mensagens.`;
+  }
+
+  // BASE DE CONHECIMENTO
+  let knowledgeInfo = '';
+  if (knowledgeResponse) {
+    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE: ${knowledgeResponse.answer}`;
+  }
+
+  return `Você é o assistente virtual oficial da SUPERLOJA, uma loja de tecnologia em Angola.
+MISSÃO: Atender clientes com informações PRECISAS e ATUALIZADAS sobre nossos produtos.
+
+INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}${knowledgeInfo}
+
+🎯 INSTRUÇÕES CRÍTICAS DE VENDAS:
+- Sempre confirme se um produto ESTÁ EM STOCK antes de mencionar
+- Use os preços EXATOS da lista acima - não invente preços
+- Se perguntarem sobre um produto inexistente, responda: "Não temos esse produto no momento"
+- Para auriculares/fones, mostre apenas os que estão EM STOCK
+- Sugira produtos similares se o desejado estiver indisponível
+
+💬 ESTILO DE COMUNICAÇÃO:
+- Seja simpático e profissional como um vendedor real
+- Cumprimente com "Olá! Tudo bem?" ou "Bom dia!"
+- Responda objetivamente - máximo 3 frases
+- Use 1-2 emojis por resposta
+- Português de Angola sempre
+
+🚫 NUNCA FAÇA:
+- Mencionar produtos sem stock
+- Inventar preços ou produtos
+- Enviar respostas longas
+- Mencionar produtos sem o cliente perguntar
+- Prometer algo que não temos
+
+✅ SEMPRE FAÇA:
+- Verificar stock antes de recomendar
+- Dar preços corretos da lista
+- Ser honesto sobre disponibilidade
+- Direcionar para o site para ver imagens
+
+SEJA PRECISO, HONESTO E ÚTIL!`;
+}
+
+// Função para construir prompt 100% IA (manter para compatibilidade)
 function buildPureAIPrompt(userContext: any, knowledgeResponse: any, products: any[]): string {
   
   // INFORMAÇÕES DA EMPRESA
