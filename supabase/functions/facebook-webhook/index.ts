@@ -236,6 +236,13 @@ async function handleMessage(messaging: any, supabase: any) {
     // Verificar se a IA solicitou envio de imagem
     const imageResponse = await checkAndSendProductImage(messageText, aiResponse, senderId, supabase);
     
+    // Verificar se precisa finalizar compra
+    const needsOrderProcessing = await checkForOrderCompletion(aiResponse, senderId, supabase);
+    if (needsOrderProcessing) {
+      console.log('🛒 Detectado pedido finalizado - notificando administrador');
+      await notifyAdminOfNewOrder(needsOrderProcessing.orderData, supabase);
+    }
+    
     // Enviar a resposta da IA
     await sendFacebookMessage(senderId, aiResponse, supabase);
     
@@ -919,9 +926,15 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
         console.log(`📸 Produto encontrado pelo número: ${selectedProduct.name}`);
         
         if (selectedProduct.image_url) {
+          // Converter URL da imagem para URL público do Supabase se necessário
+          let imageUrl = selectedProduct.image_url;
+          if (imageUrl.includes('product-images/') && !imageUrl.startsWith('http')) {
+            imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/${imageUrl}`;
+          }
+          
           await sendFacebookImage(
             recipientId,
-            selectedProduct.image_url,
+            imageUrl,
             `📸 ${selectedProduct.name}\n💰 ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz\n🔗 https://superloja.vip/produto/${selectedProduct.slug}`,
             supabase
           );
@@ -949,15 +962,20 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
         .maybeSingle();
 
       if (product && product.image_url) {
-        console.log(`📸 Enviando imagem do produto: ${product.name}`);
+        console.log(`📸 Produto encontrado: ${product.name}`);
+        
+        // Converter URL da imagem para URL público do Supabase se necessário
+        let imageUrl = product.image_url;
+        if (imageUrl.includes('product-images/') && !imageUrl.startsWith('http')) {
+          imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/${imageUrl}`;
+        }
         
         await sendFacebookImage(
           recipientId,
-          product.image_url,
+          imageUrl,
           `📸 ${product.name}\n💰 ${parseFloat(product.price).toLocaleString('pt-AO')} Kz\n🔗 https://superloja.vip/produto/${product.slug}`,
           supabase
         );
-        
         return { imageSent: true, productFound: product };
       } else {
         console.log('📸 Produto não encontrado ou sem imagem');
@@ -968,6 +986,119 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
     
   } catch (error) {
     console.error('❌ Erro ao processar solicitação de imagem:', error);
-    return { imageSent: false };
+  return { imageSent: false };
+}
+
+// NOVA FUNÇÃO: Verificar se pedido foi finalizado
+async function checkForOrderCompletion(aiResponse: string, recipientId: string, supabase: any): Promise<{orderData?: any} | null> {
+  console.log('🛒 === VERIFICANDO FINALIZAÇÃO DE PEDIDO ===');
+  
+  // Detectar se a resposta contém confirmação de pedido
+  const orderKeywords = [
+    'confirmando os dados para o seu pedido',
+    'está tudo correto',
+    'vou processar seu pedido',
+    'pedido processado',
+    'entrar em contato'
+  ];
+  
+  const hasOrderConfirmation = orderKeywords.some(keyword => 
+    aiResponse.toLowerCase().includes(keyword)
+  );
+
+  if (!hasOrderConfirmation) {
+    return null;
+  }
+
+  console.log('🛒 Detectado finalização de pedido!');
+
+  // Extrair dados do pedido da resposta da IA
+  const productMatch = aiResponse.match(/\*produto\*:\s*([^\n]+)/i);
+  const priceMatch = aiResponse.match(/\*preço\*:\s*([^\n]+)/i);
+  const nameMatch = aiResponse.match(/\*nome\*:\s*([^\n]+)/i);
+  const phoneMatch = aiResponse.match(/\*telefone\*:\s*([^\n]+)/i);
+  const addressMatch = aiResponse.match(/\*endereço\*:\s*([^\n]+)/i);
+
+  const orderData = {
+    recipientId,
+    produto: productMatch ? productMatch[1].trim() : 'Produto não identificado',
+    preco: priceMatch ? priceMatch[1].trim() : 'Preço não identificado',
+    nome: nameMatch ? nameMatch[1].trim() : 'Nome não informado',
+    telefone: phoneMatch ? phoneMatch[1].trim() : 'Telefone não informado',
+    endereco: addressMatch ? addressMatch[1].trim() : 'Endereço não informado',
+    timestamp: new Date().toLocaleString('pt-AO')
+  };
+
+  console.log('🛒 Dados do pedido extraídos:', orderData);
+  return { orderData };
+}
+
+// NOVA FUNÇÃO: Notificar administrador sobre novo pedido
+async function notifyAdminOfNewOrder(orderData: any, supabase: any): Promise<void> {
+  console.log('📢 === NOTIFICANDO ADMINISTRADOR ===');
+  
+  try {
+    // ID do administrador no Facebook (carlosfox)
+    const adminFacebookId = "carlosfox"; // Pode precisar ser ajustado para o ID real
+    
+    const orderMessage = `🚨 NOVO PEDIDO RECEBIDO! 🚨
+
+📦 Produto: ${orderData.produto}
+💰 Preço: ${orderData.preco}
+👤 Cliente: ${orderData.nome}
+📞 Telefone: ${orderData.telefone}
+📍 Endereço: ${orderData.endereco}
+⏰ Horário: ${orderData.timestamp}
+
+🔗 ID do cliente no Messenger: ${orderData.recipientId}
+
+Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
+
+    // Tentar enviar via Facebook Messenger para o admin
+    try {
+      await sendFacebookMessage(adminFacebookId, orderMessage, supabase);
+      console.log('✅ Notificação enviada para admin via Facebook');
+    } catch (error) {
+      console.error('❌ Erro ao enviar para admin via Facebook:', error);
+    }
+
+    // Salvar pedido no banco de dados
+    const { data: orderInsert, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        customer_name: orderData.nome,
+        customer_phone: orderData.telefone,
+        customer_email: '', // Não temos email do Facebook
+        total_amount: parseFloat(orderData.preco.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
+        order_status: 'pending',
+        order_source: 'facebook_messenger',
+        payment_status: 'pending',
+        notes: `Endereço: ${orderData.endereco}\nProduto: ${orderData.produto}\nMessenger ID: ${orderData.recipientId}`
+      });
+
+    if (orderError) {
+      console.error('❌ Erro ao salvar pedido no banco:', orderError);
+    } else {
+      console.log('✅ Pedido salvo no banco de dados');
+    }
+
+    // Criar notificação no sistema
+    const { error: notificationError } = await supabase
+      .from('notifications')
+      .insert({
+        title: 'Novo Pedido Via Messenger',
+        message: `Pedido de ${orderData.nome} - ${orderData.produto}`,
+        type: 'order',
+        user_id: null // Notificação para todos os admins
+      });
+
+    if (notificationError) {
+      console.error('❌ Erro ao criar notificação:', notificationError);
+    } else {
+      console.log('✅ Notificação criada no sistema');
+    }
+
+  } catch (error) {
+    console.error('❌ Erro geral ao notificar administrador:', error);
   }
 }
