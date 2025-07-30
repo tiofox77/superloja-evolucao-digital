@@ -145,27 +145,29 @@ PERSONALIDADE: Amigável, direto, conhece bem os produtos, fala como um angolano
 
 ${productsInfo}
 
-INSTRUÇÕES IMPORTANTES:
-- Seja natural e conversacional como um angolano
-- Quando perguntarem sobre fones, bluetooth ou auriculares, mostre TODOS os produtos relacionados
-- NUNCA limite a quantidade de produtos mostrados
-- NUNCA inclua imagens (![Imagem]) no texto por padrão
-- Só mencione imagens se o cliente pedir especificamente para ver fotos
+INSTRUÇÕES CRÍTICAS PARA FONES:
+- Quando perguntarem sobre fones, bluetooth ou auriculares, você DEVE mostrar TODOS os produtos relacionados
+- Não pode limitar quantidade - deve mostrar os 9 fones que temos
+- Cada produto deve ter seu próprio número (1, 2, 3, 4, 5, 6, 7, 8, 9)
+- NUNCA corte a lista no meio
+- NUNCA use frases como "entre outros" ou "e mais"
 
-FORMATO OBRIGATÓRIO PARA PRODUTOS:
-1. *[NOME DO PRODUTO]* - [PREÇO] Kz
+FORMATO OBRIGATÓRIO PARA CADA PRODUTO:
+X. *[NOME COMPLETO DO PRODUTO]* - [PREÇO EXATO] Kz
    🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
 
-REGRAS CRÍTICAS:
+REGRAS ABSOLUTAS:
 - Use * para texto em negrito (*produto*)
-- Use [Ver produto](URL) para links
-- Numere sempre os produtos (1., 2., 3...)
+- Use [Ver produto](URL) para links  
+- Numere TODOS os produtos (1., 2., 3., etc.)
 - Use preços EXATOS da lista acima
-- SÓ mencione produtos da lista disponível
-- Mostre TODOS os produtos relevantes da categoria solicitada
-- NÃO inclua ![Imagem](URL) a menos que o cliente peça fotos
+- Mostre a lista COMPLETA de fones - todos os 9 produtos
+- NÃO inclua ![Imagem](URL) a menos que cliente peça fotos
+- NÃO corte a resposta no meio
 
-IMPORTANTE: Se perguntarem sobre fones, mostre TODOS os ${products?.filter((p: any) => p.name.toLowerCase().includes('fone')).length || 0} modelos de fones disponíveis!`;
+IMPORTANTE: Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('fone')).length || 9} fones. Mostre TODOS eles quando perguntarem sobre fones!`;
+
+    console.log('🤖 Enviando para OpenAI com instruções para mostrar TODOS os fones...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -179,8 +181,8 @@ IMPORTANTE: Se perguntarem sobre fones, mostre TODOS os ${products?.filter((p: a
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 800,
-        temperature: 0.7,
+        max_tokens: 1500,
+        temperature: 0.6,
       }),
     });
 
@@ -229,8 +231,8 @@ async function getFallbackResponse(message: string, supabase: any): Promise<stri
         .order('price', { ascending: true });
       
       if (headphones && headphones.length > 0) {
-        console.log(`✅ Encontrados ${headphones.length} fones em stock`);
-        let response = "Claro! Temos vários modelos de fones de ouvido disponíveis. Aqui estão eles:\n\n";
+        console.log(`✅ Encontrados ${headphones.length} fones em stock - enviando TODOS`);
+        let response = "Claro! Aqui estão todos os fones de ouvido disponíveis na nossa loja:\n\n";
         headphones.forEach((product: any, index: number) => {
           const price = parseFloat(product.price).toLocaleString('pt-AO');
           response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
