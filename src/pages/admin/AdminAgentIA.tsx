@@ -331,17 +331,23 @@ const AdminAgentIA = () => {
         { key: 'escalation_time', value: escalationTime.toString(), description: 'Tempo para escalation em minutos' }
       ];
 
-      const { data, error } = await supabase
-        .from('ai_settings')
-        .upsert(settingsToSave, { 
-          onConflict: 'key',
-          ignoreDuplicates: false 
-        })
-        .select();
-      
-      if (error) throw error;
+      console.log('📦 Settings preparadas:', settingsToSave);
 
-      console.log('✅ Dados salvos no Supabase:', data);
+      // Salvar cada setting individualmente para evitar problemas de constraint
+      for (const setting of settingsToSave) {
+        const { error } = await supabase
+          .from('ai_settings')
+          .upsert(setting, { 
+            onConflict: 'key',
+            ignoreDuplicates: false 
+          });
+        
+        if (error) {
+          console.error(`❌ Erro ao salvar ${setting.key}:`, error);
+          throw error;
+        }
+        console.log(`✅ ${setting.key} salvo com sucesso`);
+      }
       
       await notifyConfigurationChanged(
         'Configurações Gerais',

@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import { 
   Zap, 
   Bot, 
@@ -113,7 +114,7 @@ export const TestsTab: React.FC<TestsTabProps> = ({
           {/* Sistema de Notificações */}
           <div className="border-t pt-6 space-y-4">
             <h3 className="text-lg font-semibold">🔔 Sistema de Notificações</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Button 
                 variant="outline" 
                 className="h-16"
@@ -140,6 +141,39 @@ export const TestsTab: React.FC<TestsTabProps> = ({
                 <div className="text-center">
                   <Settings className="h-6 w-6 mx-auto mb-1 text-orange-500" />
                   <div className="text-sm font-medium">Config Alertas</div>
+                </div>
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="h-16"
+                onClick={async () => {
+                  try {
+                    toast.info('Iniciando limpeza de insights...');
+                    
+                    // Usar a edge function do Supabase
+                    const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/clean-learning-insights', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (!response.ok) {
+                      throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    console.log('✅ Limpeza concluída:', result);
+                    
+                    toast.success(`Limpeza realizada! ${result.removedErrors || 0} erros removidos, ${result.remainingInsights || 0} insights restantes.`);
+                  } catch (error) {
+                    console.error('❌ Erro na limpeza:', error);
+                    toast.error('Erro ao limpar insights');
+                  }
+                }}
+              >
+                <div className="text-center">
+                  <Settings className="h-6 w-6 mx-auto mb-1 text-red-500" />
+                  <div className="text-sm font-medium">Limpar Insights</div>
                 </div>
               </Button>
             </div>
