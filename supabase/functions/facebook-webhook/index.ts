@@ -160,15 +160,24 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
     const userPrefs = await getUserPreferences(senderId, supabase);
     
     // Buscar produtos em stock com personalização
-    const { data: products } = await supabase
+    console.log('🔍 Buscando produtos...');
+    const { data: products, error: productsError } = await supabase
       .from('products')
       .select('id, name, slug, price, description, image_url')
       .eq('active', true)
       .eq('in_stock', true)
       .limit(20);
     
+    if (productsError) {
+      console.error('❌ Erro ao buscar produtos:', productsError);
+    }
+    
+    console.log(`✅ Encontrados ${products?.length || 0} produtos em stock`);
+    
     // Filtrar produtos baseado nas preferências do usuário
     const personalizedProducts = personalizeProductSelection(products || [], userPrefs, detectedIntent);
+    
+    console.log(`🎯 Produtos personalizados: ${personalizedProducts?.length || 0}`);
     
     // Buscar histórico da conversa
     const { data: history } = await supabase
@@ -207,7 +216,8 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
-      return getFallbackResponse(message, personalizedProducts || [], userPrefs, sentiment);
+      console.error('❌ OpenAI API Key não encontrada');
+      return 'Desculpe, estou com problemas técnicos no momento. Tente novamente em alguns minutos!';
     }
 
     // Construir lista de produtos personalizada
@@ -265,6 +275,13 @@ REGRAS CRÍTICAS:
 - Máximo 5 produtos por resposta
 - Personalize baseado no perfil do cliente`;
 
+    console.log('🤖 Enviando para OpenAI:', {
+      message: message,
+      products_count: personalizedProducts?.length || 0,
+      user_sentiment: sentiment.label,
+      intent: detectedIntent.intent
+    });
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -282,10 +299,23 @@ REGRAS CRÍTICAS:
       }),
     });
 
+    console.log('📡 Resposta OpenAI status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Erro OpenAI HTTP:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
     const data = await response.json();
+    console.log('📨 Resposta OpenAI recebida:', {
+      choices_length: data.choices?.length || 0,
+      has_content: !!data.choices?.[0]?.message?.content
+    });
     
     if (data.choices && data.choices[0]) {
       const aiResponse = data.choices[0].message.content.trim();
+      console.log('✅ Resposta IA gerada:', aiResponse.substring(0, 100) + '...');
       
       // Atualizar preferências do usuário baseado na interação
       await updateUserPreferences(senderId, message, detectedIntent, sentiment, supabase);
@@ -301,12 +331,17 @@ REGRAS CRÍTICAS:
       
       return aiResponse;
     } else {
+      console.error('❌ Resposta OpenAI inválida:', data);
       throw new Error('Resposta inválida da OpenAI');
     }
 
   } catch (error) {
-    console.error('Erro OpenAI:', error);
-    return getFallbackResponse(message, personalizedProducts || [], userPrefs, sentiment);
+    console.error('❌ Erro OpenAI detalhado:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    return 'Desculpe, tive um problema técnico. Tente novamente!';
   }
 }
 
