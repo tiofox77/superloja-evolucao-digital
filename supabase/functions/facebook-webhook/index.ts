@@ -900,43 +900,32 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
   }
 }
 
-// NOVA FUNÇÃO: Detectar e enviar imagens de produtos (CORRIGIDO PARA ENVIAR IMAGEM DIRETAMENTE)
+// FUNÇÃO: Detectar e enviar imagens APENAS quando solicitado explicitamente
 async function checkAndSendProductImage(userMessage: string, aiResponse: string, recipientId: string, supabase: any): Promise<{imageSent: boolean, productFound?: any}> {
   console.log('📸 === VERIFICANDO SOLICITAÇÃO DE IMAGEM ===');
   
-  // Detectar se a IA mencionou produtos na resposta ou se o usuário pediu imagem
-  const imageKeywords = [
-    'foto', 'imagem', 'ver', 'mostrar', 'picture', 'pic', 'visual', 'aparência', 
-    'como é', 'aspecto', 'mostra', 'vê', 'visualizar', 'observar', 'photo'
-  ];
-
-  const productMentions = [
-    'fones', 'auricular', 'tws', 'bluetooth', 'cabo', 'carregador', 'adaptador',
-    'mouse', 'teclado', 'headset', 'smartphone', 'tablet', 'acessório'
+  // APENAS detectar se o usuário pediu EXPLICITAMENTE uma imagem
+  const explicitImageKeywords = [
+    'foto', 'imagem', 'ver foto', 'mostrar foto', 'mostrar imagem', 'picture', 'pic', 
+    'como é', 'aspecto', 'ver como é', 'quero ver', 'me mostra', 'photo',
+    'aparência', 'visual do produto'
   ];
   
-  const userWantsImage = imageKeywords.some(keyword => 
+  const userWantsImage = explicitImageKeywords.some(keyword => 
     userMessage.toLowerCase().includes(keyword)
   );
 
-  const aiMentionedProduct = productMentions.some(keyword => 
-    aiResponse.toLowerCase().includes(keyword)
-  );
-
-  // Buscar automaticamente quando a IA menciona um produto específico
-  const shouldSendImage = userWantsImage || (aiMentionedProduct && aiResponse.includes('Kz'));
-
-  if (!shouldSendImage) {
-    console.log('📸 Não detectada necessidade de imagem');
+  if (!userWantsImage) {
+    console.log('📸 Usuário NÃO solicitou imagem explicitamente');
     return { imageSent: false };
   }
 
-  console.log('📸 Detectada necessidade de enviar imagem do produto...');
+  console.log('📸 Usuário solicitou imagem EXPLICITAMENTE - buscando produto...');
 
   try {
     let selectedProduct = null;
     
-    // 1. Detectar número da lista primeiro (ex: "produto 29", "número 5", etc)
+    // 1. Detectar número da lista primeiro (ex: "produto 29", "número 5", "foto do produto 1", etc)
     const numberMatch = userMessage.match(/(?:produto|número|item|n[ºo°]?\.?)\s*(\d+)/i);
     if (numberMatch) {
       const productNumber = parseInt(numberMatch[1]);
@@ -956,34 +945,11 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
       }
     }
 
-    // 2. Se não achou por número, buscar por nome específico mencionado na resposta da IA
-    if (!selectedProduct && aiResponse.includes('**')) {
-      const productNameMatch = aiResponse.match(/\*\*([^*]+)\*\*/);
-      if (productNameMatch) {
-        const productName = productNameMatch[1].trim();
-        console.log(`📸 Buscando produto pelo nome da IA: ${productName}`);
-        
-        const { data: product } = await supabase
-          .from('products')
-          .select('*')
-          .eq('active', true)
-          .eq('in_stock', true)
-          .ilike('name', `%${productName}%`)
-          .limit(1)
-          .maybeSingle();
-          
-        if (product) {
-          selectedProduct = product;
-          console.log(`📸 Produto encontrado pelo nome: ${selectedProduct.name}`);
-        }
-      }
-    }
-
-    // 3. Se ainda não achou, buscar por palavras-chave
+    // 2. Se não achou por número, buscar por palavras-chave mencionadas pelo usuário
     if (!selectedProduct) {
       const keywords = ['fones', 'auricular', 'tws', 'bluetooth', 'cabo', 'carregador', 'adaptador', 'mouse', 'teclado'];
       const foundKeyword = keywords.find(keyword => 
-        (userMessage.toLowerCase().includes(keyword) || aiResponse.toLowerCase().includes(keyword))
+        userMessage.toLowerCase().includes(keyword)
       );
 
       if (foundKeyword) {
@@ -1005,14 +971,12 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
       }
     }
 
-    // 4. Enviar imagem se produto foi encontrado
+    // 3. Se encontrou produto, enviar imagem
     if (selectedProduct && selectedProduct.image_url) {
       console.log(`📸 Enviando imagem do produto: ${selectedProduct.name}`);
       
-      // Garantir URL completa e correta para o Supabase Storage
+      // Garantir URL completa para Supabase Storage
       let imageUrl = selectedProduct.image_url;
-      
-      // Se a URL não começar com http, construir URL completa do Supabase
       if (!imageUrl.startsWith('http')) {
         if (imageUrl.startsWith('product-images/')) {
           imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/${imageUrl}`;
@@ -1023,7 +987,7 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
       
       console.log(`📸 URL da imagem: ${imageUrl}`);
       
-      // Enviar imagem diretamente (não como link)
+      // Enviar imagem diretamente
       await sendFacebookImage(
         recipientId,
         imageUrl,
@@ -1038,6 +1002,18 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
       return { imageSent: true, productFound: selectedProduct };
     } else {
       console.log('📸 Produto não encontrado ou sem imagem disponível');
+      // Informar que não encontrou o produto para mostrar foto
+      await sendFacebookMessage(
+        recipientId,
+        `🤔 Desculpe, não consegui identificar qual produto você quer ver a foto. 
+
+📋 Você pode me dizer:
+- "foto do produto 1" (usando o número da lista)
+- "foto dos fones" (mencionando o tipo)
+
+Ou consulte nossa lista de produtos disponíveis! 😊`,
+        supabase
+      );
       return { imageSent: false };
     }
     
