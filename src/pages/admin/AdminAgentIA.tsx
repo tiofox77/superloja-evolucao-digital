@@ -105,6 +105,7 @@ const AdminAgentIA = () => {
     loadConversations();
     loadKnowledgeBase();
     loadLearningInsights();
+    loadBotSettings();
     
     // Configurar polling para mensagens em tempo real
     const interval = setInterval(() => {
@@ -229,6 +230,22 @@ const AdminAgentIA = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar insights:', error);
+    }
+  };
+
+  const loadBotSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('ai_settings')
+        .select('key, value')
+        .eq('key', 'bot_enabled')
+        .single();
+      
+      if (data) {
+        setBotEnabled(data.value === 'true');
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações do bot:', error);
     }
   };
 
@@ -740,6 +757,36 @@ const AdminAgentIA = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-8">
+                {/* Controle de Emergência do Bot */}
+                <div className="border-2 border-red-200 bg-red-50 p-6 rounded-lg space-y-4">
+                  <h3 className="text-lg font-semibold text-red-800 flex items-center gap-2">
+                    🚨 Controle de Emergência
+                  </h3>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-red-700 font-medium">Status do Bot</Label>
+                      <p className="text-sm text-red-600 mt-1">
+                        Use este controle para pausar o bot em caso de loops ou problemas
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={botEnabled ? "default" : "destructive"} className="text-sm">
+                        {botEnabled ? "🟢 ATIVO" : "🔴 PAUSADO"}
+                      </Badge>
+                      <Switch
+                        checked={botEnabled}
+                        onCheckedChange={handleBotToggle}
+                        className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-red-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <p className="text-sm text-gray-700">
+                      <strong>Como usar:</strong> Se o bot entrar em loop ou começar a enviar respostas incorretas, 
+                      desative-o imediatamente usando este switch. O bot parará de responder instantaneamente.
+                    </p>
+                  </div>
+                </div>
                 {/* Modelo OpenAI */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">🤖 Modelo OpenAI</h3>
