@@ -181,7 +181,7 @@ IMPORTANTE: Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 2500,
+        max_tokens: 10000,
         temperature: 0.6,
       }),
     });
