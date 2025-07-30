@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // LOGS DETALHADOS PARA DEBUG FACEBOOK v3.0 - Detecção inteligente de produtos
+  // LOGS DETALHADOS PARA DEBUG FACEBOOK v4.0 - Formatação correta de produtos
   console.log('🚀 === WEBHOOK CHAMADO ===');
   console.log('Timestamp:', new Date().toISOString());
   console.log('Método:', req.method);
@@ -639,15 +639,17 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
         const originalPrice = product.original_price ? 
           ` (antes: ${parseFloat(product.original_price).toLocaleString('pt-AO')} Kz)` : '';
         const category = product.categories?.name ? ` | ${product.categories.name}` : '';
+        const imageUrl = product.image_url || '';
         
         productsInfo += `${index + 1}. ${product.name} - ${price} Kz${originalPrice}${category}\n`;
         productsInfo += `   🔗 LINK: https://superloja.vip/produto/${product.slug}\n`;
+        if (imageUrl) {
+          productsInfo += `   📸 IMAGEM: ${imageUrl}\n`;
+        }
         if (product.description) {
           productsInfo += `   📝 ${product.description.substring(0, 80)}...\n`;
         }
-        if (product.image_url) {
-          productsInfo += `   📸 IMAGEM: ${product.image_url}\n`;
-        }
+      });
       });
     }
     
@@ -727,10 +729,40 @@ ${knowledgeResponse ? `
 - Para auriculares/fones, mostre apenas os que estão EM STOCK
 - Sugira produtos similares se o desejado estiver indisponível
 
-🔗 LINKS E IMAGENS:
-- Quando cliente escolher produto ESPECÍFICO, use LINK DIRETO: https://superloja.vip/produto/[slug]
-- Se cliente pedir foto/imagem, envie URL da imagem do produto
-- Para lista geral, pode usar https://superloja.vip
+🔗 FORMATAÇÃO OBRIGATÓRIA PARA PRODUTOS:
+**QUANDO LISTAR PRODUTOS, USE SEMPRE ESTE FORMATO EXATO:**
+
+Para LISTAS DE PRODUTOS (múltiplos produtos):
+"Temos os seguintes [categoria] em stock:
+
+1. *[Nome do Produto]* - [Preço] Kz
+   🔗 [Ver produto](https://superloja.vip/produto/[slug])
+   📸 ![Imagem]([URL da imagem])
+
+2. *[Nome do Produto]* - [Preço] Kz
+   🔗 [Ver produto](https://superloja.vip/produto/[slug])
+   📸 ![Imagem]([URL da imagem])
+
+[continuar para todos os produtos...]
+
+Qual desses você gostaria de comprar? 😊"
+
+Para PRODUTO ÚNICO/ESPECÍFICO:
+"✅ [Nome do Produto] - [Preço] Kz
+🔗 [Ver produto](https://superloja.vip/produto/[slug])
+📸 ![Imagem]([URL da imagem])
+
+[Descrição breve se necessário]
+
+Quer que eu mostre mais detalhes? 😊"
+
+**REGRAS CRÍTICAS DE FORMATAÇÃO:**
+- SEMPRE incluir link [Ver produto](URL) para cada produto
+- SEMPRE incluir imagem ![Imagem](URL) para cada produto
+- Usar * para deixar nome do produto em itálico
+- Numerar produtos em listas (1., 2., 3., etc.)
+- URLs das imagens vêm da lista de produtos acima
+- Preços sempre em Kz (Kwanza)
 
 🛒 PROCESSO DE COMPRA:
 - Se cliente quiser comprar, pergunte: nome, telefone, endereço
