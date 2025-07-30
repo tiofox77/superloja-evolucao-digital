@@ -30,6 +30,9 @@ port = 54325
 [functions.analytics-ai]
 verify_jwt = false
 
+[functions.facebook-webhook-simple]
+verify_jwt = false
+
 [functions.facebook-webhook]
 verify_jwt = false
 

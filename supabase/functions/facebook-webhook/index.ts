@@ -248,24 +248,12 @@ async function handleMessage(messaging: any, supabase: any) {
     
     console.log('💾 Mensagem salva no banco');
     
-    // NOVA LÓGICA: 100% IA - Sem verificações automáticas
-    const aiResponse = await processWithPureAI(messageText, senderId, supabase);
+    // LÓGICA SIMPLIFICADA: Apenas ChatGPT direto
+    const aiResponse = await callOpenAIDirectly(messageText, senderId, supabase);
     console.log(`🤖 Resposta IA: ${aiResponse}`);
     
-    // Verificar se a IA solicitou envio de imagem EXPLICITAMENTE
-    const imageResponse = await checkAndSendProductImage(messageText, aiResponse, senderId, supabase);
-    
-    // Verificar se precisa finalizar compra
-    const needsOrderProcessing = await checkForOrderCompletion(aiResponse, senderId, supabase);
-    if (needsOrderProcessing) {
-      console.log('🛒 Detectado pedido finalizado - notificando administrador');
-      await notifyAdminOfNewOrder(needsOrderProcessing.orderData, supabase);
-    }
-    
-    // IMPORTANTE: Só enviar resposta texto se NÃO enviou imagem
-    if (!imageResponse.imageSent) {
-      await sendFacebookMessage(senderId, aiResponse, supabase);
-    }
+    // Enviar resposta direta - sem verificações extras
+    await sendFacebookMessage(senderId, aiResponse, supabase);
     
     // Salvar resposta enviada
     await supabase.from('ai_conversations').insert({
