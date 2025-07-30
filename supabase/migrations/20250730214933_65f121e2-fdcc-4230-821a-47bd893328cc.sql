@@ -1,0 +1,1 @@
+UPDATE ai_settings SET value = 'false' WHERE key = 'knowledge_base_enabled';
