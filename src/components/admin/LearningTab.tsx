@@ -151,6 +151,39 @@ export const LearningTab: React.FC<LearningTabProps> = ({ learningInsights }) =>
             )}
           </div>
 
+          {/* Sugestões de Melhoria */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+              <div className="flex items-center gap-3 mb-3">
+                <TrendingUp className="h-6 w-6 text-blue-600" />
+                <h4 className="font-semibold text-blue-800">📈 Otimização de Respostas</h4>
+              </div>
+              <p className="text-sm text-blue-700">
+                Adicione mais variações de respostas para perguntas frequentes para tornar as conversas mais naturais.
+              </p>
+            </Card>
+
+            <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+              <div className="flex items-center gap-3 mb-3">
+                <Target className="h-6 w-6 text-purple-600" />
+                <h4 className="font-semibold text-purple-800">🎯 Personalização</h4>
+              </div>
+              <p className="text-sm text-purple-700">
+                Implemente respostas personalizadas baseadas no histórico de cada usuário.
+              </p>
+            </Card>
+
+            <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+              <div className="flex items-center gap-3 mb-3">
+                <Zap className="h-6 w-6 text-orange-600" />
+                <h4 className="font-semibold text-orange-800">⚡ Performance</h4>
+              </div>
+              <p className="text-sm text-orange-700">
+                Otimize o tempo de resposta implementando cache para respostas frequentes.
+              </p>
+            </Card>
+          </div>
+
           {/* Como Funciona */}
           <div className="bg-blue-50 p-4 rounded-lg">
             <h4 className="font-medium text-blue-800 mb-2">Como Funciona o Aprendizado</h4>
@@ -160,6 +193,7 @@ export const LearningTab: React.FC<LearningTabProps> = ({ learningInsights }) =>
               <li>• Aprende com feedback dos usuários e resultados</li>
               <li>• Otimiza respostas baseado no histórico de sucesso</li>
               <li>• Sugere melhorias na base de conhecimento</li>
+              <li>• <strong>Correções são aplicadas automaticamente à base de conhecimento</strong></li>
             </ul>
           </div>
         </div>

@@ -133,7 +133,21 @@ export const CorrectionsTab: React.FC = () => {
 
     setLoading(true);
     try {
-      // 1. Salvar feedback de correção
+      // Verificar se já existe correção para esta pergunta/resposta
+      const { data: existingCorrection } = await supabase
+        .from('ai_feedback')
+        .select('id')
+        .eq('user_message', selectedConversation.user_message)
+        .eq('ai_response', selectedConversation.ai_response)
+        .single();
+
+      if (existingCorrection) {
+        toast.error('Esta conversa já foi corrigida anteriormente');
+        setIsCorrectDialogOpen(false);
+        return;
+      }
+
+      // 1. Salvar feedback de correção (SEMPRE aplicado automaticamente)
       const { data: feedbackData, error: feedbackError } = await supabase
         .from('ai_feedback')
         .insert({
@@ -142,38 +156,36 @@ export const CorrectionsTab: React.FC = () => {
           ai_response: selectedConversation.ai_response,
           correction_provided: correctionForm.correct_response,
           is_correct: false,
-          learning_applied: false
+          learning_applied: true // Aplicado automaticamente
         })
         .select()
         .single();
 
       if (feedbackError) throw feedbackError;
 
-      // 2. Se marcado para adicionar à base de conhecimento
-      if (correctionForm.add_to_knowledge) {
-        const { error: knowledgeError } = await supabase
-          .from('ai_knowledge_base')
-          .insert({
-            category: correctionForm.category,
-            question: selectedConversation.user_message,
-            answer: correctionForm.correct_response,
-            keywords: selectedConversation.user_message
-              .toLowerCase()
-              .split(' ')
-              .filter(word => word.length > 2),
-            priority: 3, // Alta prioridade para correções
-            active: true
-          });
+      // 2. SEMPRE adicionar à base de conhecimento (não opcional)
+      const { error: knowledgeError } = await supabase
+        .from('ai_knowledge_base')
+        .insert({
+          category: correctionForm.category,
+          question: selectedConversation.user_message,
+          answer: correctionForm.correct_response,
+          keywords: selectedConversation.user_message
+            .toLowerCase()
+            .split(' ')
+            .filter(word => word.length > 2),
+          priority: 3, // Alta prioridade para correções
+          active: true
+        });
 
-        if (knowledgeError) throw knowledgeError;
-      }
+      if (knowledgeError) throw knowledgeError;
 
       // 3. Criar insight de aprendizado
       const { error: insightError } = await supabase
         .from('ai_learning_insights')
         .insert({
           insight_type: 'response_correction',
-          content: `Correção aplicada: "${selectedConversation.user_message}" -> "${correctionForm.correct_response}"`,
+          content: `Correção aplicada automaticamente: "${selectedConversation.user_message}" -> "${correctionForm.correct_response}"`,
           confidence_score: 0.9,
           usage_count: 1,
           effectiveness_score: 0.8,
@@ -181,13 +193,14 @@ export const CorrectionsTab: React.FC = () => {
             original_response: selectedConversation.ai_response,
             corrected_response: correctionForm.correct_response,
             correction_type: correctionForm.correction_type,
-            user_id: selectedConversation.user_id
+            user_id: selectedConversation.user_id,
+            auto_applied: true
           }
         });
 
       if (insightError) throw insightError;
 
-      toast.success('Correção aplicada com sucesso!');
+      toast.success('Correção aplicada e adicionada à base de conhecimento automaticamente!');
       setIsCorrectDialogOpen(false);
       await loadCorrections();
       await loadRecentConversations();
@@ -350,9 +363,9 @@ export const CorrectionsTab: React.FC = () => {
                         Corrigido em {new Date(correction.created_at).toLocaleString('pt-BR')}
                       </p>
                     </div>
-                    <Badge variant="secondary">
-                      {correction.learning_applied ? 'Aplicado' : 'Pendente'}
-                    </Badge>
+                <Badge variant="secondary">
+                  Aplicado Automaticamente
+                </Badge>
                   </div>
                 </Card>
               ))
@@ -438,16 +451,12 @@ export const CorrectionsTab: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="add_to_knowledge"
-                  checked={correctionForm.add_to_knowledge}
-                  onChange={(e) => setCorrectionForm(prev => ({...prev, add_to_knowledge: e.target.checked}))}
-                />
-                <Label htmlFor="add_to_knowledge">
-                  Adicionar à Base de Conhecimento para futuras consultas
-                </Label>
+              <div className="flex items-center space-x-2 bg-green-50 p-3 rounded border border-green-200">
+                <div className="flex items-center text-green-700">
+                  <span className="text-sm font-medium">
+                    ✅ Esta correção será automaticamente adicionada à Base de Conhecimento
+                  </span>
+                </div>
               </div>
 
               <div className="flex gap-2 justify-end">
