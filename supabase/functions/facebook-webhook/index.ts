@@ -144,13 +144,43 @@ async function handleMessage(messaging: any, supabase: any) {
 
 async function callOpenAIDirectly(message: string, senderId: string, supabase: any): Promise<string> {
   try {
-    // Buscar produtos em stock
-    const { data: products } = await supabase
-      .from('products')
-      .select('id, name, slug, price, description, image_url')
-      .eq('active', true)
-      .eq('in_stock', true)
-      .limit(10);
+    // Buscar produtos relevantes baseado na mensagem do usuário
+    let products = [];
+    const lowerMessage = message.toLowerCase();
+    
+    // Se pergunta sobre fones, buscar TODOS os fones
+    if (lowerMessage.includes('fone') || lowerMessage.includes('auricular')) {
+      const { data: headphones } = await supabase
+        .from('products')
+        .select('id, name, slug, price, description, image_url')
+        .ilike('name', '%fone%')
+        .eq('active', true)
+        .eq('in_stock', true)
+        .order('name');
+      products = headphones || [];
+    }
+    // Se pergunta sobre smartphones
+    else if (lowerMessage.includes('smartphone') || lowerMessage.includes('telefone') || lowerMessage.includes('telemóvel')) {
+      const { data: phones } = await supabase
+        .from('products')
+        .select('id, name, slug, price, description, image_url')
+        .or('name.ilike.%smartphone%,name.ilike.%telefone%,name.ilike.%telemóvel%')
+        .eq('active', true)
+        .eq('in_stock', true)
+        .order('name');
+      products = phones || [];
+    }
+    // Busca geral para outros produtos
+    else {
+      const { data: allProducts } = await supabase
+        .from('products')
+        .select('id, name, slug, price, description, image_url')
+        .eq('active', true)
+        .eq('in_stock', true)
+        .limit(8)
+        .order('featured', { ascending: false });
+      products = allProducts || [];
+    }
     
     // Buscar histórico da conversa
     const { data: history } = await supabase
@@ -182,6 +212,7 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
           productsInfo += `   Descrição: ${product.description.substring(0, 100)}...\n`;
         }
       });
+      productsInfo += `\nTOTAL DE PRODUTOS ENCONTRADOS: ${products.length}`;
     }
 
     const systemPrompt = `Você é um vendedor angolano simpático da SuperLoja (https://superloja.vip).
@@ -194,11 +225,12 @@ CONVERSA ANTERIOR:
 ${(history || []).reverse().map(h => `${h.type === 'received' ? 'Cliente' : 'Você'}: ${h.message}`).join('\n')}
 
 INSTRUÇÕES CRÍTICAS:
-- Quando cliente perguntar sobre produtos, liste os produtos disponíveis no formato EXATO abaixo:
+- Quando cliente perguntar sobre produtos, liste TODOS os produtos disponíveis no formato EXATO abaixo
+- NUNCA omita produtos da lista - mostre TODOS os ${products?.length || 0} produtos encontrados
 - Use SEMPRE este formato para produtos:
 
 FORMATO OBRIGATÓRIO PARA PRODUTOS:
-Olá! Tudo bem? 😊 Temos os seguintes [CATEGORIA] em stock:
+Olá! Tudo bem? 😊 Aqui estão os [CATEGORIA] disponíveis:
 
 1. *[NOME DO PRODUTO]* - [PREÇO] Kz
    🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
@@ -208,9 +240,9 @@ Olá! Tudo bem? 😊 Temos os seguintes [CATEGORIA] em stock:
    🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
    📸 ![Imagem]([URL_DA_IMAGEM])
 
-[Continue para todos os produtos relevantes]
+[Continue para TODOS os ${products?.length || 0} produtos da lista]
 
-Se algum deles te interessar, avise-me! 😊
+Qual deles você gostaria? 😊
 
 REGRAS CRÍTICAS:
 - Use * para texto em negrito (*produto*)
@@ -218,9 +250,9 @@ REGRAS CRÍTICAS:
 - Use [Ver produto](URL) para links
 - Numere sempre os produtos (1., 2., 3...)
 - Use preços EXATOS da lista acima
-- SÓ mencione produtos da lista disponível
-- Máximo 5 produtos por resposta
-- Se não for sobre produtos, responda normalmente e de forma amigável`;
+- MOSTRE TODOS OS PRODUTOS - nunca omita nenhum
+- Use URLs EXATAS de imagem e link da lista
+- Se for sobre fones, mostre TODOS os 8 fones disponíveis`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -234,8 +266,8 @@ REGRAS CRÍTICAS:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 800,
-        temperature: 0.7,
+        max_tokens: 1200,
+        temperature: 0.6,
       }),
     });
 
@@ -257,15 +289,10 @@ function getFallbackResponse(message: string, products: any[]): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('fone') || lowerMessage.includes('auricular')) {
-    // Buscar fones na lista de produtos
-    const headphones = products.filter(p => 
-      p.name.toLowerCase().includes('fone') || 
-      p.name.toLowerCase().includes('auricular')
-    );
-    
-    if (headphones.length > 0) {
-      let response = "Olá! Tudo bem? 😊 Temos os seguintes fones de ouvido em stock:\n\n";
-      headphones.slice(0, 3).forEach((product, index) => {
+    // Se há produtos fones carregados, usar eles
+    if (products.length > 0) {
+      let response = "Olá! Tudo bem? 😊 Aqui estão os fones de ouvido disponíveis:\n\n";
+      products.forEach((product, index) => {
         const price = parseFloat(product.price).toLocaleString('pt-AO');
         response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
         response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n`;
@@ -274,7 +301,7 @@ function getFallbackResponse(message: string, products: any[]): string {
         }
         response += "\n";
       });
-      response += "Se algum deles te interessar, avise-me! 😊";
+      response += "Qual deles você gostaria? 😊";
       return response;
     }
     return `Temos fones de ouvido incríveis! Veja em https://superloja.vip 🎧`;
