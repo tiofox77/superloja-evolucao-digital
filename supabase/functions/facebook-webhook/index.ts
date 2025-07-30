@@ -150,7 +150,7 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
       .select('id, name, slug, price, description, image_url')
       .eq('active', true)
       .eq('in_stock', true)
-      .limit(10);
+      .limit(20);
     
     // Buscar histórico da conversa
     const { data: history } = await supabase
@@ -265,7 +265,7 @@ function getFallbackResponse(message: string, products: any[]): string {
     
     if (headphones.length > 0) {
       let response = "Olá! Tudo bem? 😊 Temos os seguintes fones de ouvido em stock:\n\n";
-      headphones.slice(0, 3).forEach((product, index) => {
+      headphones.forEach((product, index) => {
         const price = parseFloat(product.price).toLocaleString('pt-AO');
         response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
         response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n`;
