@@ -154,6 +154,15 @@ serve(async (req) => {
             for (const messaging of entry.messaging) {
               console.log('💬 Processando messaging:', Object.keys(messaging));
               
+              // PRIMEIRO: Verificar se é comando administrativo
+              if (messaging.message && messaging.message.text) {
+                const isAdminCommand = await processAdminCommands(messaging, supabase);
+                if (isAdminCommand) {
+                  console.log('🔧 Comando administrativo processado');
+                  continue; // Pular processamento normal
+                }
+              }
+
               // MENSAGEM DE TEXTO
               if (messaging.message && messaging.message.text) {
                 console.log('📝 Mensagem de texto encontrada');
@@ -163,6 +172,14 @@ serve(async (req) => {
               // POSTBACK (botões)
               else if (messaging.postback) {
                 console.log('🔘 Postback encontrado:', messaging.postback);
+                // Tratar postback como mensagem de texto
+                const textMessage = {
+                  ...messaging,
+                  message: {
+                    text: messaging.postback.payload
+                  }
+                };
+                await handleMessage(textMessage, supabase);
               }
               
               // OUTROS TIPOS
@@ -883,112 +900,151 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
   }
 }
 
-// NOVA FUNÇÃO: Detectar e enviar imagens de produtos
+// NOVA FUNÇÃO: Detectar e enviar imagens de produtos (CORRIGIDO PARA ENVIAR IMAGEM DIRETAMENTE)
 async function checkAndSendProductImage(userMessage: string, aiResponse: string, recipientId: string, supabase: any): Promise<{imageSent: boolean, productFound?: any}> {
   console.log('📸 === VERIFICANDO SOLICITAÇÃO DE IMAGEM ===');
   
-  // Detectar se o usuário está pedindo foto/imagem
+  // Detectar se a IA mencionou produtos na resposta ou se o usuário pediu imagem
   const imageKeywords = [
     'foto', 'imagem', 'ver', 'mostrar', 'picture', 'pic', 'visual', 'aparência', 
     'como é', 'aspecto', 'mostra', 'vê', 'visualizar', 'observar', 'photo'
+  ];
+
+  const productMentions = [
+    'fones', 'auricular', 'tws', 'bluetooth', 'cabo', 'carregador', 'adaptador',
+    'mouse', 'teclado', 'headset', 'smartphone', 'tablet', 'acessório'
   ];
   
   const userWantsImage = imageKeywords.some(keyword => 
     userMessage.toLowerCase().includes(keyword)
   );
 
-  if (!userWantsImage) {
-    console.log('📸 Usuário não solicitou imagem');
+  const aiMentionedProduct = productMentions.some(keyword => 
+    aiResponse.toLowerCase().includes(keyword)
+  );
+
+  // Buscar automaticamente quando a IA menciona um produto específico
+  const shouldSendImage = userWantsImage || (aiMentionedProduct && aiResponse.includes('Kz'));
+
+  if (!shouldSendImage) {
+    console.log('📸 Não detectada necessidade de imagem');
     return { imageSent: false };
   }
 
-  console.log('📸 Usuário solicitou imagem - buscando produto...');
+  console.log('📸 Detectada necessidade de enviar imagem do produto...');
 
   try {
-    // Extrair nome/palavra-chave do produto da mensagem
-    let productKeyword = '';
+    let selectedProduct = null;
     
-    // Detectar número da lista primeiro (ex: "produto 29", "número 5", etc)
+    // 1. Detectar número da lista primeiro (ex: "produto 29", "número 5", etc)
     const numberMatch = userMessage.match(/(?:produto|número|item|n[ºo°]?\.?)\s*(\d+)/i);
     if (numberMatch) {
       const productNumber = parseInt(numberMatch[1]);
       console.log(`📸 Detectado número do produto: ${productNumber}`);
       
-      // Buscar produto pelo índice na lista (ordenada por nome)
       const { data: products } = await supabase
         .from('products')
         .select('*')
         .eq('active', true)
         .eq('in_stock', true)
         .order('name', { ascending: true })
-        .limit(50); // Buscar até 50 produtos
+        .limit(50);
       
       if (products && products.length >= productNumber && productNumber > 0) {
-        const selectedProduct = products[productNumber - 1];
+        selectedProduct = products[productNumber - 1];
         console.log(`📸 Produto encontrado pelo número: ${selectedProduct.name}`);
+      }
+    }
+
+    // 2. Se não achou por número, buscar por nome específico mencionado na resposta da IA
+    if (!selectedProduct && aiResponse.includes('**')) {
+      const productNameMatch = aiResponse.match(/\*\*([^*]+)\*\*/);
+      if (productNameMatch) {
+        const productName = productNameMatch[1].trim();
+        console.log(`📸 Buscando produto pelo nome da IA: ${productName}`);
         
-        if (selectedProduct.image_url) {
-          // Converter URL da imagem para URL público do Supabase se necessário
-          let imageUrl = selectedProduct.image_url;
-          if (imageUrl.includes('product-images/') && !imageUrl.startsWith('http')) {
-            imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/${imageUrl}`;
-          }
+        const { data: product } = await supabase
+          .from('products')
+          .select('*')
+          .eq('active', true)
+          .eq('in_stock', true)
+          .ilike('name', `%${productName}%`)
+          .limit(1)
+          .maybeSingle();
           
-          await sendFacebookImage(
-            recipientId,
-            imageUrl,
-            `📸 ${selectedProduct.name}\n💰 ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz\n🔗 https://superloja.vip/produto/${selectedProduct.slug}`,
-            supabase
-          );
-          return { imageSent: true, productFound: selectedProduct };
+        if (product) {
+          selectedProduct = product;
+          console.log(`📸 Produto encontrado pelo nome: ${selectedProduct.name}`);
         }
       }
     }
 
-    // Se não achou por número, buscar por palavras-chave
-    const keywords = ['fones', 'auricular', 'tws', 'bluetooth', 'cabo', 'carregador', 'adaptador'];
-    productKeyword = keywords.find(keyword => 
-      userMessage.toLowerCase().includes(keyword)
-    ) || '';
+    // 3. Se ainda não achou, buscar por palavras-chave
+    if (!selectedProduct) {
+      const keywords = ['fones', 'auricular', 'tws', 'bluetooth', 'cabo', 'carregador', 'adaptador', 'mouse', 'teclado'];
+      const foundKeyword = keywords.find(keyword => 
+        (userMessage.toLowerCase().includes(keyword) || aiResponse.toLowerCase().includes(keyword))
+      );
 
-    if (productKeyword) {
-      console.log(`📸 Buscando produto com palavra-chave: ${productKeyword}`);
+      if (foundKeyword) {
+        console.log(`📸 Buscando produto com palavra-chave: ${foundKeyword}`);
+        
+        const { data: product } = await supabase
+          .from('products')
+          .select('*')
+          .eq('active', true)
+          .eq('in_stock', true)
+          .ilike('name', `%${foundKeyword}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (product) {
+          selectedProduct = product;
+          console.log(`📸 Produto encontrado por palavra-chave: ${selectedProduct.name}`);
+        }
+      }
+    }
+
+    // 4. Enviar imagem se produto foi encontrado
+    if (selectedProduct && selectedProduct.image_url) {
+      console.log(`📸 Enviando imagem do produto: ${selectedProduct.name}`);
       
-      const { data: product } = await supabase
-        .from('products')
-        .select('*')
-        .eq('active', true)
-        .eq('in_stock', true)
-        .ilike('name', `%${productKeyword}%`)
-        .limit(1)
-        .maybeSingle();
-
-      if (product && product.image_url) {
-        console.log(`📸 Produto encontrado: ${product.name}`);
-        
-        // Converter URL da imagem para URL público do Supabase se necessário
-        let imageUrl = product.image_url;
-        if (imageUrl.includes('product-images/') && !imageUrl.startsWith('http')) {
+      // Garantir URL completa e correta para o Supabase Storage
+      let imageUrl = selectedProduct.image_url;
+      
+      // Se a URL não começar com http, construir URL completa do Supabase
+      if (!imageUrl.startsWith('http')) {
+        if (imageUrl.startsWith('product-images/')) {
           imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/${imageUrl}`;
+        } else {
+          imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/product-images/${imageUrl}`;
         }
-        
-        await sendFacebookImage(
-          recipientId,
-          imageUrl,
-          `📸 ${product.name}\n💰 ${parseFloat(product.price).toLocaleString('pt-AO')} Kz\n🔗 https://superloja.vip/produto/${product.slug}`,
-          supabase
-        );
-        return { imageSent: true, productFound: product };
-      } else {
-        console.log('📸 Produto não encontrado ou sem imagem');
       }
-    }
+      
+      console.log(`📸 URL da imagem: ${imageUrl}`);
+      
+      // Enviar imagem diretamente (não como link)
+      await sendFacebookImage(
+        recipientId,
+        imageUrl,
+        `📸 ${selectedProduct.name}
+💰 Preço: ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz
+🔗 Ver mais: https://superloja.vip/produto/${selectedProduct.slug}
 
-    return { imageSent: false };
+✨ Interessado? Me diga seu nome, telefone e endereço para processar seu pedido!`,
+        supabase
+      );
+      
+      return { imageSent: true, productFound: selectedProduct };
+    } else {
+      console.log('📸 Produto não encontrado ou sem imagem disponível');
+      return { imageSent: false };
+    }
     
   } catch (error) {
     console.error('❌ Erro ao processar solicitação de imagem:', error);
-  return { imageSent: false };
+    return { imageSent: false };
+  }
 }
 
 // NOVA FUNÇÃO: Verificar se pedido foi finalizado
@@ -1040,8 +1096,30 @@ async function notifyAdminOfNewOrder(orderData: any, supabase: any): Promise<voi
   console.log('📢 === NOTIFICANDO ADMINISTRADOR ===');
   
   try {
-    // ID do administrador no Facebook (carlosfox)
-    const adminFacebookId = "carlosfox"; // Pode precisar ser ajustado para o ID real
+    // Buscar ID do administrador no Facebook das configurações
+    let adminFacebookId = "";
+    
+    try {
+      const { data: adminIdSetting } = await supabase
+        .from('ai_settings')
+        .select('value')
+        .eq('key', 'admin_facebook_id')
+        .limit(1)
+        .maybeSingle();
+      
+      if (adminIdSetting?.value) {
+        adminFacebookId = adminIdSetting.value;
+        console.log(`📞 Admin Facebook ID encontrado: ${adminFacebookId}`);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar admin ID:', error);
+    }
+
+    // Fallback para ID padrão se não encontrar nas configurações
+    if (!adminFacebookId) {
+      adminFacebookId = "carlosfox"; // ID padrão
+      console.log(`📞 Usando admin ID padrão: ${adminFacebookId}`);
+    }
     
     const orderMessage = `🚨 NOVO PEDIDO RECEBIDO! 🚨
 
@@ -1054,6 +1132,11 @@ async function notifyAdminOfNewOrder(orderData: any, supabase: any): Promise<voi
 
 🔗 ID do cliente no Messenger: ${orderData.recipientId}
 
+🎯 AÇÕES RÁPIDAS:
+✅ Responda "CONFIRMAR ${orderData.recipientId}" para confirmar o pedido
+❌ Responda "CANCELAR ${orderData.recipientId}" para cancelar
+📱 Responda "CONTATO ${orderData.recipientId}" para enviar seus dados de contato
+
 Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
 
     // Tentar enviar via Facebook Messenger para o admin
@@ -1064,32 +1147,36 @@ Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
       console.error('❌ Erro ao enviar para admin via Facebook:', error);
     }
 
-    // Salvar pedido no banco de dados
+    // Salvar pedido no banco de dados com informações detalhadas
+    const priceClean = orderData.preco.toString().replace(/[^\d,.]/g, '').replace(',', '.');
+    const totalAmount = parseFloat(priceClean) || 0;
+
     const { data: orderInsert, error: orderError } = await supabase
       .from('orders')
       .insert({
         customer_name: orderData.nome,
         customer_phone: orderData.telefone,
         customer_email: '', // Não temos email do Facebook
-        total_amount: parseFloat(orderData.preco.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
+        total_amount: totalAmount,
         order_status: 'pending',
         order_source: 'facebook_messenger',
         payment_status: 'pending',
-        notes: `Endereço: ${orderData.endereco}\nProduto: ${orderData.produto}\nMessenger ID: ${orderData.recipientId}`
+        payment_method: 'to_be_defined',
+        notes: `Endereço: ${orderData.endereco}\nProduto: ${orderData.produto}\nMessenger ID: ${orderData.recipientId}\nDetalhes: Pedido recebido via Facebook Messenger às ${orderData.timestamp}`
       });
 
     if (orderError) {
       console.error('❌ Erro ao salvar pedido no banco:', orderError);
     } else {
-      console.log('✅ Pedido salvo no banco de dados');
+      console.log('✅ Pedido salvo no banco de dados:', orderInsert);
     }
 
-    // Criar notificação no sistema
+    // Criar notificação no sistema para admins
     const { error: notificationError } = await supabase
       .from('notifications')
       .insert({
         title: 'Novo Pedido Via Messenger',
-        message: `Pedido de ${orderData.nome} - ${orderData.produto}`,
+        message: `Cliente: ${orderData.nome} | Produto: ${orderData.produto} | Valor: ${orderData.preco}`,
         type: 'order',
         user_id: null // Notificação para todos os admins
       });
@@ -1100,8 +1187,138 @@ Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
       console.log('✅ Notificação criada no sistema');
     }
 
+    // Log detalhado para rastreamento
+    const { error: logError } = await supabase
+      .from('notification_logs')
+      .insert({
+        notification_type: 'order_facebook',
+        recipient: adminFacebookId,
+        subject: 'Novo Pedido Facebook',
+        message: orderMessage,
+        status: 'sent',
+        provider: 'facebook_messenger',
+        metadata: {
+          order_data: orderData,
+          timestamp: new Date().toISOString(),
+          admin_id: adminFacebookId
+        }
+      });
+
+    if (logError) {
+      console.error('❌ Erro ao criar log de notificação:', logError);
+    }
+
   } catch (error) {
     console.error('❌ Erro geral ao notificar administrador:', error);
+  }
+}
+
+// NOVA FUNÇÃO: Processar comandos administrativos
+async function processAdminCommands(messaging: any, supabase: any): Promise<boolean> {
+  const senderId = messaging.sender.id;
+  const userMessage = messaging.message?.text?.trim() || '';
+  
+  // Verificar se é comando administrativo
+  const commandPatterns = [
+    /^CONFIRMAR\s+(.+)$/i,
+    /^CANCELAR\s+(.+)$/i,
+    /^CONTATO\s+(.+)$/i
+  ];
+
+  let isAdminCommand = false;
+  let customerId = '';
+  let command = '';
+
+  for (const pattern of commandPatterns) {
+    const match = userMessage.match(pattern);
+    if (match) {
+      isAdminCommand = true;
+      customerId = match[1].trim();
+      command = userMessage.split(' ')[0].toUpperCase();
+      break;
+    }
+  }
+
+  if (!isAdminCommand) {
+    return false;
+  }
+
+  console.log(`🔧 Comando administrativo detectado: ${command} para ${customerId}`);
+
+  try {
+    switch (command) {
+      case 'CONFIRMAR':
+        await sendFacebookMessage(
+          customerId,
+          `✅ Ótima notícia! Seu pedido foi CONFIRMADO! 🎉
+
+🚚 Nossa equipe entrará em contato em breve para coordenar a entrega.
+📞 Mantenha seu telefone disponível para confirmarmos os detalhes.
+
+Obrigado por escolher a SuperLoja! 💙`,
+          supabase
+        );
+        
+        await sendFacebookMessage(
+          senderId,
+          `✅ Confirmação enviada para o cliente ${customerId}`,
+          supabase
+        );
+        break;
+
+      case 'CANCELAR':
+        await sendFacebookMessage(
+          customerId,
+          `❌ Infelizmente não conseguimos processar seu pedido no momento.
+
+🔄 Por favor, entre em contato novamente ou visite nosso site: https://superloja.vip
+
+Pedimos desculpas pelo inconveniente. 🙏`,
+          supabase
+        );
+        
+        await sendFacebookMessage(
+          senderId,
+          `❌ Cancelamento enviado para o cliente ${customerId}`,
+          supabase
+        );
+        break;
+
+      case 'CONTATO':
+        await sendFacebookMessage(
+          customerId,
+          `📞 Dados para contato direto:
+
+👤 Atendimento: Carlos
+📱 WhatsApp: +244 939 729 902
+📧 Email: carlos@superloja.vip
+🌐 Site: https://superloja.vip
+
+🕒 Horário de atendimento:
+Segunda a Sexta: 8h às 18h
+Sábado: 8h às 14h
+
+Entre em contato quando for melhor para você! 😊`,
+          supabase
+        );
+        
+        await sendFacebookMessage(
+          senderId,
+          `📞 Dados de contato enviados para ${customerId}`,
+          supabase
+        );
+        break;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao processar comando administrativo:', error);
+    await sendFacebookMessage(
+      senderId,
+      `❌ Erro ao executar comando. Tente novamente.`,
+      supabase
+    );
+    return true;
   }
 }
 
