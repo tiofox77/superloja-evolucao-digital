@@ -139,31 +139,46 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
       });
     }
 
+    // Detectar se usuário quer ver fotos
+    const photoKeywords = ['fotos', 'foto', 'imagem', 'imagens', 'envie fotos', 'manda imagem', 'manda imagens', 'quero fotos', 'quero ver', 'mostra foto', 'mostra imagem'];
+    const wantsPhotos = photoKeywords.some(keyword => message.toLowerCase().includes(keyword));
+    
+    console.log(`📸 Usuário quer fotos: ${wantsPhotos}`);
+
     const systemPrompt = `Você é um vendedor angolano inteligente da SuperLoja (https://superloja.vip).
 
 PERSONALIDADE: Amigável, direto, conhece bem os produtos, fala como um angolano real.
 
 ${productsInfo}
 
+DETECÇÃO DE FOTOS:
+Usuário pediu fotos: ${wantsPhotos}
+
 INSTRUÇÕES CRÍTICAS PARA FONES:
 - Quando perguntarem sobre fones, bluetooth ou auriculares, você DEVE mostrar TODOS os produtos relacionados
-- Não pode limitar quantidade - deve mostrar os 9 fones que temos
+- Não pode limitar quantidade - deve mostrar os 8-9 fones que temos
 - Cada produto deve ter seu próprio número (1, 2, 3, 4, 5, 6, 7, 8, 9)
 - NUNCA corte a lista no meio
 - NUNCA use frases como "entre outros" ou "e mais"
 
+REGRAS PARA IMAGENS:
+${wantsPhotos ? 
+  '- INCLUA imagens para TODOS os produtos usando: 📸 ![Imagem](URL_DA_IMAGEM)' :
+  '- NÃO inclua imagens a menos que o cliente peça especificamente'
+}
+
 FORMATO OBRIGATÓRIO PARA CADA PRODUTO:
 X. *[NOME COMPLETO DO PRODUTO]* - [PREÇO EXATO] Kz
    🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
+${wantsPhotos ? '   📸 ![Imagem]([URL_DA_IMAGEM])' : ''}
 
 REGRAS ABSOLUTAS:
 - Use * para texto em negrito (*produto*)
 - Use [Ver produto](URL) para links  
 - Numere TODOS os produtos (1., 2., 3., etc.)
 - Use preços EXATOS da lista acima
-- Mostre a lista COMPLETA de fones - todos os 9 produtos
-- NÃO inclua ![Imagem](URL) a menos que cliente peça fotos
-- NÃO corte a resposta no meio
+- Mostre a lista COMPLETA de fones - todos os produtos
+${wantsPhotos ? '- INCLUA 📸 ![Imagem](URL) para cada produto' : '- NÃO inclua ![Imagem](URL) a menos que cliente peça fotos'}
 
 IMPORTANTE: Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('fone')).length || 9} fones. Mostre TODOS eles quando perguntarem sobre fones!`;
 
@@ -222,6 +237,12 @@ IMPORTANTE: Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('
 async function getFallbackResponse(message: string, supabase: any): Promise<string> {
   const lowerMessage = message.toLowerCase();
   
+  // Detectar se usuário quer ver fotos
+  const photoKeywords = ['fotos', 'foto', 'imagem', 'imagens', 'envie fotos', 'manda imagem', 'manda imagens', 'quero fotos', 'quero ver', 'mostra foto', 'mostra imagem'];
+  const wantsPhotos = photoKeywords.some(keyword => lowerMessage.includes(keyword));
+  
+  console.log(`📸 Fallback - Usuário quer fotos: ${wantsPhotos}`);
+  
   // Buscar produtos por categoria específica
   if (lowerMessage.includes('fone') || lowerMessage.includes('bluetooth') || lowerMessage.includes('auricular')) {
     try {
@@ -239,11 +260,19 @@ async function getFallbackResponse(message: string, supabase: any): Promise<stri
         headphones.forEach((product: any, index: number) => {
           const price = parseFloat(product.price).toLocaleString('pt-AO');
           response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
-          response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n\n`;
+          response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n`;
+          
+          // Incluir imagem se usuário pediu fotos E produto tem imagem
+          if (wantsPhotos && product.image_url) {
+            response += `   📸 ![Imagem](${product.image_url})\n`;
+          }
+          response += "\n";
         });
         
-        // Só adicionar imagens se forem múltiplos produtos (mais de 1) E se não pediram especificamente
-        if (headphones.length > 1 && !lowerMessage.includes('foto') && !lowerMessage.includes('imagem')) {
+        // Mensagem adicional sobre fotos
+        if (wantsPhotos) {
+          response += "📸 Fotos incluídas acima! Se alguma não aparecer, é só avisar.\n";
+        } else {
           response += "Se quiseres ver as fotos dos produtos, é só pedir! 📸\n";
         }
         
