@@ -252,7 +252,7 @@ async function handleMessage(messaging: any, supabase: any) {
     const aiResponse = await processWithPureAI(messageText, senderId, supabase);
     console.log(`🤖 Resposta IA: ${aiResponse}`);
     
-    // Verificar se a IA solicitou envio de imagem
+    // Verificar se a IA solicitou envio de imagem EXPLICITAMENTE
     const imageResponse = await checkAndSendProductImage(messageText, aiResponse, senderId, supabase);
     
     // Verificar se precisa finalizar compra
@@ -262,12 +262,9 @@ async function handleMessage(messaging: any, supabase: any) {
       await notifyAdminOfNewOrder(needsOrderProcessing.orderData, supabase);
     }
     
-    // Enviar a resposta da IA
-    await sendFacebookMessage(senderId, aiResponse, supabase);
-    
-    // Se houve envio de imagem, aguardar para não sobrecarregar
-    if (imageResponse.imageSent) {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Delay de 1s
+    // IMPORTANTE: Só enviar resposta texto se NÃO enviou imagem
+    if (!imageResponse.imageSent) {
+      await sendFacebookMessage(senderId, aiResponse, supabase);
     }
     
     // Salvar resposta enviada
@@ -392,6 +389,9 @@ async function getAllAvailableProducts(supabase: any) {
       .order('name', { ascending: true });
     
     console.log('📦 Total de produtos carregados:', products?.length || 0);
+    console.log('📦 Produtos em stock:', products?.filter(p => p.in_stock).length || 0);
+    console.log('📦 Produtos sem stock:', products?.filter(p => !p.in_stock).length || 0);
+    
     return products || [];
   } catch (error) {
     console.error('❌ Erro ao buscar produtos:', error);
@@ -762,7 +762,7 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
   
   try {
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -798,7 +798,7 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
   } catch (error) {
     console.error('❌ Erro de rede/conexão ao enviar mensagem:');
     console.error('🌐 Network error:', error.message);
-    console.error('🔗 URL tentativa:', `https://graph.facebook.com/v18.0/me/messages`);
+    console.error('🔗 URL tentativa:', `https://graph.facebook.com/v21.0/me/messages`);
     console.error('🔑 Token usado (primeiros 20 chars):', PAGE_ACCESS_TOKEN.substring(0, 20) + '...');
   }
 }
@@ -857,7 +857,7 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
   
   try {
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -945,33 +945,51 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
       }
     }
 
-    // 2. Se não achou por número, buscar por palavras-chave mencionadas pelo usuário
+    // 2. Se não achou por número, buscar em TODOS os produtos disponíveis
     if (!selectedProduct) {
-      const keywords = ['fones', 'auricular', 'tws', 'bluetooth', 'cabo', 'carregador', 'adaptador', 'mouse', 'teclado'];
-      const foundKeyword = keywords.find(keyword => 
-        userMessage.toLowerCase().includes(keyword)
-      );
-
-      if (foundKeyword) {
-        console.log(`📸 Buscando produto com palavra-chave: ${foundKeyword}`);
+      console.log('📸 Buscando em TODOS os produtos disponíveis...');
+      
+      // Buscar por QUALQUER palavra mencionada pelo usuário
+      const userWords = userMessage.toLowerCase().split(' ').filter(word => word.length > 2);
+      console.log(`📸 Palavras extraídas do usuário: ${userWords.join(', ')}`);
+      
+      const { data: allProducts } = await supabase
+        .from('products')
+        .select('*')
+        .eq('active', true)
+        .eq('in_stock', true);
+      
+      if (allProducts) {
+        console.log(`📸 Verificando ${allProducts.length} produtos disponíveis...`);
         
-        const { data: product } = await supabase
-          .from('products')
-          .select('*')
-          .eq('active', true)
-          .eq('in_stock', true)
-          .ilike('name', `%${foundKeyword}%`)
-          .limit(1)
-          .maybeSingle();
-
-        if (product) {
-          selectedProduct = product;
-          console.log(`📸 Produto encontrado por palavra-chave: ${selectedProduct.name}`);
+        // Buscar produto que contenha qualquer palavra mencionada
+        for (const word of userWords) {
+          if (word.length > 2) { // Ignorar palavras muito pequenas
+            const foundProduct = allProducts.find(product => 
+              product.name.toLowerCase().includes(word) ||
+              (product.description && product.description.toLowerCase().includes(word))
+            );
+            
+            if (foundProduct) {
+              selectedProduct = foundProduct;
+              console.log(`📸 Produto encontrado por palavra "${word}": ${selectedProduct.name}`);
+              break;
+            }
+          }
+        }
+        
+        // Se ainda não achou, pegar o primeiro produto com imagem disponível
+        if (!selectedProduct) {
+          const productWithImage = allProducts.find(p => p.image_url);
+          if (productWithImage) {
+            selectedProduct = productWithImage;
+            console.log(`📸 Usando primeiro produto com imagem: ${selectedProduct.name}`);
+          }
         }
       }
     }
 
-    // 3. Se encontrou produto, enviar imagem
+    // 3. Se encontrou produto, verificar se imagem está acessível e enviar
     if (selectedProduct && selectedProduct.image_url) {
       console.log(`📸 Enviando imagem do produto: ${selectedProduct.name}`);
       
@@ -987,19 +1005,44 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
       
       console.log(`📸 URL da imagem: ${imageUrl}`);
       
-      // Enviar imagem diretamente
-      await sendFacebookImage(
-        recipientId,
-        imageUrl,
-        `📸 ${selectedProduct.name}
+      // Verificar se imagem está acessível antes de enviar
+      try {
+        const imageCheck = await fetch(imageUrl, { method: 'HEAD' });
+        if (!imageCheck.ok) {
+          throw new Error('Imagem não acessível');
+        }
+        
+        // Enviar imagem diretamente com resposta integrada
+        await sendFacebookImage(
+          recipientId,
+          imageUrl,
+          `📸 ${selectedProduct.name}
 💰 Preço: ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz
 🔗 Ver mais: https://superloja.vip/produto/${selectedProduct.slug}
 
 ✨ Interessado? Me diga seu nome, telefone e endereço para processar seu pedido!`,
-        supabase
-      );
-      
-      return { imageSent: true, productFound: selectedProduct };
+          supabase
+        );
+        
+        return { imageSent: true, productFound: selectedProduct };
+        
+      } catch (imageError) {
+        console.log('❌ Erro ao acessar imagem, enviando link:', imageError);
+        
+        // Fallback: enviar texto com link da imagem
+        await sendFacebookMessage(
+          recipientId,
+          `📸 ${selectedProduct.name}
+💰 Preço: ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz
+🔗 Ver mais: https://superloja.vip/produto/${selectedProduct.slug}
+🖼️ Imagem: ${imageUrl}
+
+✨ Interessado? Me diga seu nome, telefone e endereço para processar seu pedido!`,
+          supabase
+        );
+        
+        return { imageSent: true, productFound: selectedProduct };
+      }
     } else {
       console.log('📸 Produto não encontrado ou sem imagem disponível');
       // Informar que não encontrou o produto para mostrar foto
@@ -1014,7 +1057,7 @@ async function checkAndSendProductImage(userMessage: string, aiResponse: string,
 Ou consulte nossa lista de produtos disponíveis! 😊`,
         supabase
       );
-      return { imageSent: false };
+      return { imageSent: true }; // Marcar como enviado para evitar resposta dupla
     }
     
   } catch (error) {
