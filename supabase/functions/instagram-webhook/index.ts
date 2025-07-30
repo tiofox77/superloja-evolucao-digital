@@ -262,22 +262,22 @@ async function handleInstagramMessage(messaging: any, supabase: any) {
     // Verificar se precisa escalar para humano
     const shouldEscalate = await checkEscalationNeeded(messageText, aiResponse, senderId, supabase);
     
-    // Verificar se encontrou produtos
-    const products = await getRelevantProducts(messageText, supabase);
-    const hasProductsWithImages = products.some(p => p.image_url);
-    
     // Enviar resposta da IA primeiro
     await sendInstagramMessage(senderId, aiResponse, supabase);
     
-    // Se encontrou produtos com imagens, enviar automaticamente
-    if (hasProductsWithImages && products.length > 0) {
-      console.log('📸 Enviando imagens automaticamente dos produtos encontrados no Instagram');
+    // CORRIGIDO: Só enviar produtos se explicitamente solicitado
+    const isProductRequest = checkIfProductRequest(messageText, aiResponse);
+    
+    if (isProductRequest) {
+      console.log('📸 Usuário solicitou produtos - enviando imagens');
       
       // Pequeno delay para não sobrepor mensagens
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Enviar imagens automaticamente no Instagram
+      // Enviar imagens apenas quando solicitado
       await handleInstagramImageRequest(senderId, messageText, supabase);
+    } else {
+      console.log('ℹ️ Resposta apenas de texto - produtos não solicitados');
     }
     
     // Se precisar escalar, notificar admin
@@ -1277,4 +1277,55 @@ function checkForUnresolvedIssues(messages: any[]): boolean {
       msg.message.toLowerCase().includes(indicator)
     )
   );
+}
+
+// NOVA FUNÇÃO: Verificar se usuário realmente solicitou produtos
+function checkIfProductRequest(userMessage: string, aiResponse: string): boolean {
+  const messageLower = userMessage.toLowerCase();
+  const responseLower = aiResponse.toLowerCase();
+  
+  // Palavras que indicam pedido explícito de produtos
+  const productRequestKeywords = [
+    'mostra', 'ver produtos', 'produtos', 'imagens', 'fotos',
+    'que vocês têm', 'disponível', 'catálogo', 'quero ver',
+    'mostrar', 'opções', 'escolher', 'modelos'
+  ];
+  
+  // Palavras que indicam NÃO é pedido de produto
+  const nonProductKeywords = [
+    'horário', 'quando', 'como', 'onde', 'endereço',
+    'entrega', 'frete', 'pagamento', 'dúvida', 'informação',
+    'funciona', 'tempo', 'oi', 'olá', 'bom dia', 'boa tarde'
+  ];
+  
+  // Se a IA mencionou produtos na resposta (pode significar que detectou solicitação)
+  const aiMentionedProducts = responseLower.includes('produto') || 
+                              responseLower.includes('modelo') ||
+                              responseLower.includes('disponível') ||
+                              responseLower.includes('catálogo');
+  
+  // Verificar se usuário fez pedido explícito
+  const hasProductRequest = productRequestKeywords.some(keyword => 
+    messageLower.includes(keyword)
+  );
+  
+  // Verificar se é claramente NÃO um pedido de produto
+  const isNonProductQuery = nonProductKeywords.some(keyword => 
+    messageLower.includes(keyword)
+  );
+  
+  // LÓGICA: Só enviar produtos se:
+  // 1. Usuário fez pedido explícito OU
+  // 2. IA detectou e mencionou produtos na resposta E não é claramente outra coisa
+  const shouldSendProducts = hasProductRequest || (aiMentionedProducts && !isNonProductQuery);
+  
+  console.log('🔍 Análise de solicitação de produtos:', {
+    userMessage: messageLower,
+    hasProductRequest,
+    isNonProductQuery,
+    aiMentionedProducts,
+    shouldSendProducts
+  });
+  
+  return shouldSendProducts;
 }
