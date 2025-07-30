@@ -311,7 +311,12 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
     const availableProducts = await getAllAvailableProductsImproved(supabase);
     
     // 3. Buscar na base de conhecimento
+    console.log('🔍 === BUSCANDO BASE DE CONHECIMENTO ===');
     const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
+    console.log('📚 Resultado da busca:', knowledgeResponse ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+    if (knowledgeResponse) {
+      console.log('📖 Conhecimento encontrado:', knowledgeResponse.question, '→', knowledgeResponse.answer.substring(0, 50) + '...');
+    }
 
     // 4. Buscar configurações de IA
     const { data: aiSettings } = await supabase
@@ -561,7 +566,13 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
   // BASE DE CONHECIMENTO
   let knowledgeInfo = '';
   if (knowledgeResponse) {
-    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE: ${knowledgeResponse.answer}`;
+    console.log('📚 Incluindo conhecimento no prompt:', knowledgeResponse.question);
+    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE DA BASE DE CONHECIMENTO: 
+📝 Pergunta: ${knowledgeResponse.question}
+📋 Resposta: ${knowledgeResponse.answer}
+🏷️ Categoria: ${knowledgeResponse.category}`;
+  } else {
+    console.log('⚠️ Nenhum conhecimento relevante para incluir no prompt');
   }
 
   return `Você é o assistente virtual oficial da SUPERLOJA, uma loja de tecnologia em Angola.
@@ -644,7 +655,13 @@ function buildPureAIPrompt(userContext: any, knowledgeResponse: any, products: a
   // BASE DE CONHECIMENTO
   let knowledgeInfo = '';
   if (knowledgeResponse) {
-    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE: ${knowledgeResponse.answer}`;
+    console.log('📚 Incluindo conhecimento no prompt (modo compatibilidade):', knowledgeResponse.question);
+    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE DA BASE DE CONHECIMENTO: 
+📝 Pergunta: ${knowledgeResponse.question}
+📋 Resposta: ${knowledgeResponse.answer}
+🏷️ Categoria: ${knowledgeResponse.category}`;
+  } else {
+    console.log('⚠️ Nenhum conhecimento relevante para incluir no prompt (modo compatibilidade)');
   }
 
   return `Você é o assistente virtual oficial da empresa Superloja. 
@@ -675,15 +692,68 @@ SEJA NATURAL E HUMANO EM TODAS AS INTERAÇÕES!`;
 // Função para buscar na base de conhecimento
 async function searchKnowledgeBase(query: string, supabase: any): Promise<any> {
   try {
+    console.log('🔍 Buscando na base de conhecimento para:', query);
+    
+    // Normalizar e extrair palavras-chave com variações
+    const normalizeText = (text: string) => {
+      return text.toLowerCase()
+        .replace(/[áàâã]/g, 'a')
+        .replace(/[éèê]/g, 'e')
+        .replace(/[íì]/g, 'i')
+        .replace(/[óòôõ]/g, 'o')
+        .replace(/[úù]/g, 'u')
+        .replace(/[ç]/g, 'c')
+        .replace(/[^a-z0-9\s]/g, '');
+    };
+    
+    const normalizedQuery = normalizeText(query);
+    const keywords = normalizedQuery.split(' ').filter(word => word.length > 2);
+    console.log('🔑 Palavras-chave normalizadas:', keywords);
+    
+    // Buscar todos os conhecimentos ativos
     const { data: knowledge } = await supabase
       .from('ai_knowledge_base')
-      .select('question, answer')
-      .eq('active', true)
-      .or(`question.ilike.%${query}%,keywords.cs.{${query}}`)
-      .limit(1)
-      .maybeSingle();
-
-    return knowledge;
+      .select('question, answer, category, keywords')
+      .eq('active', true);
+    
+    if (!knowledge || knowledge.length === 0) {
+      console.log('❌ Nenhum conhecimento encontrado na base');
+      return null;
+    }
+    
+    console.log('📚 Total de conhecimentos ativos:', knowledge.length);
+    
+    // Filtrar por relevância usando busca flexível
+    const relevantKnowledge = knowledge.filter(item => {
+      const itemText = normalizeText(`${item.question} ${item.answer} ${item.keywords.join(' ')}`);
+      
+      // Verificar se alguma palavra-chave da query aparece no texto do item
+      const hasMatch = keywords.some(keyword => {
+        return itemText.includes(keyword) || 
+               keyword.includes('devoluc') && itemText.includes('devoluc') ||
+               keyword.includes('troca') && itemText.includes('troca') ||
+               keyword.includes('trocar') && itemText.includes('troca') ||
+               keyword.includes('devolver') && itemText.includes('devoluc');
+      });
+      
+      if (hasMatch) {
+        console.log(`✅ Match encontrado em: ${item.question}`);
+      }
+      
+      return hasMatch;
+    });
+    
+    console.log('🎯 Conhecimentos relevantes encontrados:', relevantKnowledge.length);
+    
+    if (relevantKnowledge.length > 0) {
+      // Ordenar por prioridade e retornar o primeiro
+      const bestMatch = relevantKnowledge.sort((a, b) => b.priority - a.priority)[0];
+      console.log('✅ Melhor conhecimento encontrado:', bestMatch.question);
+      return bestMatch;
+    }
+    
+    console.log('⚠️ Nenhum conhecimento relevante encontrado');
+    return null;
   } catch (error) {
     console.error('❌ Erro ao buscar base conhecimento:', error);
     return null;
