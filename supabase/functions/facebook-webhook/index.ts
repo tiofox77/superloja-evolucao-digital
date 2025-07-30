@@ -44,6 +44,12 @@ serve(async (req) => {
         for (const entry of body.entry) {
           if (entry.messaging) {
             for (const messaging of entry.messaging) {
+              // Ignorar mensagens próprias (echo) para evitar loops
+              if (messaging.message && messaging.message.is_echo) {
+                console.log('🔄 Ignorando mensagem echo (própria)');
+                continue;
+              }
+              
               if (messaging.message && messaging.message.text) {
                 await handleMessage(messaging, supabase);
               }
