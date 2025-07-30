@@ -310,8 +310,7 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
     // 4. Buscar TODOS os produtos disponíveis (com stock) com categorização melhorada
     const availableProducts = await getAllAvailableProductsImproved(supabase);
     
-    // 3. Buscar na base de conhecimento
-    const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
+    // Base de conhecimento desabilitada - usando apenas ChatGPT
 
     // 4. Buscar configurações de IA
     const { data: aiSettings } = await supabase
@@ -333,7 +332,7 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
     }
 
     // 5. Construir prompt 100% IA com todos os produtos
-    const systemPrompt = buildAdvancedAIPrompt(userContext, knowledgeResponse, availableProducts);
+    const systemPrompt = buildHumanAIPrompt(userContext, availableProducts);
     const conversationHistory = await getRecentConversationHistory(senderId, supabase);
 
     console.log('🧠 Chamando OpenAI (100% IA)...');
@@ -558,57 +557,75 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
     conversationContext = `\n\n📋 CONTEXTO: Esta conversa tem ${userContext.message_count} mensagens.`;
   }
 
-  // BASE DE CONHECIMENTO
-  let knowledgeInfo = '';
-  if (knowledgeResponse) {
-    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE: ${knowledgeResponse.answer}`;
+  // Base de conhecimento desabilitada - focando em respostas mais humanas
+
+// Função para construir prompt mais humano e natural
+function buildHumanAIPrompt(userContext: any, products: any[]): string {
+  
+  // INFORMAÇÕES DA EMPRESA
+  const companyInfo = `
+📍 LOCALIZAÇÃO: Angola, Luanda
+💰 MOEDA: Kz (Kwanza Angolano)  
+🚚 ENTREGA: Grátis em toda Angola
+📞 CONTATO: WhatsApp/Telegram: +244 930 000 000
+🌐 SITE: https://superloja.vip
+⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h`;
+
+  // PRODUTOS DISPONÍVEIS (apenas os em stock)
+  let productsInfo = '';
+  if (products.length > 0) {
+    const inStockProducts = products.filter(p => p.in_stock);
+    
+    if (inStockProducts.length > 0) {
+      productsInfo = '\n\n📦 PRODUTOS EM STOCK:\n';
+      inStockProducts.forEach((product, index) => {
+        const price = parseFloat(product.price).toLocaleString('pt-AO');
+        productsInfo += `${index + 1}. ${product.name} - ${price} Kz\n`;
+        productsInfo += `   🔗 https://superloja.vip/produto/${product.slug}\n`;
+        if (product.image_url) {
+          productsInfo += `   📸 ${product.image_url}\n`;
+        }
+      });
+    }
   }
 
-  return `Você é o assistente virtual oficial da SUPERLOJA, uma loja de tecnologia em Angola.
-MISSÃO: Atender clientes com informações PRECISAS e ATUALIZADAS sobre nossos produtos.
+  // CONTEXTO DA CONVERSA
+  let conversationContext = '';
+  if (userContext.message_count > 0) {
+    conversationContext = `\n\n📋 CONTEXTO: Esta conversa tem ${userContext.message_count} mensagens.`;
+  }
 
-INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}${knowledgeInfo}
+  return `Você é o assistente virtual da SUPERLOJA, uma loja de tecnologia em Angola.
+Seja MUITO HUMANO e natural nas respostas - como um vendedor real conversando com o cliente.
 
-🎯 INSTRUÇÕES CRÍTICAS DE VENDAS:
-- Sempre confirme se um produto ESTÁ EM STOCK antes de mencionar
-- Use os preços EXATOS da lista acima - não invente preços
-- Se perguntarem sobre um produto inexistente, responda: "Não temos esse produto no momento"
-- Para auriculares/fones, mostre apenas os que estão EM STOCK
-- Sugira produtos similares se o desejado estiver indisponível
+INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}
 
-🔗 LINKS E IMAGENS:
-- Quando cliente escolher produto ESPECÍFICO, use LINK DIRETO: https://superloja.vip/produto/[slug]
-- Se cliente pedir foto/imagem, envie URL da imagem do produto
-- Para lista geral, pode usar https://superloja.vip
+🗣️ TOM DE CONVERSA:
+- Seja caloroso e amigável como um angolano
+- Use "Olá! Como está?" ou "Oi! Tudo bem?"
+- Responda de forma conversacional e natural
+- Use emojis com moderação (1-2 por mensagem)
+- Máximo 2-3 frases por resposta (seja direto)
 
-🛒 PROCESSO DE COMPRA:
-- Se cliente quiser comprar, pergunte: nome, telefone, endereço
-- Confirme produto, preço e dados antes de finalizar
-- Informe sobre entrega grátis em Angola
-- Diga: "Vou processar seu pedido e entrar em contato!"
+🛒 QUANDO CLIENTE PEDIR PRODUTOS:
+- Mostre apenas produtos EM STOCK
+- Use preços EXATOS da lista
+- Para produto específico: envie link direto + imagem se disponível
+- Se não tiver o que procura: "No momento não temos esse produto"
 
-💬 COMUNICAÇÃO NATURAL:
-- Se perguntarem "como está", responda: "Estou bem, obrigado! E você?"
-- Quando mencionarem número da lista (ex: "produto 29"), identifique corretamente
-- Seja simpático: "Olá! Tudo bem?" ou "Bom dia!"
-- Máximo 3 frases por resposta
-- Use 1-2 emojis
-- Português de Angola
+💬 EXEMPLOS DE RESPOSTAS HUMANAS:
+❌ Robótico: "Temos os seguintes produtos disponíveis..."
+✅ Humano: "Olá! Temos alguns fones bacanas aqui. Quer ver?"
 
-🚫 NUNCA FAÇA:
-- Mencionar produtos sem stock
-- Inventar preços ou produtos
-- Enviar link geral quando cliente escolheu produto específico
-- Ignorar quando cliente menciona número da lista
+❌ Robótico: "Para finalizar o pedido, preciso dos seus dados..."
+✅ Humano: "Perfeito! Me passa teu nome e telefone que processo o pedido 😊"
 
-✅ SEMPRE FAÇA:
-- Verificar stock antes de recomendar
-- Dar preços corretos da lista
-- Usar link específico do produto quando cliente escolher
-- Responder de forma humana e natural
-- Identificar números de produtos mencionados
+🎯 VENDAS:
+- Para compra: pedir nome, telefone, endereço
+- Confirmar produto e preço escolhido
+- "Vou processar e te contacto!"
 
-SEJA PRECISO, HONESTO E NATURAL!`;
+SEJA HUMANO, DIRETO E SIMPÁTICO!
 }
 
 // Função para construir prompt 100% IA (manter para compatibilidade)
