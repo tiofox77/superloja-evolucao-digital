@@ -11,6 +11,7 @@ import {
 } from '@/utils/notifications';
 import { RealTimeTab } from '@/components/admin/RealTimeTab';
 import { KnowledgeBaseTab } from '@/components/admin/KnowledgeBaseTab';
+import { CorrectionsTab } from '@/components/admin/CorrectionsTab';
 import { LearningTab } from '@/components/admin/LearningTab';
 import { ConfigurationsTab } from '@/components/admin/ConfigurationsTab';
 import { TestsTab } from '@/components/admin/TestsTab';
@@ -425,12 +426,15 @@ const AdminAgentIA = () => {
 
       {/* Tabs principais */}
       <Tabs defaultValue="realtime" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="realtime">
             Tempo Real
           </TabsTrigger>
           <TabsTrigger value="knowledge">
             Base de Conhecimento
+          </TabsTrigger>
+          <TabsTrigger value="corrections">
+            Correções & Feedback
           </TabsTrigger>
           <TabsTrigger value="learning">
             Aprendizado IA
@@ -459,6 +463,10 @@ const AdminAgentIA = () => {
             knowledgeBase={knowledgeBase}
             onReload={loadKnowledgeBase}
           />
+        </TabsContent>
+
+        <TabsContent value="corrections">
+          <CorrectionsTab />
         </TabsContent>
 
         <TabsContent value="learning">
