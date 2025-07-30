@@ -252,29 +252,29 @@ async function handleMessage(messaging: any, supabase: any) {
     const aiResponse = await processWithPureAI(messageText, senderId, supabase);
     console.log(`🤖 Resposta IA: ${aiResponse}`);
     
-    // Verificar se a IA solicitou envio de imagem
+    // PRIMEIRO: Verificar se usuário pediu imagem EXPLICITAMENTE
     const imageResponse = await checkAndSendProductImage(messageText, aiResponse, senderId, supabase);
     
-    // Verificar se precisa finalizar compra
-    const needsOrderProcessing = await checkForOrderCompletion(aiResponse, senderId, supabase);
-    if (needsOrderProcessing) {
-      console.log('🛒 Detectado pedido finalizado - notificando administrador');
-      await notifyAdminOfNewOrder(needsOrderProcessing.orderData, supabase);
-    }
-    
-    // Enviar a resposta da IA
-    await sendFacebookMessage(senderId, aiResponse, supabase);
-    
-    // Se houve envio de imagem, aguardar para não sobrecarregar
+    // Se enviou imagem, NÃO enviar mensagem de texto (evitar duplicação)
     if (imageResponse.imageSent) {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Delay de 1s
+      console.log('📸 Imagem enviada - pulando envio de mensagem de texto');
+    } else {
+      // Enviar apenas a resposta da IA (sem imagem)
+      await sendFacebookMessage(senderId, aiResponse, supabase);
+      
+      // Verificar se precisa finalizar compra (apenas se não enviou imagem)
+      const needsOrderProcessing = await checkForOrderCompletion(aiResponse, senderId, supabase);
+      if (needsOrderProcessing?.orderData) {
+        console.log('🛒 Detectado pedido finalizado - notificando administrador');
+        await notifyAdminOfNewOrder(needsOrderProcessing.orderData, supabase);
+      }
     }
     
     // Salvar resposta enviada
     await supabase.from('ai_conversations').insert({
       platform: 'facebook',
       user_id: senderId,
-      message: aiResponse,
+      message: imageResponse.imageSent ? `[IMAGEM ENVIADA] ${imageResponse.productFound?.name || 'Produto'}` : aiResponse,
       type: 'sent',
       timestamp: new Date().toISOString()
     });
@@ -713,7 +713,7 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
     const { data: aiSettings } = await supabase
       .from('ai_settings')
       .select('value')
-      .eq('key', 'facebook_page_token')
+      .eq('key', 'facebook_page_access_token')
       .maybeSingle();
     
     if (aiSettings?.value) {
@@ -762,7 +762,7 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
   
   try {
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -803,25 +803,32 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
   }
 }
 
-// Função para enviar imagens do Facebook
-async function sendFacebookImage(recipientId: string, imageUrl: string, caption: string, supabase: any) {
-  // Buscar token da mesma forma que sendFacebookMessage
-  let PAGE_ACCESS_TOKEN = null;
-  let tokenSource = 'none';
-  
+// NOVA FUNÇÃO: Enviar imagem via Facebook Messenger (CORRIGIDA)
+async function sendFacebookImage(recipientId: string, imageUrl: string, caption: string, supabase: any): Promise<void> {
+  console.log('📸 === ENVIANDO IMAGEM FACEBOOK ===');
+  console.log(`📸 Recipient: ${recipientId}`);
+  console.log(`🖼️ URL: ${imageUrl}`);
+  console.log(`📝 Caption: ${caption.substring(0, 50)}...`);
+
+  // Buscar token do Facebook - usar a mesma chave que sendFacebookMessage
+  let PAGE_ACCESS_TOKEN = '';
+  let tokenSource = '';
+
   try {
     const { data: aiSettings } = await supabase
       .from('ai_settings')
       .select('value')
-      .eq('key', 'facebook_page_token')
+      .eq('key', 'facebook_page_access_token')
+      .limit(1)
       .maybeSingle();
     
     if (aiSettings?.value) {
       PAGE_ACCESS_TOKEN = aiSettings.value;
       tokenSource = 'ai_settings';
+      console.log('✅ Token encontrado nas configurações AI');
     }
   } catch (error) {
-    console.log('⚠️ Erro ao buscar token AI settings para imagem');
+    console.log('⚠️ Erro ao buscar token AI settings');
   }
 
   if (!PAGE_ACCESS_TOKEN) {
@@ -835,29 +842,39 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
       if (metaSettings?.access_token) {
         PAGE_ACCESS_TOKEN = metaSettings.access_token;
         tokenSource = 'meta_settings';
+        console.log('✅ Token encontrado nas configurações Meta');
       }
     } catch (error) {
-      console.log('⚠️ Erro ao buscar token Meta para imagem');
+      console.log('⚠️ Erro ao buscar token Meta');
     }
   }
   
   if (!PAGE_ACCESS_TOKEN) {
     PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
     tokenSource = 'secrets';
+    console.log('✅ Token encontrado nos secrets');
   }
   
   if (!PAGE_ACCESS_TOKEN) {
-    console.error('❌ Nenhum token Facebook encontrado para enviar imagem');
+    console.error('❌ Nenhum token Facebook encontrado');
+    // Fallback: enviar como mensagem de texto
+    await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Imagem: ${imageUrl}`, supabase);
     return;
   }
   
-  console.log(`📸 Enviando imagem para ${recipientId}`);
-  console.log(`🖼️ URL da imagem: ${imageUrl}`);
-  console.log(`📝 Legenda: ${caption.substring(0, 50)}...`);
+  console.log(`🔑 Token source: ${tokenSource}`);
   
   try {
+    // Verificar se a URL da imagem é acessível
+    const imageCheck = await fetch(imageUrl, { method: 'HEAD' });
+    if (!imageCheck.ok) {
+      console.error(`❌ Imagem não acessível: ${imageCheck.status}`);
+      await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
+      return;
+    }
+
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -882,20 +899,20 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
       console.log('✅ Imagem enviada com sucesso!');
       console.log('📨 Message ID:', result.message_id);
       
-      // Enviar legenda separadamente
+      // Enviar legenda em mensagem separada após delay
       if (caption && caption.trim()) {
-        await new Promise(resolve => setTimeout(resolve, 500)); // Delay de 0.5s
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 segundo
         await sendFacebookMessage(recipientId, caption, supabase);
       }
     } else {
-      console.error('❌ Erro ao enviar imagem Facebook:', result);
-      // Fallback: enviar apenas a mensagem de texto
+      console.error('❌ Erro ao enviar imagem:', result);
+      // Fallback para mensagem de texto
       await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Imagem: ${imageUrl}`, supabase);
     }
     
   } catch (error) {
     console.error('❌ Erro de rede ao enviar imagem:', error);
-    // Fallback: enviar apenas a mensagem de texto
+    // Fallback para mensagem de texto
     await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
   }
 }
