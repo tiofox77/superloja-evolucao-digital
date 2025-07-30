@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.notify-admin-purchase]
 verify_jwt = false
+
+[functions.test-admin-notification]
+verify_jwt = false

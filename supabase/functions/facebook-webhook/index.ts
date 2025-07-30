@@ -437,26 +437,147 @@ function calculateEffectivenessScore(intent: any, sentiment: any): number {
 
 // Função para notificar admin sobre compras
 async function notifyAdmin(userId: string, message: string, products: any[], supabase: any) {
-  await supabase.from('admin_notifications').insert({
-    admin_user_id: 'carlosfox2',
-    notification_type: 'purchase_confirmation',
-    message: `🛒 COMPRA CONFIRMADA!\n\nUsuário: ${userId}\nMensagem: "${message}"\n\nProdutos visualizados recentemente:\n${products.slice(0, 3).map(p => `- ${p.name} (${p.price} Kz)`).join('\n')}`,
-    metadata: {
-      user_id: userId,
-      original_message: message,
-      products_count: products.length,
-      timestamp: new Date().toISOString()
-    }
-  });
+  console.log(`🔔 INICIANDO NOTIFICAÇÃO ADMIN - Usuario: ${userId}, Mensagem: "${message}"`);
   
-  // Tentar enviar notificação diretamente para carlosfox2
   try {
-    await sendFacebookMessage('carlosfox2', 
-      `🛒 NOVA COMPRA CONFIRMADA!\n\nCliente ${userId} confirmou uma compra!\nMensagem: "${message}"\n\nVerifique o admin para mais detalhes.`, 
-      supabase
-    );
+    // Salvar notificação no banco
+    const { data: notificationData, error: notificationError } = await supabase.from('admin_notifications').insert({
+      admin_user_id: 'carlosfox2',
+      notification_type: 'purchase_confirmation',
+      message: `🛒 COMPRA CONFIRMADA!\n\nUsuário: ${userId}\nMensagem: "${message}"\n\nProdutos visualizados recentemente:\n${products.slice(0, 3).map(p => `- ${p.name} (${p.price} Kz)`).join('\n')}`,
+      metadata: {
+        user_id: userId,
+        original_message: message,
+        products_count: products.length,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    if (notificationError) {
+      console.error('❌ Erro ao salvar notificação no banco:', notificationError);
+    } else {
+      console.log('✅ Notificação salva no banco:', notificationData);
+    }
+    
+    // Buscar configurações de admin
+    const { data: adminSettings, error: adminError } = await supabase
+      .from('ai_settings')
+      .select('key, value')
+      .in('key', ['admin_facebook_id', 'facebook_page_token']);
+      
+    console.log('📋 Configurações admin encontradas:', adminSettings);
+    
+    if (adminError) {
+      console.error('❌ Erro ao buscar configurações:', adminError);
+      return;
+    }
+    
+    const adminId = adminSettings?.find(s => s.key === 'admin_facebook_id')?.value || 'carlosfox2';
+    const pageToken = adminSettings?.find(s => s.key === 'facebook_page_token')?.value;
+    
+    console.log(`📱 Tentando enviar para admin ID: ${adminId}`);
+    console.log(`🔑 Token disponível: ${pageToken ? 'SIM' : 'NÃO'}`);
+    
+    // Tentar enviar notificação diretamente para carlosfox2
+    await sendAdminFacebookNotification(adminId, userId, message, products, supabase);
   } catch (error) {
-    console.log('Não foi possível enviar notificação direta para carlosfox2');
+    console.error('❌ Erro geral na notificação admin:', error);
+  }
+}
+
+// Função específica para enviar notificação ao admin
+async function sendAdminFacebookNotification(adminId: string, customerId: string, customerMessage: string, products: any[], supabase: any) {
+  console.log(`📤 ENVIANDO NOTIFICAÇÃO ADMIN - Admin: ${adminId}, Cliente: ${customerId}`);
+  
+  try {
+    const { data: pageTokenData } = await supabase
+      .from('ai_settings')
+      .select('value')
+      .eq('key', 'facebook_page_token')
+      .single();
+
+    const pageAccessToken = pageTokenData?.value || Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+    
+    if (!pageAccessToken) {
+      console.error('❌ Facebook Page Access Token não encontrado');
+      console.log('🔍 Tokens disponíveis:', {
+        db_token: pageTokenData?.value ? 'SIM' : 'NÃO',
+        env_token: Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN') ? 'SIM' : 'NÃO'
+      });
+      return;
+    }
+
+    console.log('✅ Token encontrado, preparando mensagem...');
+
+    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
+    
+    const notificationMessage = `🚨 ESCALATION AUTOMÁTICO! 🚨\n\n👤 Cliente: ${customerId}\n💬 Mensagem: "${customerMessage}"\n\n📦 Produtos de interesse:\n${products.slice(0, 3).map(p => `• ${p.name} - ${p.price} Kz`).join('\n')}\n\n🕐 ${new Date().toLocaleString('pt-AO')}\n\n⚡ Responda rapidamente para manter o engajamento!`;
+    
+    console.log('📝 Mensagem preparada:', notificationMessage.substring(0, 100) + '...');
+    console.log('🎯 Enviando para ID:', adminId);
+    console.log('🌐 URL da API:', url.substring(0, 50) + '...');
+    
+    const payload = {
+      recipient: { id: adminId },
+      message: { text: notificationMessage },
+      messaging_type: 'MESSAGE_TAG',
+      tag: 'BUSINESS_PRODUCTIVITY'
+    };
+
+    console.log('📦 Payload preparado:', JSON.stringify(payload, null, 2).substring(0, 200) + '...');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    console.log('📡 Resposta da API Facebook:', response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Erro detalhado da API Facebook:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+        adminId: adminId,
+        url: url.substring(0, 50) + '...'
+      });
+      
+      // Tentar com messaging_type diferente
+      console.log('🔄 Tentando com messaging_type RESPONSE...');
+      const fallbackPayload = {
+        recipient: { id: adminId },
+        message: { text: notificationMessage },
+        messaging_type: 'RESPONSE'
+      };
+      
+      const fallbackResponse = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fallbackPayload),
+      });
+      
+      console.log('📡 Resposta fallback:', fallbackResponse.status, fallbackResponse.statusText);
+      
+      if (!fallbackResponse.ok) {
+        const fallbackError = await fallbackResponse.text();
+        console.error('❌ Erro fallback também falhou:', fallbackError);
+      } else {
+        console.log('✅ Mensagem enviada via fallback!');
+      }
+    } else {
+      const responseData = await response.json();
+      console.log('✅ Notificação enviada com sucesso para admin!', responseData);
+    }
+
+  } catch (error) {
+    console.error('❌ Erro ao enviar notificação para admin:', error);
+    console.log('🔍 Detalhes do erro:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack?.substring(0, 300)
+    });
   }
 }
 
