@@ -24,12 +24,15 @@ serve(async (req) => {
     console.log('📝 Query para teste:', query);
 
     // 1. Verificar se a configuração da base de conhecimento está ativa
-    const { data: knowledgeConfig } = await supabase
+    const { data: knowledgeConfig, error: configError } = await supabase
       .from('ai_settings')
       .select('*')
       .eq('key', 'knowledge_base_enabled');
 
     console.log('⚙️ Configuração da base de conhecimento:', knowledgeConfig);
+    console.log('⚙️ Erro na config (se houver):', configError);
+    console.log('⚙️ Valor extraído:', knowledgeConfig?.[0]?.value);
+    console.log('⚙️ Comparação:', knowledgeConfig?.[0]?.value === 'true');
 
     // 2. Verificar todos os conhecimentos ativos
     const { data: allKnowledge } = await supabase
@@ -55,32 +58,78 @@ serve(async (req) => {
     const keywords = normalizedQuery.split(' ').filter(word => word.length > 2);
     console.log('🔑 Palavras-chave normalizadas:', keywords);
 
-    // 4. Buscar conhecimentos relevantes
+    // 4. Buscar conhecimentos relevantes usando algoritmo corrigido
     let foundKnowledge = null;
     if (allKnowledge) {
-      const relevantKnowledge = allKnowledge.filter(item => {
-        const itemText = normalizeText(`${item.question} ${item.answer} ${item.keywords.join(' ')}`);
-        
-        const hasMatch = keywords.some(keyword => {
-          return itemText.includes(keyword) || 
-                 keyword.includes('devoluc') && itemText.includes('devoluc') ||
-                 keyword.includes('troca') && itemText.includes('troca') ||
-                 keyword.includes('trocar') && itemText.includes('troca') ||
-                 keyword.includes('devolver') && itemText.includes('devoluc') ||
-                 keyword.includes('promocao') && itemText.includes('promocao') ||
-                 keyword.includes('desconto') && itemText.includes('desconto');
-        });
-        
-        if (hasMatch) {
-          console.log(`✅ Match encontrado: ${item.question}`);
+      console.log('🔍 Aplicando algoritmo de busca corrigido...');
+      
+      // Primeiro, buscar correspondência EXATA na pergunta
+      const exactMatch = allKnowledge.find(item => {
+        const normalizedQuestion = normalizeText(item.question);
+        const match = normalizedQuestion === normalizedQuery;
+        if (match) {
+          console.log('🎯 CORRESPONDÊNCIA EXATA encontrada:', item.question);
         }
-        
-        return hasMatch;
+        return match;
       });
+      
+      if (exactMatch) {
+        foundKnowledge = exactMatch;
+        console.log('✅ Usando correspondência exata:', exactMatch.question);
+      } else {
+        // Se não encontrou correspondência exata, buscar por palavras-chave
+        const relevantKnowledge = allKnowledge.filter(item => {
+          const itemText = normalizeText(`${item.question} ${item.answer} ${item.keywords.join(' ')}`);
+          
+          // Calcular score de relevância
+          let score = 0;
+          
+          const hasMatch = keywords.some(keyword => {
+            if (itemText.includes(keyword)) {
+              score += 1;
+              return true;
+            }
+            
+            // Verificações especiais para palavras relacionadas
+            if (keyword.includes('devoluc') && itemText.includes('devoluc')) {
+              score += 1;
+              return true;
+            }
+            if (keyword.includes('troca') && itemText.includes('troca')) {
+              score += 1;
+              return true;
+            }
+            if (keyword.includes('entrega') && itemText.includes('entrega')) {
+              score += 2; // Prioridade extra para entrega
+              return true;
+            }
+            if (keyword.includes('pagamento') && itemText.includes('pagamento')) {
+              score += 2; // Prioridade extra para pagamento
+              return true;
+            }
+            
+            return false;
+          });
+          
+          if (hasMatch) {
+            console.log(`✅ Match encontrado: ${item.question} (score: ${score})`);
+            item.relevanceScore = score;
+          }
+          
+          return hasMatch;
+        });
 
-      if (relevantKnowledge.length > 0) {
-        foundKnowledge = relevantKnowledge.sort((a, b) => b.priority - a.priority)[0];
-        console.log('🎯 Melhor conhecimento encontrado:', foundKnowledge.question);
+        if (relevantKnowledge.length > 0) {
+          // Ordenar por score de relevância primeiro, depois por prioridade
+          foundKnowledge = relevantKnowledge.sort((a, b) => {
+            if (a.relevanceScore !== b.relevanceScore) {
+              return b.relevanceScore - a.relevanceScore;
+            }
+            return b.priority - a.priority;
+          })[0];
+          
+          console.log('✅ Melhor conhecimento encontrado:', foundKnowledge.question, 'Score:', foundKnowledge.relevanceScore);
+        }
       }
     }
 
