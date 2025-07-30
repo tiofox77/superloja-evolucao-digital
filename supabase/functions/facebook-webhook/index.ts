@@ -199,6 +199,8 @@ serve(async (req) => {
   }
 });
 
+// FUNÇÕES AUXILIARES FORA DO SERVE
+
 async function handleMessage(messaging: any, supabase: any) {
   const senderId = messaging.sender.id;
   const messageText = messaging.message.text;
@@ -1103,4 +1105,3 @@ Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
   }
 }
 
-});  // Fechamento da função serve
