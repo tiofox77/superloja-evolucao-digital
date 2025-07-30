@@ -310,12 +310,13 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
     // 4. Buscar TODOS os produtos disponíveis (com stock) com categorização melhorada
     const availableProducts = await getAllAvailableProductsImproved(supabase);
     
-    // 3. Buscar na base de conhecimento
-    console.log('🔍 === BUSCANDO BASE DE CONHECIMENTO ===');
+    // 3. Buscar na base de conhecimento PRIMEIRO - PRIORIDADE ABSOLUTA
+    console.log('🔍 === BUSCANDO BASE DE CONHECIMENTO (PRIORIDADE MÁXIMA) ===');
     const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
     console.log('📚 Resultado da busca:', knowledgeResponse ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
     if (knowledgeResponse) {
       console.log('📖 Conhecimento encontrado:', knowledgeResponse.question, '→', knowledgeResponse.answer.substring(0, 50) + '...');
+      console.log('🎯 BASE DE CONHECIMENTO TEM PRIORIDADE - IA deve usar exatamente esta resposta');
     }
 
     // 4. Buscar configurações de IA
@@ -580,11 +581,22 @@ MISSÃO: Atender clientes com informações PRECISAS e ATUALIZADAS sobre nossos 
 
 INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}${knowledgeInfo}
 
+🎯 REGRA ABSOLUTA - BASE DE CONHECIMENTO:
+${knowledgeResponse ? `
+🚨 ATENÇÃO: FOI ENCONTRADA INFORMAÇÃO ESPECÍFICA NA BASE DE CONHECIMENTO!
+📝 PERGUNTA: ${knowledgeResponse.question}
+📋 RESPOSTA OBRIGATÓRIA: ${knowledgeResponse.answer}
+
+⚠️ VOCÊ DEVE USAR EXATAMENTE ESTA RESPOSTA ACIMA - NÃO INVENTE NADA DIFERENTE!
+⚠️ NÃO ADICIONE INFORMAÇÕES QUE NÃO ESTÃO NA BASE DE CONHECIMENTO!
+⚠️ USE APENAS O CONTEÚDO DA BASE DE CONHECIMENTO PARA ESTA PERGUNTA!
+` : ''}
+
 🎯 INSTRUÇÕES CRÍTICAS DE VENDAS:
-- **SEMPRE usar informações da base de conhecimento quando disponíveis**
-- Se há informação relevante na base de conhecimento, USE-A EXATAMENTE como está
-- NÃO invente respostas quando há conhecimento específico disponível
-- Priorize sempre o conhecimento da base sobre informações genéricas
+- **PRIORIDADE MÁXIMA: SEMPRE usar informações da base de conhecimento quando disponíveis**
+- Se há informação na base de conhecimento acima, USE-A EXATAMENTE - não invente nada
+- NÃO adicione informações extras quando há conhecimento específico disponível
+- A base de conhecimento tem prioridade sobre qualquer outra informação
 - Sempre confirme se um produto ESTÁ EM STOCK antes de mencionar
 - Use os preços EXATOS da lista acima - não invente preços
 - Se perguntarem sobre um produto inexistente, responda: "Não temos esse produto no momento"

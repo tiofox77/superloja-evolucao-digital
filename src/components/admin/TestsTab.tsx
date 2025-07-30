@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Zap, 
   Bot, 
@@ -39,11 +40,38 @@ export const TestsTab: React.FC<TestsTabProps> = ({
       <CardContent>
         <div className="space-y-6">
           {/* Testes de API */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button 
+              variant="outline" 
+              className="h-16"
+              onClick={async () => {
+                try {
+                  const testQuery = "Como funciona a entrega?";
+                  toast.info(`Testando base de conhecimento com: "${testQuery}"`);
+                  
+                  const { data, error } = await supabase.functions.invoke('debug-knowledge-base', {
+                    body: { query: testQuery }
+                  });
+                  
+                  if (error) {
+                    toast.error('Erro no teste: ' + error.message);
+                  } else {
+                    console.log('🔍 Debug completo:', data);
+                    
+                    if (data.foundKnowledge) {
+                      toast.success(`✅ Base funcionando! Encontrou: "${data.foundKnowledge.question}"`);
+                    } else {
+                      toast.warning('⚠️ Nenhum conhecimento relevante encontrado');
+                    }
+                  }
+                } catch (error) {
+                  toast.error('Erro no teste: ' + error.message);
+                }
+              }}
+            >
               <div className="text-center">
-                <Bot className="h-6 w-6 mx-auto mb-1" />
-                <div className="text-sm font-medium">Testar OpenAI</div>
+                <Brain className="h-6 w-6 mx-auto mb-1" />
+                <div className="text-sm font-medium">Testar Base Conhecimento</div>
               </div>
             </Button>
             
