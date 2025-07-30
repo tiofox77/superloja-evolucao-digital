@@ -168,10 +168,11 @@ Usuário pediu fotos: ${wantsPhotos}
 
 INSTRUÇÕES CRÍTICAS PARA FONES:
 - Quando perguntarem sobre fones, bluetooth ou auriculares, você DEVE mostrar TODOS os produtos relacionados
-- Não pode limitar quantidade - deve mostrar os 8-9 fones que temos
-- Cada produto deve ter seu próprio número (1, 2, 3, 4, 5, 6, 7, 8, 9)
-- NUNCA corte a lista no meio
+- OBRIGATÓRIO: mostrar todos os 9 fones - NUNCA menos de 9 fones
+- Cada produto deve ter seu próprio número sequencial (1, 2, 3, 4, 5, 6, 7, 8, 9)
+- NUNCA corte a lista no meio ou limite a 5 produtos
 - NUNCA use frases como "entre outros" ou "e mais"
+- Se não mostrar todos os 9 fones, a resposta está INCORRETA
 
 REGRAS PARA IMAGENS:
 ${wantsPhotos ? 
