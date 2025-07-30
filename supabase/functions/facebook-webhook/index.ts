@@ -147,7 +147,8 @@ ${productsInfo}
 
 INSTRUÇÕES IMPORTANTES:
 - Seja natural e conversacional como um angolano
-- Recomende produtos específicos da lista acima quando relevante
+- Quando perguntarem sobre fones, bluetooth ou auriculares, mostre TODOS os produtos relacionados
+- NUNCA limite a quantidade de produtos mostrados
 - NUNCA inclua imagens (![Imagem]) no texto por padrão
 - Só mencione imagens se o cliente pedir especificamente para ver fotos
 
@@ -161,10 +162,10 @@ REGRAS CRÍTICAS:
 - Numere sempre os produtos (1., 2., 3...)
 - Use preços EXATOS da lista acima
 - SÓ mencione produtos da lista disponível
-- Mostre TODOS os produtos relevantes disponíveis (não limite a 3 ou 5)
+- Mostre TODOS os produtos relevantes da categoria solicitada
 - NÃO inclua ![Imagem](URL) a menos que o cliente peça fotos
 
-Se alguém perguntar sobre fones bluetooth, mostre TODOS os modelos de fones disponíveis!`;
+IMPORTANTE: Se perguntarem sobre fones, mostre TODOS os ${products?.filter((p: any) => p.name.toLowerCase().includes('fone')).length || 0} modelos de fones disponíveis!`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -224,11 +225,12 @@ async function getFallbackResponse(message: string, supabase: any): Promise<stri
         .select('name, slug, price, image_url')
         .eq('active', true)
         .eq('in_stock', true)
-        .ilike('name', '%fone%')
-        .limit(10);
+        .or('name.ilike.%fone%,name.ilike.%bluetooth%,name.ilike.%auricular%')
+        .order('price', { ascending: true });
       
       if (headphones && headphones.length > 0) {
-        let response = "Olá! Temos estes fones de ouvido em stock:\n\n";
+        console.log(`✅ Encontrados ${headphones.length} fones em stock`);
+        let response = "Claro! Temos vários modelos de fones de ouvido disponíveis. Aqui estão eles:\n\n";
         headphones.forEach((product: any, index: number) => {
           const price = parseFloat(product.price).toLocaleString('pt-AO');
           response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
