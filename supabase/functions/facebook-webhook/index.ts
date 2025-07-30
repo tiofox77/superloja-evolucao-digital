@@ -181,7 +181,7 @@ IMPORTANTE: Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 1500,
+        max_tokens: 2500,
         temperature: 0.6,
       }),
     });
@@ -196,6 +196,9 @@ IMPORTANTE: Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('
     
     if (data.choices && data.choices[0]) {
       const aiResponse = data.choices[0].message.content.trim();
+      console.log(`✅ Resposta IA gerada - Tamanho: ${aiResponse.length} caracteres`);
+      console.log(`📊 Tokens usados: ${data.usage?.total_tokens || 'não disponível'}`);
+      console.log(`📝 Tokens completion: ${data.usage?.completion_tokens || 'não disponível'}`);
       
       // Detectar se é confirmação de compra e notificar admin
       const lowerMessage = message.toLowerCase();
