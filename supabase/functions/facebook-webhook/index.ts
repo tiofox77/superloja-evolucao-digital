@@ -229,28 +229,12 @@ async function handleMessage(messaging: any, supabase: any) {
     
     console.log('💾 Mensagem salva no banco');
     
-    // Verificar se usuário está pedindo fotos/imagens explicitamente
-    const isRequestingImages = checkIfRequestingImages(messageText);
-    
-    // Processar com IA normal SEMPRE
-    const aiResponse = await processWithAI(messageText, senderId, supabase);
+    // NOVA LÓGICA: 100% IA - Sem verificações automáticas
+    const aiResponse = await processWithPureAI(messageText, senderId, supabase);
     console.log(`🤖 Resposta IA: ${aiResponse}`);
     
-    // Enviar resposta da IA primeiro
+    // Enviar apenas a resposta da IA
     await sendFacebookMessage(senderId, aiResponse, supabase);
-    
-    // CORRIGIDO: Só enviar produtos se explicitamente solicitado
-    if (isRequestingImages && await shouldSendProducts(senderId, messageText, supabase)) {
-      console.log('📸 Usuário solicitou produtos - enviando imagens');
-      
-      // Pequeno delay para não sobrepor mensagens
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Enviar imagens apenas quando solicitado
-      await handleImageRequest(senderId, messageText, supabase);
-    } else {
-      console.log('ℹ️ Resposta apenas de texto - produtos não solicitados ou já enviados recentemente');
-    }
     
     // Salvar resposta enviada
     await supabase.from('ai_conversations').insert({
@@ -269,87 +253,24 @@ async function handleMessage(messaging: any, supabase: any) {
   }
 }
 
-// Função para verificar se usuário está pedindo imagens
-function checkIfRequestingImages(message: string): boolean {
-  const messageLower = message.toLowerCase();
-  const imageKeywords = [
-    'foto', 'fotos', 'imagem', 'imagens', 'mostrar', 'mostra', 'ver', 'veja',
-    'picture', 'photo', 'image', 'show', 'see', 'visualizar'
-  ];
-  
-  return imageKeywords.some(keyword => messageLower.includes(keyword));
-}
-
-// Função para lidar com pedidos de imagens
-async function handleImageRequest(senderId: string, messageText: string, supabase: any) {
-  try {
-    // Buscar produtos relevantes com imagens
-    const products = await getRelevantProducts(messageText, supabase);
-    const productsWithImages = products.filter(p => p.image_url);
-    
-    if (productsWithImages.length === 0) {
-      await sendFacebookMessage(senderId, 'Desculpe, não encontrei produtos com imagens para mostrar. 😔', supabase);
-      return;
-    }
-    
-    // Enviar imagens dos produtos encontrados
-    for (const product of productsWithImages.slice(0, 3)) { // Máximo 3 produtos
-      const price = parseFloat(product.price).toLocaleString('pt-AO');
-      const stock = product.in_stock ? 'Em estoque' : 'Indisponível';
-      const productLink = `https://superloja.vip/produto/${product.slug || product.id}`;
-      
-      const caption = `🛍️ ${product.name}\n💰 ${price} Kz\n📦 ${stock}\n\n${product.description || ''}\n\n🔗 Ver detalhes: ${productLink}`;
-      
-      // Enviar imagem com legenda
-      await sendFacebookImage(senderId, product.image_url, caption, supabase);
-      
-      // Delay pequeno entre envios
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    
-    // Salvar resposta enviada no histórico
-    await supabase.from('ai_conversations').insert({
-      platform: 'facebook',
-      user_id: senderId,
-      message: `📸 Enviou ${productsWithImages.length} imagem(ns) de produtos`,
-      type: 'sent',
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('❌ Erro ao enviar imagens:', error);
-    await sendFacebookMessage(senderId, 'Desculpe, tive um problema ao buscar as imagens. 😔', supabase);
-  }
-}
-
-async function processWithAI(userMessage: string, senderId: string, supabase: any): Promise<string> {
-  console.log('🤖 === PROCESSAMENTO IA AVANÇADO ===');
+// NOVA FUNÇÃO: 100% IA - Sem automações
+async function processWithPureAI(userMessage: string, senderId: string, supabase: any): Promise<string> {
+  console.log('🤖 === PROCESSAMENTO 100% IA ===');
   console.log('👤 Usuário:', senderId);
   console.log('💬 Mensagem:', userMessage);
   
   try {
-    // 1. BUSCAR OU CRIAR CONTEXTO DO USUÁRIO
+    // 1. Buscar contexto do usuário 
     let userContext = await getOrCreateUserContext(senderId, supabase);
-    console.log('📋 Contexto do usuário:', { 
-      messageCount: userContext.message_count,
-      hasPreferences: !!userContext.user_preferences 
-    });
+    console.log('📋 Contexto:', { messageCount: userContext.message_count });
 
-    // 2. COMENTADO: Verificar padrões de conversas predefinidos (USAR APENAS OPENAI)
-    // const patternResponse = await checkConversationPatterns(userMessage, userContext, supabase);
-    // if (patternResponse) {
-    //   console.log('🎯 Resposta por padrão encontrada');
-    //   await updateUserContext(senderId, userMessage, patternResponse, supabase);
-    //   return patternResponse;
-    // }
-
-    // 3. BUSCAR NA BASE DE CONHECIMENTO
-    const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
+    // 2. Buscar produtos (para IA ter conhecimento disponível)
+    const availableProducts = await getProductsForAI(supabase);
     
-    // 4. BUSCAR PRODUTOS RELEVANTES
-    const relevantProducts = await getRelevantProducts(userMessage, supabase);
+    // 3. Buscar na base de conhecimento
+    const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
 
-    // 5. BUSCAR CONFIGURAÇÕES DE IA
+    // 4. Buscar configurações de IA
     const { data: aiSettings } = await supabase
       .from('ai_settings')
       .select('key, value')
@@ -368,16 +289,15 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
       return getFallbackResponse(userMessage, senderId, supabase);
     }
 
-    // 6. CONSTRUIR PROMPT INTELIGENTE E CONTEXTUAL
-    const systemPrompt = buildIntelligentSystemPrompt(userContext, knowledgeResponse, relevantProducts);
+    // 5. Construir prompt 100% IA
+    const systemPrompt = buildPureAIPrompt(userContext, knowledgeResponse, availableProducts);
     const conversationHistory = await getRecentConversationHistory(senderId, supabase);
 
-    console.log('🧠 Chamando OpenAI com contexto avançado...');
+    console.log('🧠 Chamando OpenAI (100% IA)...');
     console.log('📊 Histórico:', conversationHistory.length, 'mensagens');
-    console.log('🔍 Produtos relevantes:', relevantProducts.length);
-    console.log('📚 Base conhecimento:', knowledgeResponse ? 'encontrada' : 'não encontrada');
+    console.log('🗃️ Produtos disponíveis:', availableProducts.length);
 
-    // 7. CHAMAR OPENAI COM CONTEXTO COMPLETO
+    // 6. Chamar OpenAI - IA decide tudo
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -391,8 +311,8 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
           ...conversationHistory,
           { role: 'user', content: userMessage }
         ],
-        temperature: 0.7,
-        max_tokens: 300,
+        temperature: 0.8,
+        max_tokens: 500,
         presence_penalty: 0.3,
         frequency_penalty: 0.2
       }),
@@ -401,8 +321,6 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Erro OpenAI:', response.status, response.statusText);
-      console.error('❌ Erro OpenAI detalhado:', errorText);
-      console.error('🔑 Chave OpenAI usada (primeiros 10 chars):', openaiApiKey.substring(0, 10) + '...');
       throw new Error(`Erro OpenAI ${response.status}: ${errorText}`);
     }
 
@@ -413,20 +331,111 @@ async function processWithAI(userMessage: string, senderId: string, supabase: an
       throw new Error('Resposta vazia da IA');
     }
 
-    console.log('✅ Resposta IA gerada:', aiResponse.substring(0, 100) + '...');
+    console.log('✅ Resposta IA 100% gerada:', aiResponse.substring(0, 100) + '...');
 
-    // 8. ATUALIZAR CONTEXTO E APRENDER
+    // 7. Atualizar contexto
     await updateUserContext(senderId, userMessage, aiResponse, supabase);
-    await learnFromInteraction(userMessage, aiResponse, userContext, supabase);
 
     return aiResponse;
 
   } catch (error) {
-    console.error('❌ Erro no processamento IA:', error);
+    console.error('❌ Erro no processamento 100% IA:', error);
+    return getFallbackResponse(userMessage, senderId, supabase);
+  }
+}
+
+// Função simples para buscar produtos (sem filtros automáticos)
+async function getProductsForAI(supabase: any) {
+  try {
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, name, slug, price, description, image_url, in_stock')
+      .eq('active', true)
+      .limit(10); // Apenas 10 produtos para IA ter conhecimento
     
-    // FALLBACK INTELIGENTE
-    const fallbackResponse = await getFallbackResponse(userMessage, senderId, supabase);
-    return fallbackResponse;
+    return products || [];
+  } catch (error) {
+    console.error('❌ Erro ao buscar produtos para IA:', error);
+    return [];
+  }
+}
+
+// Função para construir prompt 100% IA
+function buildPureAIPrompt(userContext: any, knowledgeResponse: any, products: any[]): string {
+  
+  // INFORMAÇÕES DA EMPRESA
+  const companyInfo = `
+📍 LOCALIZAÇÃO: Angola, Luanda
+💰 MOEDA: Kz (Kwanza Angolano)
+🚚 ENTREGA: Grátis em toda Angola
+📞 CONTATO: WhatsApp/Telegram: +244 930 000 000
+🌐 SITE: https://superloja.vip
+⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h`;
+
+  // PRODUTOS DISPONÍVEIS (apenas informação, não envio automático)
+  let productsInfo = '';
+  if (products.length > 0) {
+    productsInfo = '\n\n📦 PRODUTOS DISPONÍVEIS PARA CONSULTA:\n';
+    products.forEach((product, index) => {
+      const price = parseFloat(product.price).toLocaleString('pt-AO');
+      const stock = product.in_stock ? '✅ Disponível' : '❌ Indisponível';
+      productsInfo += `${index + 1}. ${product.name} - ${price} Kz - ${stock}\n`;
+    });
+    productsInfo += '\n⚠️ IMPORTANTE: Só mencione produtos se o cliente perguntar diretamente sobre eles!';
+  }
+
+  // CONTEXTO DA CONVERSA
+  let conversationContext = '';
+  if (userContext.message_count > 0) {
+    conversationContext = `\n\n📋 CONTEXTO: Esta conversa tem ${userContext.message_count} mensagens.`;
+  }
+
+  // BASE DE CONHECIMENTO
+  let knowledgeInfo = '';
+  if (knowledgeResponse) {
+    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE: ${knowledgeResponse.answer}`;
+  }
+
+  return `Você é o assistente virtual oficial da empresa Superloja. 
+Seu objetivo é responder às mensagens recebidas de forma amigável, profissional e natural, como se fosse um atendente humano real. 
+
+INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}${knowledgeInfo}
+
+INSTRUÇÕES CRÍTICAS:
+- Cumprimente de forma personalizada ("Olá, tudo bem?" ou "Bom dia! Como posso ajudar?").
+- Responda de forma clara e objetiva às perguntas sobre serviços, preços, horários, localização.
+- Colete dados do cliente quando necessário (nome, email, telefone), mas sempre de forma gradual e educada.
+- Encerre a conversa com simpatia quando o usuário disser que não precisa mais de ajuda.
+- NUNCA mencione produtos sem o usuário perguntar especificamente sobre eles.
+- Se perguntarem sobre produtos, use apenas as informações da lista acima.
+- NÃO envie imagens automaticamente - apenas texto.
+
+REGRAS IMPORTANTES:
+- Não envie respostas longas. Use no máximo 2 ou 3 frases.
+- Se a mensagem for saudação (ex.: "Oi", "Bom dia"), responda com saudação amigável e "Como posso te ajudar hoje?".
+- Se não entender, peça para explicar melhor: "Desculpe, poderia me dar mais detalhes?".
+- Evite respostas robóticas. Seja variado, criativo e humano.
+- Use emojis moderadamente (1-2 por resposta).
+- Sempre responda em português de Angola.
+
+SEJA NATURAL E HUMANO EM TODAS AS INTERAÇÕES!`;
+}
+
+// Função para buscar na base de conhecimento
+async function searchKnowledgeBase(query: string, supabase: any): Promise<any> {
+  try {
+    const { data: knowledge } = await supabase
+      .from('ai_knowledge_base')
+      .select('question, answer')
+      .eq('active', true)
+      .or(`question.ilike.%${query}%,keywords.cs.{${query}}`)
+      .limit(1)
+      .maybeSingle();
+
+    return knowledge;
+  } catch (error) {
+    console.error('❌ Erro ao buscar base conhecimento:', error);
+    return null;
   }
 }
 
@@ -459,231 +468,6 @@ async function getOrCreateUserContext(userId: string, supabase: any): Promise<an
   return newContext || { user_id: userId, message_count: 0, context_data: {}, user_preferences: {} };
 }
 
-// Função para verificar padrões de conversas
-async function checkConversationPatterns(message: string, userContext: any, supabase: any): Promise<string | null> {
-  const { data: patterns } = await supabase
-    .from('ai_conversation_patterns')
-    .select('*')
-    .eq('is_active', true)
-    .order('priority', { ascending: false });
-
-  if (!patterns) return null;
-
-  const messageLower = message.toLowerCase();
-  
-  for (const pattern of patterns) {
-    const hasMatchingKeyword = pattern.trigger_keywords.some((keyword: string) => 
-      messageLower.includes(keyword.toLowerCase())
-    );
-
-    if (hasMatchingKeyword) {
-      // Atualizar estatísticas do padrão
-      await supabase
-        .from('ai_conversation_patterns')
-        .update({ 
-          usage_count: pattern.usage_count + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', pattern.id);
-
-      return personalizeResponse(pattern.response_template, userContext);
-    }
-  }
-
-  return null;
-}
-
-// Função para personalizar resposta baseada no contexto
-function personalizeResponse(template: string, userContext: any): string {
-  let response = template;
-  
-  // Personalização baseada no histórico
-  if (userContext.message_count > 5) {
-    response = response.replace('😊', '😊✨');
-  }
-  
-  if (userContext.message_count === 0) {
-    response = `Seja bem-vindo(a)! ${response}`;
-  }
-
-  return response;
-}
-
-// Função para buscar na base de conhecimento
-async function searchKnowledgeBase(message: string, supabase: any): Promise<any> {
-  const { data: knowledge } = await supabase
-    .from('ai_knowledge_base')
-    .select('*')
-    .eq('active', true)
-    .order('priority', { ascending: false });
-
-  if (!knowledge) return null;
-
-  const messageLower = message.toLowerCase();
-  
-  for (const item of knowledge) {
-    const hasMatchingKeyword = item.keywords.some((keyword: string) => 
-      messageLower.includes(keyword.toLowerCase())
-    );
-
-    if (hasMatchingKeyword || messageLower.includes(item.question.toLowerCase())) {
-      return item;
-    }
-  }
-
-  return null;
-}
-
-// Função para buscar produtos relevantes com detalhes completos
-async function getRelevantProducts(message: string, supabase: any): Promise<any[]> {
-  console.log('🔍 Buscando produtos para:', message);
-  
-  // Palavras-chave para busca mais inteligente
-  const keywords = extractProductKeywords(message);
-  console.log('🏷️ Palavras-chave extraídas:', keywords);
-  
-  let products = [];
-  
-  // Busca por palavras-chave específicas primeiro
-  if (keywords.length > 0) {
-    for (const keyword of keywords) {
-      const { data: keywordProducts } = await supabase
-        .from('products')
-        .select('id, name, slug, price, original_price, description, image_url, images, in_stock, stock_quantity')
-        .eq('active', true)
-        .or(`name.ilike.%${keyword}%,description.ilike.%${keyword}%`)
-        .limit(2);
-      
-      if (keywordProducts && keywordProducts.length > 0) {
-        products.push(...keywordProducts);
-      }
-    }
-  }
-  
-  // Se não encontrou nada com keywords, busca geral
-  if (products.length === 0) {
-    const { data: generalProducts } = await supabase
-      .from('products')
-      .select('id, name, slug, price, original_price, description, image_url, images, in_stock, stock_quantity')
-      .eq('active', true)
-      .or(`name.ilike.%${message}%,description.ilike.%${message}%`)
-      .limit(3);
-    
-    products = generalProducts || [];
-  }
-  
-  // Remover duplicados e limitar a 3
-  const uniqueProducts = products
-    .filter((product, index, self) => 
-      self.findIndex(p => p.id === product.id) === index
-    )
-    .slice(0, 3);
-  
-  console.log('📦 Produtos encontrados:', uniqueProducts.length);
-  
-  return uniqueProducts;
-}
-
-// Função para extrair palavras-chave de produtos
-function extractProductKeywords(message: string): string[] {
-  const messageLower = message.toLowerCase();
-  const keywords: string[] = [];
-  
-  // Categorias de produtos (MELHORADAS para Angola)
-  const productCategories = {
-    'auricular': ['auricular', 'fone', 'fones', 'escutador', 'auscultador', 'headphone', 'earphone', 'ouvido'],
-    'mouse': ['mouse', 'rato'],
-    'teclado': ['teclado', 'keyboard'],
-    'cabo': ['cabo', 'carregador', 'adaptador', 'fio'],
-    'organizador': ['organizador', 'organizar', 'arrumação'],
-    'sem fio': ['sem fio', 'wireless', 'bluetooth'],
-    'usb': ['usb', 'pendrive', 'pen drive'],
-    'carregador': ['carregador', 'charger', 'fonte'],
-    'bluetooth': ['bluetooth', 'sem fio', 'wireless'],
-    'esportivo': ['esportivo', 'sport', 'exercício', 'corrida'],
-    'gaming': ['gaming', 'gamer', 'jogos', 'jogo']
-  };
-  
-  // Verificar cada categoria
-  for (const [category, terms] of Object.entries(productCategories)) {
-    if (terms.some(term => messageLower.includes(term))) {
-      keywords.push(category);
-      // Adicionar também os termos específicos
-      terms.forEach(term => {
-        if (messageLower.includes(term)) {
-          keywords.push(term);
-        }
-      });
-    }
-  }
-  
-  // Extrair palavras individuais relevantes
-  const words = messageLower.split(' ').filter(word => word.length > 3);
-  keywords.push(...words);
-  
-  return [...new Set(keywords)]; // Remove duplicatas
-}
-
-// Função para construir prompt humanizado
-function buildIntelligentSystemPrompt(userContext: any, knowledgeResponse: any, products: any[]): string {
-  
-  // INFORMAÇÕES DA EMPRESA
-  const companyInfo = `
-📍 LOCALIZAÇÃO: Angola, Luanda
-💰 MOEDA: Kz (Kwanza Angolano)
-🚚 ENTREGA: Grátis em toda Angola
-📞 CONTATO: WhatsApp/Telegram: +244 930 000 000
-🌐 SITE: https://superloja.vip
-⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h`;
-
-  // PRODUTOS DISPONÍVEIS (se existirem)
-  let productsInfo = '';
-  if (products.length > 0) {
-    productsInfo = '\n\n📦 PRODUTOS RELACIONADOS DISPONÍVEIS:\n';
-    products.forEach((product, index) => {
-      const price = parseFloat(product.price).toLocaleString('pt-AO');
-      const stock = product.in_stock ? '✅ Em estoque' : '❌ Indisponível';
-      productsInfo += `${index + 1}. ${product.name} - ${price} Kz - ${stock}\n`;
-    });
-  }
-
-  // CONTEXTO DA CONVERSA
-  let conversationContext = '';
-  if (userContext.message_count > 0) {
-    conversationContext = `\n\n📋 CONTEXTO: Esta conversa tem ${userContext.message_count} mensagens. Cliente ${userContext.message_count > 3 ? 'frequente' : 'novo'}.`;
-  }
-
-  // BASE DE CONHECIMENTO
-  let knowledgeInfo = '';
-  if (knowledgeResponse) {
-    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE: ${knowledgeResponse.answer}`;
-  }
-
-  return `Você é o assistente virtual oficial da empresa Superloja. 
-Seu objetivo é responder às mensagens recebidas de forma amigável, profissional e natural, como se fosse um atendente humano real. 
-
-INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}${knowledgeInfo}
-
-INSTRUÇÕES DE COMPORTAMENTO:
-- Cumprimente de forma personalizada ("Olá, tudo bem?" ou "Bom dia! Como posso ajudar?").
-- Responda de forma clara e objetiva às perguntas sobre serviços, preços, horários, localização, entre outros.
-- Coletar dados do cliente quando necessário (nome, email, telefone), mas sempre de forma gradual e educada.
-- Sugerir soluções e fornecer links ou informações úteis, caso estejam disponíveis.
-- Encerrar a conversa com simpatia quando o usuário disser que não precisa mais de ajuda.
-- Use as informações dos produtos APENAS se o usuário perguntar sobre produtos específicos.
-- NÃO mencione produtos sem o usuário solicitar.
-
-REGRAS IMPORTANTES:
-- Não envie respostas longas. Use no máximo 2 ou 3 frases.
-- Se a mensagem do cliente for apenas uma saudação (ex.: "Oi", "Bom dia"), devolva uma saudação amigável e uma pergunta do tipo "Como posso te ajudar hoje?".
-- Se não entender a mensagem do usuário, peça para ele explicar melhor, com frases como "Desculpe, poderia me dar mais detalhes?".
-- Evite respostas robóticas ou repetitivas. Seja variado, criativo e humano.
-- Use emojis moderadamente (1-2 por resposta).
-- Sempre responda em português de Angola.
-
-Seja natural, empático e útil em todas as interações!`;
-}
-
 // Função para obter histórico recente
 async function getRecentConversationHistory(userId: string, supabase: any): Promise<any[]> {
   const { data: conversations } = await supabase
@@ -704,10 +488,9 @@ async function getRecentConversationHistory(userId: string, supabase: any): Prom
     }));
 }
 
-// Função para atualizar contexto do usuário
+// Função para atualizar contexto do usuário - CORRIGIDA
 async function updateUserContext(userId: string, userMessage: string, aiResponse: string, supabase: any): Promise<void> {
   try {
-    // CORRIGIDO: Usar incremento direto sem supabase.raw
     const { data: existingContext } = await supabase
       .from('ai_conversation_context')
       .select('message_count')
@@ -732,68 +515,21 @@ async function updateUserContext(userId: string, userMessage: string, aiResponse
   }
 }
 
-// Função para aprendizado automático
-async function learnFromInteraction(userMessage: string, aiResponse: string, userContext: any, supabase: any): Promise<void> {
-  try {
-    // Detectar padrões frequentes
-    const messageLower = userMessage.toLowerCase();
-    
-    // Aprender palavras-chave frequentes
-    if (messageLower.includes('preço') || messageLower.includes('valor') || messageLower.includes('custa')) {
-      await recordLearningInsight(
-        'frequent_question',
-        'Usuário pergunta sobre preços frequentemente',
-        { keyword: 'preço', context: userMessage.substring(0, 50) },
-        supabase
-      );
-    }
-
-    // Detectar satisfação através de palavras positivas
-    if (messageLower.includes('obrigado') || messageLower.includes('valeu') || messageLower.includes('perfeito')) {
-      await recordLearningInsight(
-        'positive_feedback',
-        'Resposta bem recebida pelo usuário',
-        { response: aiResponse.substring(0, 100), userReaction: userMessage },
-        supabase
-      );
-    }
-  } catch (error) {
-    console.log('⚠️ Erro no aprendizado:', error);
-  }
-}
-
-// Função para registrar insights de aprendizado
-async function recordLearningInsight(type: string, content: string, metadata: any, supabase: any): Promise<void> {
-  try {
-    await supabase
-      .from('ai_learning_insights')
-      .insert({
-        insight_type: type,
-        content: content,
-        metadata: metadata,
-        usage_count: 1
-      });
-  } catch (error) {
-    console.log('⚠️ Erro ao salvar insight:', error);
-  }
-}
-
-// Função para resposta de fallback inteligente
-async function getFallbackResponse(userMessage: string, userId: string, supabase: any): Promise<string> {
+// Função para fallback quando IA falha
+async function getFallbackResponse(userMessage: string, senderId: string, supabase: any): Promise<string> {
+  console.log('🔄 Usando resposta fallback');
+  
   const fallbacks = [
-    'Desculpe, não entendi completamente. Pode reformular sua pergunta? 🤔',
-    'Hmm, deixe-me pensar... Pode me dar mais detalhes? 💭',
-    'Não tenho certeza sobre isso, mas posso te ajudar de outra forma! 😊',
-    'Ops! Parece que preciso de mais informações. Me conta melhor! 🙂',
-    'Que interessante! Me explica um pouco mais sobre isso? 🤗',
-    'Não captei direito, mas estou aqui para ajudar! Reformula pra mim? 😄'
+    'Olá! Como posso te ajudar hoje? 😊',
+    'Oi! Estou aqui para te auxiliar. O que precisa?',
+    'Seja bem-vindo(a)! Em que posso ser útil?',
+    'Olá! Conte-me como posso te ajudar! 😊',
   ];
-
-  try {
-    const userContext = await getOrCreateUserContext(userId, supabase);
-    const randomIndex = userContext.message_count % fallbacks.length;
-    return fallbacks[randomIndex];
-  } catch {
+  
+  // Escolher fallback baseado no comprimento da mensagem do usuário
+  if (userMessage.length < 10) {
+    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+  } else {
     return fallbacks[0];
   }
 }
@@ -992,50 +728,3 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
     // Fallback: enviar apenas a mensagem de texto
     await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
   }
-}
-
-// NOVA FUNÇÃO: Verificar se deve enviar produtos (evitar spam)
-async function shouldSendProducts(senderId: string, messageText: string, supabase: any): Promise<boolean> {
-  try {
-    // Verificar se já enviou produtos recentemente (últimos 5 minutos)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    
-    const { data: recentProductSends } = await supabase
-      .from('ai_conversations')
-      .select('*')
-      .eq('user_id', senderId)
-      .eq('platform', 'facebook')
-      .eq('type', 'sent')
-      .gte('timestamp', fiveMinutesAgo)
-      .like('message', '%📸 Enviou%imagem%');
-    
-    if (recentProductSends && recentProductSends.length > 0) {
-      console.log('⛔ Produtos já enviados recentemente - evitando spam');
-      return false;
-    }
-    
-    // Verificar se a mensagem realmente solicita produtos
-    const messageLower = messageText.toLowerCase();
-    const productRequestKeywords = [
-      'mostra', 'ver produtos', 'produtos', 'imagens', 'fotos',
-      'que vocês têm', 'disponível', 'catálogo', 'quero ver',
-      'mostrar', 'opções', 'escolher', 'modelos', 'escutadores'
-    ];
-    
-    const hasProductRequest = productRequestKeywords.some(keyword => 
-      messageLower.includes(keyword)
-    );
-    
-    console.log('🔍 Análise de solicitação de produtos:', {
-      hasProductRequest,
-      messageText: messageLower,
-      recentSends: recentProductSends?.length || 0
-    });
-    
-    return hasProductRequest;
-    
-  } catch (error) {
-    console.error('❌ Erro ao verificar envio de produtos:', error);
-    return false; // Em caso de erro, não envia para evitar spam
-  }
-}
