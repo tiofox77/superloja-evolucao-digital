@@ -288,6 +288,13 @@ REGRAS CRÍTICAS:
 function getFallbackResponse(message: string, products: any[]): string {
   const lowerMessage = message.toLowerCase();
   
+  // Cumprimentos gerais
+  if (lowerMessage.includes('ola') || lowerMessage.includes('oi') || 
+      lowerMessage.includes('bom dia') || lowerMessage.includes('boa tarde') || 
+      lowerMessage.includes('boa noite') || lowerMessage.includes('hey')) {
+    return `Olá! Tudo bem? 😊 Bem-vindo à SuperLoja! Como posso ajudá-lo hoje? Temos produtos incríveis com entrega grátis em Angola! 🛍️`;
+  }
+  
   if (lowerMessage.includes('fone') || lowerMessage.includes('auricular')) {
     // Se há produtos fones carregados, usar eles
     if (products.length > 0) {
@@ -315,7 +322,12 @@ function getFallbackResponse(message: string, products: any[]): string {
     return `Nossos preços são os melhores de Angola! Ver catálogo: https://superloja.vip 💰`;
   }
   
-  return `Olá! Bem-vindo à SuperLoja! 😊 Temos produtos incríveis com entrega grátis. O que procura? https://superloja.vip`;
+  if (lowerMessage.includes('obrigad') || lowerMessage.includes('thanks')) {
+    return `De nada! 😊 Estou sempre aqui para ajudar. Precisa de mais alguma coisa?`;
+  }
+  
+  // Resposta padrão para qualquer mensagem
+  return `Olá! Bem-vindo à SuperLoja! 😊 Como posso ajudá-lo? Temos produtos incríveis com entrega grátis. O que procura? https://superloja.vip`;
 }
 
 async function sendFacebookMessage(recipientId: string, messageText: string, supabase: any) {
