@@ -128,22 +128,34 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
       .eq('in_stock', true)
       .limit(25);
 
-    // Construir informações dos produtos (sem imagens por padrão)
+    // Construir informações dos produtos (incluindo URLs das imagens quando necessário)
     let productsInfo = '';
     if (products && products.length > 0) {
       productsInfo = '\n\nPRODUTOS DISPONÍVEIS:\n';
       products.forEach((product: any, index: number) => {
         const price = parseFloat(product.price).toLocaleString('pt-AO');
         productsInfo += `${index + 1}. ${product.name} - ${price} Kz\n`;
-        productsInfo += `   Link: https://superloja.vip/produto/${product.slug}\n\n`;
+        productsInfo += `   Link: https://superloja.vip/produto/${product.slug}\n`;
+        // Incluir URL da imagem nos dados do produto para a IA
+        if (product.image_url) {
+          productsInfo += `   ImageURL: ${product.image_url}\n`;
+        }
+        productsInfo += '\n';
       });
+      
+      console.log(`📊 Produtos carregados: ${products.length}`);
+      console.log(`🖼️ Produtos com imagem: ${products.filter((p: any) => p.image_url).length}`);
     }
 
     // Detectar se usuário quer ver fotos
     const photoKeywords = ['fotos', 'foto', 'imagem', 'imagens', 'envie fotos', 'manda imagem', 'manda imagens', 'quero fotos', 'quero ver', 'mostra foto', 'mostra imagem'];
     const wantsPhotos = photoKeywords.some(keyword => message.toLowerCase().includes(keyword));
     
-    console.log(`📸 Usuário quer fotos: ${wantsPhotos}`);
+    console.log('=== DEBUG FOTOS ===');
+    console.log('📝 Mensagem original:', message);
+    console.log('📸 Keywords encontradas:', photoKeywords.filter(k => message.toLowerCase().includes(k)));
+    console.log('🎯 Usuário quer fotos:', wantsPhotos);
+    console.log('==================');
 
     const systemPrompt = `Você é um vendedor angolano inteligente da SuperLoja (https://superloja.vip).
 
@@ -163,9 +175,10 @@ INSTRUÇÕES CRÍTICAS PARA FONES:
 
 REGRAS PARA IMAGENS:
 ${wantsPhotos ? 
-  '- INCLUA imagens para TODOS os produtos usando: 📸 ![Imagem](URL_DA_IMAGEM)' :
+  '- DEVE INCLUIR imagens para TODOS os produtos usando: 📸 ![Imagem](ImageURL)' :
   '- NÃO inclua imagens a menos que o cliente peça especificamente'
 }
+- Use EXATAMENTE a ImageURL fornecida nos dados do produto acima
 
 FORMATO OBRIGATÓRIO PARA CADA PRODUTO:
 X. *[NOME COMPLETO DO PRODUTO]* - [PREÇO EXATO] Kz
