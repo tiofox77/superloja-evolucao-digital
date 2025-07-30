@@ -284,19 +284,31 @@ async function handleMessage(messaging: any, supabase: any) {
   }
 }
 
-// NOVA FUNÇÃO: 100% IA - Sem automações
+// NOVA FUNÇÃO: 100% IA - Sem automações com aprendizado
 async function processWithPureAI(userMessage: string, senderId: string, supabase: any): Promise<string> {
-  console.log('🤖 === PROCESSAMENTO 100% IA ===');
+  console.log('🤖 === PROCESSAMENTO 100% IA COM APRENDIZADO ===');
   console.log('👤 Usuário:', senderId);
   console.log('💬 Mensagem:', userMessage);
   
   try {
-    // 1. Buscar contexto do usuário 
+    // 1. Verificar se é feedback negativo ou correção do usuário
+    const feedbackDetected = await detectUserFeedback(userMessage, senderId, supabase);
+    if (feedbackDetected) {
+      return await handleUserFeedback(userMessage, senderId, supabase);
+    }
+
+    // 2. Buscar contexto do usuário 
     let userContext = await getOrCreateUserContext(senderId, supabase);
     console.log('📋 Contexto:', { messageCount: userContext.message_count });
 
-    // 2. Buscar TODOS os produtos disponíveis (com stock)
-    const availableProducts = await getAllAvailableProducts(supabase);
+    // 3. Verificar se há aprendizado aplicável
+    const learnedResponse = await improveProductSearch(userMessage, supabase);
+    if (learnedResponse) {
+      return learnedResponse;
+    }
+
+    // 4. Buscar TODOS os produtos disponíveis (com stock) com categorização melhorada
+    const availableProducts = await getAllAvailableProductsImproved(supabase);
     
     // 3. Buscar na base de conhecimento
     const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
@@ -399,6 +411,70 @@ async function getAllAvailableProducts(supabase: any) {
   }
 }
 
+// FUNÇÃO MELHORADA: Buscar produtos com categorização aprimorada
+async function getAllAvailableProductsImproved(supabase: any) {
+  try {
+    const { data: products } = await supabase
+      .from('products')
+      .select(`
+        id, name, slug, price, original_price, description, 
+        image_url, in_stock, stock_quantity, featured,
+        category_id, categories(name), variants, colors, sizes
+      `)
+      .eq('active', true)
+      .order('name', { ascending: true });
+
+    if (!products) return [];
+
+    // Categorizar produtos por tipo para evitar confusão entre fones e cabos
+    const categorizedProducts = products.map(product => {
+      const name = product.name.toLowerCase();
+      let aiCategory = 'outros';
+      let specificType = '';
+      
+      // Categorização específica para fones de ouvido
+      if (name.includes('fone') || name.includes('auricular') || name.includes('headphone') || 
+          name.includes('earphone') || name.includes('auscultador')) {
+        aiCategory = 'fones_audio';
+        specificType = 'dispositivo_audio';
+      } 
+      // Categorização específica para cabos (excluindo fones)
+      else if ((name.includes('cabo') || name.includes('cable')) && 
+               !name.includes('fone') && !name.includes('auricular')) {
+        aiCategory = 'cabos_conexao';
+        specificType = 'cabo_conectividade';
+      } 
+      // Carregadores
+      else if (name.includes('carregador') || name.includes('fonte') || name.includes('charger')) {
+        aiCategory = 'carregadores';
+        specificType = 'dispositivo_alimentacao';
+      } 
+      // Adaptadores
+      else if (name.includes('adaptador') || name.includes('conversor') || name.includes('adapter')) {
+        aiCategory = 'adaptadores';
+        specificType = 'conversor_sinais';
+      }
+      
+      return { 
+        ...product, 
+        ai_category: aiCategory,
+        ai_specific_type: specificType,
+        ai_search_keywords: name.split(' ').filter(word => word.length > 2)
+      };
+    });
+
+    console.log('📦 Produtos categorizados:', categorizedProducts.length);
+    console.log('📦 Fones de áudio:', categorizedProducts.filter(p => p.ai_category === 'fones_audio').length);
+    console.log('📦 Cabos:', categorizedProducts.filter(p => p.ai_category === 'cabos_conexao').length);
+    console.log('📦 Carregadores:', categorizedProducts.filter(p => p.ai_category === 'carregadores').length);
+    
+    return categorizedProducts;
+  } catch (error) {
+    console.error('❌ Erro ao buscar produtos melhorados:', error);
+    return [];
+  }
+}
+
 // Função simples para buscar produtos (manter para compatibilidade)
 async function getProductsForAI(supabase: any) {
   try {
@@ -422,10 +498,11 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
   const companyInfo = `
 📍 LOCALIZAÇÃO: Angola, Luanda
 💰 MOEDA: Kz (Kwanza Angolano)
-🚚 ENTREGA: Grátis em toda Angola
+🚚 ENTREGA: ✅ GRÁTIS em Luanda | 💰 PAGA fora de Luanda (calcular frete)
 📞 CONTATO: WhatsApp/Telegram: +244 930 000 000
 🌐 SITE: https://superloja.vip
-⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h`;
+⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h
+⚠️ IMPORTANTE: Entregas fora de Luanda têm custo adicional - solicitar contato para calcular frete`;
 
   // CATÁLOGO COMPLETO DE PRODUTOS - CRÍTICO PARA PRECISÃO
   let productsInfo = '';
@@ -469,6 +546,10 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
     productsInfo += '\n• Quando cliente escolher um produto ESPECÍFICO, use o LINK DIRETO do produto';
     productsInfo += '\n• Se cliente pedir imagem/foto, use a URL da imagem do produto';
     productsInfo += '\n• Se cliente mencionar número da lista (ex: "produto 5"), identifique qual produto é';
+    productsInfo += '\n• ⚠️ ATENÇÃO CATEGORIA: FONES ≠ CABOS (são produtos diferentes!)';
+    productsInfo += '\n• Se cliente pedir FONES/AURICULARES: mostre apenas produtos de ÁUDIO';
+    productsInfo += '\n• Se cliente pedir CABOS: mostre apenas produtos de CONEXÃO/CARREGAMENTO';
+    productsInfo += '\n• Se não tiver certeza do que cliente quer, PERGUNTE especificamente';
   }
 
   // CONTEXTO DA CONVERSA
@@ -1230,6 +1311,157 @@ Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
   } catch (error) {
     console.error('❌ Erro geral ao notificar administrador:', error);
   }
+}
+
+// NOVA FUNÇÃO: Detectar feedback negativo do usuário
+async function detectUserFeedback(userMessage: string, senderId: string, supabase: any): Promise<boolean> {
+  console.log('🧠 === DETECTANDO FEEDBACK DO USUÁRIO ===');
+  
+  const feedbackKeywords = [
+    'errado', 'incorreto', 'não é isso', 'não quero', 'não era isso',
+    'quero fones', 'eu pedi fones', 'não cabos', 'pedi auriculares',
+    'isso está errado', 'você enviou errado', 'não é o que pedi',
+    'queria outro produto', 'não quero cabo', 'eu disse fones',
+    'por que cabo', 'pedi headphones', 'quero earphones',
+    'não mandou certo', 'enviou produto errado'
+  ];
+  
+  const userMsgLower = userMessage.toLowerCase();
+  const hasFeedback = feedbackKeywords.some(keyword => userMsgLower.includes(keyword));
+  
+  if (hasFeedback) {
+    console.log('🧠 Feedback negativo detectado!');
+    
+    // Buscar últimas conversas para contexto
+    const { data: recentConversations } = await supabase
+      .from('ai_conversations')
+      .select('message, type')
+      .eq('user_id', senderId)
+      .eq('platform', 'facebook')
+      .order('timestamp', { ascending: false })
+      .limit(4);
+    
+    if (recentConversations && recentConversations.length >= 2) {
+      const lastAiResponse = recentConversations.find(c => c.type === 'sent')?.message || '';
+      const userPreviousMessage = recentConversations.find(c => c.type === 'received')?.message || '';
+      
+      // Salvar feedback para aprendizado
+      await supabase.from('ai_feedback').insert({
+        user_id: senderId,
+        user_message: userPreviousMessage,
+        ai_response: lastAiResponse,
+        user_feedback: userMessage,
+        is_correct: false,
+        learning_applied: false
+      });
+      
+      console.log('💾 Feedback negativo salvo para aprendizado');
+    }
+  }
+  
+  return hasFeedback;
+}
+
+// NOVA FUNÇÃO: Tratar feedback do usuário e aprender
+async function handleUserFeedback(userMessage: string, senderId: string, supabase: any): Promise<string> {
+  console.log('🎓 === TRATANDO FEEDBACK E APRENDENDO ===');
+  
+  // Detectar produto correto que o usuário quer
+  const productKeywords = {
+    'fones': ['fones', 'auriculares', 'headphones', 'earphones', 'auscultadores'],
+    'cabos': ['cabo', 'cabos', 'carregador', 'adaptador'],
+    'carregadores': ['carregador', 'fonte', 'alimentação'],
+    'adaptadores': ['adaptador', 'conversor', 'hub']
+  };
+  
+  let desiredCategory = '';
+  const userMsgLower = userMessage.toLowerCase();
+  
+  for (const [category, keywords] of Object.entries(productKeywords)) {
+    if (keywords.some(keyword => userMsgLower.includes(keyword))) {
+      desiredCategory = category;
+      break;
+    }
+  }
+  
+  if (desiredCategory) {
+    console.log(`🎓 Usuário quer categoria: ${desiredCategory}`);
+    
+    // Buscar produtos da categoria correta
+    const { data: correctProducts } = await supabase
+      .from('products')
+      .select('*')
+      .eq('active', true)
+      .eq('in_stock', true)
+      .ilike('name', `%${desiredCategory}%`)
+      .limit(5);
+    
+    if (correctProducts && correctProducts.length > 0) {
+      let response = `🎯 Peço desculpas pelo erro! Você quer ${desiredCategory}. Aqui estão os disponíveis:\n\n`;
+      
+      correctProducts.forEach((product, index) => {
+        const price = parseFloat(product.price).toLocaleString('pt-AO');
+        response += `${index + 1}. ${product.name} - ${price} Kz\n`;
+        response += `   🔗 https://superloja.vip/produto/${product.slug}\n\n`;
+      });
+      
+      response += '✨ Qual destes produtos lhe interessa? Posso mostrar mais detalhes!';
+      
+      // Marcar feedback como aprendido
+      await supabase
+        .from('ai_feedback')
+        .update({ learning_applied: true, correction_provided: response })
+        .eq('user_id', senderId)
+        .eq('learning_applied', false)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      return response;
+    }
+  }
+  
+  // Se não conseguiu identificar produto específico, pedir clarificação
+  return `🤔 Peço desculpas pelo erro! Para te ajudar melhor, pode me dizer exatamente qual produto você procura?
+
+📋 Temos essas categorias:
+• Fones de ouvido e auriculares
+• Cabos e adaptadores  
+• Carregadores
+• Acessórios para smartphone
+
+O que você gostaria de ver? 😊`;
+}
+
+// NOVA FUNÇÃO: Melhorar busca de produtos com base no aprendizado
+async function improveProductSearch(userMessage: string, supabase: any) {
+  console.log('🎓 === MELHORANDO BUSCA COM APRENDIZADO ===');
+  
+  // Buscar feedbacks anteriores para melhorar precisão
+  const { data: learningData } = await supabase
+    .from('ai_feedback')
+    .select('user_message, correction_provided, user_feedback')
+    .eq('is_correct', false)
+    .eq('learning_applied', true)
+    .limit(10);
+  
+  if (learningData && learningData.length > 0) {
+    console.log(`🎓 Aplicando ${learningData.length} insights de aprendizado`);
+    
+    // Verificar se mensagem atual é similar a erros passados
+    const userMsgLower = userMessage.toLowerCase();
+    
+    for (const feedback of learningData) {
+      const similarityKeywords = feedback.user_message.toLowerCase().split(' ').filter(w => w.length > 2);
+      const hasSimilarity = similarityKeywords.some(keyword => userMsgLower.includes(keyword));
+      
+      if (hasSimilarity && feedback.correction_provided) {
+        console.log('🎓 Aplicando correção aprendida anteriormente');
+        return feedback.correction_provided;
+      }
+    }
+  }
+  
+  return null; // Continuar com busca normal
 }
 
 // NOVA FUNÇÃO: Processar comandos administrativos

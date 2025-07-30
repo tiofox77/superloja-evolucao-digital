@@ -125,6 +125,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_feedback: {
+        Row: {
+          ai_response: string
+          conversation_id: string | null
+          correction_provided: string | null
+          created_at: string
+          id: string
+          is_correct: boolean | null
+          learning_applied: boolean | null
+          updated_at: string
+          user_feedback: string | null
+          user_id: string
+          user_message: string
+        }
+        Insert: {
+          ai_response: string
+          conversation_id?: string | null
+          correction_provided?: string | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          learning_applied?: boolean | null
+          updated_at?: string
+          user_feedback?: string | null
+          user_id: string
+          user_message: string
+        }
+        Update: {
+          ai_response?: string
+          conversation_id?: string | null
+          correction_provided?: string | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          learning_applied?: boolean | null
+          updated_at?: string
+          user_feedback?: string | null
+          user_id?: string
+          user_message?: string
+        }
+        Relationships: []
+      }
       ai_knowledge_base: {
         Row: {
           active: boolean | null
