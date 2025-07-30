@@ -233,6 +233,53 @@ export const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({
                     Adicione um novo conhecimento para o agente IA
                   </DialogDescription>
                 </DialogHeader>
+                
+                {/* Botões de Ação Rápida */}
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/add-missing-knowledge', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' }
+                        });
+                        const result = await response.json();
+                        console.log('✅ Conhecimentos adicionados:', result);
+                        toast.success(`Conhecimentos verificados! Total: ${result.totalKnowledge}`);
+                        onReload();
+                      } catch (error) {
+                        console.error('❌ Erro:', error);
+                        toast.error('Erro ao adicionar conhecimentos');
+                      }
+                    }}
+                  >
+                    🔧 Auto-completar Base
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/debug-knowledge-base', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ query: 'teste debug completo' })
+                        });
+                        const result = await response.json();
+                        console.log('🔍 Debug completo:', result);
+                        toast.info(`Debug: ${result.totalKnowledge} conhecimentos ativos`);
+                      } catch (error) {
+                        console.error('❌ Erro:', error);
+                        toast.error('Erro no debug');
+                      }
+                    }}
+                  >
+                    🔍 Debug Base
+                  </Button>
+                </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
