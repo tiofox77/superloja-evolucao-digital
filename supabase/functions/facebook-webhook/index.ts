@@ -207,7 +207,7 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
-      return getFallbackResponse(message, personalizedProducts, userPrefs, sentiment);
+      return getFallbackResponse(message, personalizedProducts || [], userPrefs, sentiment);
     }
 
     // Construir lista de produtos personalizada
@@ -306,7 +306,7 @@ REGRAS CRÍTICAS:
 
   } catch (error) {
     console.error('Erro OpenAI:', error);
-    return getFallbackResponse(message, [], {}, { score: 0.5, label: 'neutral' });
+    return getFallbackResponse(message, personalizedProducts || [], userPrefs, sentiment);
   }
 }
 
@@ -676,7 +676,23 @@ function getFallbackResponse(message: string, products: any[], userPrefs: any = 
       response += "Se algum deles te interessar, avise-me! 😊";
       return response;
     }
-    return `Temos fones de ouvido incríveis! Veja em https://superloja.vip 🎧`;
+    return `Meu irmão, ainda não temos fones bluetooth completos em stock na SuperLoja neste momento. Sei que bluetooth é mesmo prático para quem não quer ficar agarrado a fios, mas infelizmente só estamos com acessórios para fones agora.
+
+Mas olha, se já tens fones ou pretendes conectar fones em vários aparelhos (telemóvel, computador, rádio do carro), temos adaptadores que podem facilitar tua vida enquanto aguardas os novos fones chegarem. Dá só uma olhada nestas opções:
+
+1. *Adaptor de Áudio para Fones de Ouvido* - 5 500 Kz  
+   🔗 [Ver produto](https://superloja.vip/produto/adaptor-de-udio-para-fones-de-ouvido)  
+   
+
+2. *2 em 1 Cabo Adaptador* - 5 500 Kz  
+   🔗 [Ver produto](https://superloja.vip/produto/2-em-1-cabo-adaptador)  
+   
+
+3. *Adaptador de cabo (carregador)* - 5 500 Kz  
+   🔗 [Ver produto](https://superloja.vip/produto/adaptador-de-cabo-carregador)  
+   
+
+Se quiseres, posso guardar teu contacto para te avisar assim que chegarem fones bluetooth novos. Que tal, irmão? Posso te ajudar com algum destes acessórios enquanto isso?`;
   }
   
   if (lowerMessage.includes('smartphone') || lowerMessage.includes('telefone')) {
