@@ -69,19 +69,15 @@ async function processWebsiteChat(
   // 1. Buscar produtos relevantes baseado na mensagem
   const products = await searchRelevantProducts(message, supabase);
   
-  // 2. Buscar na base de conhecimento
-  const knowledgeBase = await searchKnowledgeBase(message, supabase);
-  
-  // 3. Obter histórico da conversa
+  // 2. Obter histórico da conversa
   const conversationHistory = await getConversationHistory(userId, supabase);
   
-  // 4. Verificar se usuário está logado/registrado
+  // 3. Verificar se usuário está logado/registrado
   const userInfo = await getUserInfo(userId, supabase);
   
-  // 5. Processar com IA
+  // 4. Processar com IA (sem base de conhecimento)
   const aiResponse = await callOpenAI(message, {
     products,
-    knowledgeBase,
     conversationHistory,
     userInfo
   });
@@ -100,20 +96,6 @@ async function searchRelevantProducts(query: string, supabase: any) {
   return products || [];
 }
 
-async function searchKnowledgeBase(query: string, supabase: any) {
-  // Buscar por palavras-chave na base de conhecimento
-  const keywords = query.toLowerCase().split(' ').filter(word => word.length > 2);
-  
-  const { data: knowledge } = await supabase
-    .from('ai_knowledge_base')
-    .select('question, answer, category, priority')
-    .eq('active', true)
-    .or(keywords.map(keyword => `keywords.cs.{${keyword}}`).join(','))
-    .order('priority', { ascending: false })
-    .limit(3);
-    
-  return knowledge || [];
-}
 
 async function getConversationHistory(userId: string, supabase: any) {
   const { data: history } = await supabase
@@ -160,10 +142,6 @@ ${context.products.map(p =>
   `• ${p.name} - ${p.price} AOA - ${p.description} (Stock: ${p.stock})`
 ).join('\n')}
 
-CONHECIMENTO BASE:
-${context.knowledgeBase.map(k => 
-  `${k.category.toUpperCase()}: ${k.question} → ${k.answer}`
-).join('\n')}
 
 HISTÓRICO DA CONVERSA:
 ${context.conversationHistory.slice(-5).map(h => 
