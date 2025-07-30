@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Brain, Plus, Edit, Trash2, ToggleLeft, ToggleRight, Search } from 'lucide-react';
@@ -233,65 +234,6 @@ export const KnowledgeBaseTab: React.FC<KnowledgeBaseTabProps> = ({
                     Adicione um novo conhecimento para o agente IA
                   </DialogDescription>
                 </DialogHeader>
-                
-                {/* Botões de Ação Rápida */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        toast.info('🤖 Adicionando conhecimentos essenciais...');
-                        
-                        const { data, error } = await supabase.functions.invoke('add-missing-knowledge');
-                        
-                        if (error) {
-                          toast.error('Erro ao adicionar conhecimentos: ' + error.message);
-                        } else {
-                          console.log('✅ Conhecimentos adicionados:', data);
-                          toast.success(`✅ Conhecimentos verificados! Total: ${data.totalKnowledge || 'N/A'}`);
-                          onReload();
-                        }
-                      } catch (error) {
-                        console.error('❌ Erro:', error);
-                        toast.error('Erro ao adicionar conhecimentos: ' + error.message);
-                      }
-                    }}
-                  >
-                    🔧 Auto-completar Base
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        toast.info('🔍 Testando base de conhecimento...');
-                        
-                        const { data, error } = await supabase.functions.invoke('debug-knowledge-base', {
-                          body: { query: 'Como funciona a entrega?' }
-                        });
-                        
-                        if (error) {
-                          toast.error('Erro no debug: ' + error.message);
-                        } else {
-                          console.log('🔍 Debug completo:', data);
-                          
-                          if (data.foundKnowledge) {
-                            toast.success(`✅ Base funcionando! Encontrou: "${data.foundKnowledge.question}"`);
-                          } else {
-                            toast.warning(`⚠️ Debug OK - ${data.totalKnowledge} conhecimentos ativos, mas nenhum relevante para teste`);
-                          }
-                        }
-                      } catch (error) {
-                        console.error('❌ Erro:', error);
-                        toast.error('Erro no debug: ' + error.message);
-                      }
-                    }}
-                  >
-                    🔍 Debug Base
-                  </Button>
-                </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">

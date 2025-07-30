@@ -11,7 +11,6 @@ import {
 } from '@/utils/notifications';
 import { RealTimeTab } from '@/components/admin/RealTimeTab';
 import { KnowledgeBaseTab } from '@/components/admin/KnowledgeBaseTab';
-import { CorrectionsTab } from '@/components/admin/CorrectionsTab';
 import { LearningTab } from '@/components/admin/LearningTab';
 import { ConfigurationsTab } from '@/components/admin/ConfigurationsTab';
 import { TestsTab } from '@/components/admin/TestsTab';
@@ -332,23 +331,17 @@ const AdminAgentIA = () => {
         { key: 'escalation_time', value: escalationTime.toString(), description: 'Tempo para escalation em minutos' }
       ];
 
-      console.log('📦 Settings preparadas:', settingsToSave);
+      const { data, error } = await supabase
+        .from('ai_settings')
+        .upsert(settingsToSave, { 
+          onConflict: 'key',
+          ignoreDuplicates: false 
+        })
+        .select();
+      
+      if (error) throw error;
 
-      // Salvar cada setting individualmente para evitar problemas de constraint
-      for (const setting of settingsToSave) {
-        const { error } = await supabase
-          .from('ai_settings')
-          .upsert(setting, { 
-            onConflict: 'key',
-            ignoreDuplicates: false 
-          });
-        
-        if (error) {
-          console.error(`❌ Erro ao salvar ${setting.key}:`, error);
-          throw error;
-        }
-        console.log(`✅ ${setting.key} salvo com sucesso`);
-      }
+      console.log('✅ Dados salvos no Supabase:', data);
       
       await notifyConfigurationChanged(
         'Configurações Gerais',
@@ -426,15 +419,12 @@ const AdminAgentIA = () => {
 
       {/* Tabs principais */}
       <Tabs defaultValue="realtime" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="realtime">
             Tempo Real
           </TabsTrigger>
           <TabsTrigger value="knowledge">
             Base de Conhecimento
-          </TabsTrigger>
-          <TabsTrigger value="corrections">
-            Correções & Feedback
           </TabsTrigger>
           <TabsTrigger value="learning">
             Aprendizado IA
@@ -463,10 +453,6 @@ const AdminAgentIA = () => {
             knowledgeBase={knowledgeBase}
             onReload={loadKnowledgeBase}
           />
-        </TabsContent>
-
-        <TabsContent value="corrections">
-          <CorrectionsTab />
         </TabsContent>
 
         <TabsContent value="learning">
