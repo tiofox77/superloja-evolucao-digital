@@ -233,8 +233,16 @@ async function handleMessage(messaging: any, supabase: any) {
     const aiResponse = await processWithPureAI(messageText, senderId, supabase);
     console.log(`🤖 Resposta IA: ${aiResponse}`);
     
-    // Enviar apenas a resposta da IA
+    // Verificar se a IA solicitou envio de imagem
+    const imageResponse = await checkAndSendProductImage(messageText, aiResponse, senderId, supabase);
+    
+    // Enviar a resposta da IA
     await sendFacebookMessage(senderId, aiResponse, supabase);
+    
+    // Se houve envio de imagem, aguardar para não sobrecarregar
+    if (imageResponse.imageSent) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Delay de 1s
+    }
     
     // Salvar resposta enviada
     await supabase.from('ai_conversations').insert({
@@ -411,8 +419,12 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
         const category = product.categories?.name ? ` | ${product.categories.name}` : '';
         
         productsInfo += `${index + 1}. ${product.name} - ${price} Kz${originalPrice}${category}\n`;
+        productsInfo += `   🔗 LINK: https://superloja.vip/produto/${product.slug}\n`;
         if (product.description) {
           productsInfo += `   📝 ${product.description.substring(0, 80)}...\n`;
+        }
+        if (product.image_url) {
+          productsInfo += `   📸 IMAGEM: ${product.image_url}\n`;
         }
       });
     }
@@ -428,8 +440,9 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
     productsInfo += '\n• SÓ mencione produtos que estão EM STOCK (✅)';
     productsInfo += '\n• NUNCA mencione produtos sem stock (❌)';
     productsInfo += '\n• Use os preços EXATOS da lista acima';
-    productsInfo += '\n• Só fale de produtos se o cliente perguntar';
-    productsInfo += '\n• Para ver imagens, direcione para: https://superloja.vip';
+    productsInfo += '\n• Quando cliente escolher um produto ESPECÍFICO, use o LINK DIRETO do produto';
+    productsInfo += '\n• Se cliente pedir imagem/foto, use a URL da imagem do produto';
+    productsInfo += '\n• Se cliente mencionar número da lista (ex: "produto 5"), identifique qual produto é';
   }
 
   // CONTEXTO DA CONVERSA
@@ -456,27 +469,39 @@ INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}${kn
 - Para auriculares/fones, mostre apenas os que estão EM STOCK
 - Sugira produtos similares se o desejado estiver indisponível
 
-💬 ESTILO DE COMUNICAÇÃO:
-- Seja simpático e profissional como um vendedor real
-- Cumprimente com "Olá! Tudo bem?" ou "Bom dia!"
-- Responda objetivamente - máximo 3 frases
-- Use 1-2 emojis por resposta
-- Português de Angola sempre
+🔗 LINKS E IMAGENS:
+- Quando cliente escolher produto ESPECÍFICO, use LINK DIRETO: https://superloja.vip/produto/[slug]
+- Se cliente pedir foto/imagem, envie URL da imagem do produto
+- Para lista geral, pode usar https://superloja.vip
+
+🛒 PROCESSO DE COMPRA:
+- Se cliente quiser comprar, pergunte: nome, telefone, endereço
+- Confirme produto, preço e dados antes de finalizar
+- Informe sobre entrega grátis em Angola
+- Diga: "Vou processar seu pedido e entrar em contato!"
+
+💬 COMUNICAÇÃO NATURAL:
+- Se perguntarem "como está", responda: "Estou bem, obrigado! E você?"
+- Quando mencionarem número da lista (ex: "produto 29"), identifique corretamente
+- Seja simpático: "Olá! Tudo bem?" ou "Bom dia!"
+- Máximo 3 frases por resposta
+- Use 1-2 emojis
+- Português de Angola
 
 🚫 NUNCA FAÇA:
 - Mencionar produtos sem stock
 - Inventar preços ou produtos
-- Enviar respostas longas
-- Mencionar produtos sem o cliente perguntar
-- Prometer algo que não temos
+- Enviar link geral quando cliente escolheu produto específico
+- Ignorar quando cliente menciona número da lista
 
 ✅ SEMPRE FAÇA:
 - Verificar stock antes de recomendar
 - Dar preços corretos da lista
-- Ser honesto sobre disponibilidade
-- Direcionar para o site para ver imagens
+- Usar link específico do produto quando cliente escolher
+- Responder de forma humana e natural
+- Identificar números de produtos mencionados
 
-SEJA PRECISO, HONESTO E ÚTIL!`;
+SEJA PRECISO, HONESTO E NATURAL!`;
 }
 
 // Função para construir prompt 100% IA (manter para compatibilidade)
@@ -846,5 +871,103 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
     console.error('❌ Erro de rede ao enviar imagem:', error);
     // Fallback: enviar apenas a mensagem de texto
     await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
+  }
+}
+
+// NOVA FUNÇÃO: Detectar e enviar imagens de produtos
+async function checkAndSendProductImage(userMessage: string, aiResponse: string, recipientId: string, supabase: any): Promise<{imageSent: boolean, productFound?: any}> {
+  console.log('📸 === VERIFICANDO SOLICITAÇÃO DE IMAGEM ===');
+  
+  // Detectar se o usuário está pedindo foto/imagem
+  const imageKeywords = [
+    'foto', 'imagem', 'ver', 'mostrar', 'picture', 'pic', 'visual', 'aparência', 
+    'como é', 'aspecto', 'mostra', 'vê', 'visualizar', 'observar', 'photo'
+  ];
+  
+  const userWantsImage = imageKeywords.some(keyword => 
+    userMessage.toLowerCase().includes(keyword)
+  );
+
+  if (!userWantsImage) {
+    console.log('📸 Usuário não solicitou imagem');
+    return { imageSent: false };
+  }
+
+  console.log('📸 Usuário solicitou imagem - buscando produto...');
+
+  try {
+    // Extrair nome/palavra-chave do produto da mensagem
+    let productKeyword = '';
+    
+    // Detectar número da lista primeiro (ex: "produto 29", "número 5", etc)
+    const numberMatch = userMessage.match(/(?:produto|número|item|n[ºo°]?\.?)\s*(\d+)/i);
+    if (numberMatch) {
+      const productNumber = parseInt(numberMatch[1]);
+      console.log(`📸 Detectado número do produto: ${productNumber}`);
+      
+      // Buscar produto pelo índice na lista (ordenada por nome)
+      const { data: products } = await supabase
+        .from('products')
+        .select('*')
+        .eq('active', true)
+        .eq('in_stock', true)
+        .order('name', { ascending: true })
+        .limit(50); // Buscar até 50 produtos
+      
+      if (products && products.length >= productNumber && productNumber > 0) {
+        const selectedProduct = products[productNumber - 1];
+        console.log(`📸 Produto encontrado pelo número: ${selectedProduct.name}`);
+        
+        if (selectedProduct.image_url) {
+          await sendFacebookImage(
+            recipientId,
+            selectedProduct.image_url,
+            `📸 ${selectedProduct.name}\n💰 ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz\n🔗 https://superloja.vip/produto/${selectedProduct.slug}`,
+            supabase
+          );
+          return { imageSent: true, productFound: selectedProduct };
+        }
+      }
+    }
+
+    // Se não achou por número, buscar por palavras-chave
+    const keywords = ['fones', 'auricular', 'tws', 'bluetooth', 'cabo', 'carregador', 'adaptador'];
+    productKeyword = keywords.find(keyword => 
+      userMessage.toLowerCase().includes(keyword)
+    ) || '';
+
+    if (productKeyword) {
+      console.log(`📸 Buscando produto com palavra-chave: ${productKeyword}`);
+      
+      const { data: product } = await supabase
+        .from('products')
+        .select('*')
+        .eq('active', true)
+        .eq('in_stock', true)
+        .ilike('name', `%${productKeyword}%`)
+        .limit(1)
+        .maybeSingle();
+
+      if (product && product.image_url) {
+        console.log(`📸 Enviando imagem do produto: ${product.name}`);
+        
+        await sendFacebookImage(
+          recipientId,
+          product.image_url,
+          `📸 ${product.name}\n💰 ${parseFloat(product.price).toLocaleString('pt-AO')} Kz\n🔗 https://superloja.vip/produto/${product.slug}`,
+          supabase
+        );
+        
+        return { imageSent: true, productFound: product };
+      } else {
+        console.log('📸 Produto não encontrado ou sem imagem');
+      }
+    }
+
+    return { imageSent: false };
+    
+  } catch (error) {
+    console.error('❌ Erro ao processar solicitação de imagem:', error);
+    return { imageSent: false };
   }
 }
