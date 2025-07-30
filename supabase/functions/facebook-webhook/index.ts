@@ -236,22 +236,20 @@ async function handleMessage(messaging: any, supabase: any) {
     const aiResponse = await processWithAI(messageText, senderId, supabase);
     console.log(`🤖 Resposta IA: ${aiResponse}`);
     
-    // Verificar se encontrou produtos na resposta da IA
-    const products = await getRelevantProducts(messageText, supabase);
-    const hasProductsWithImages = products.some(p => p.image_url);
-    
     // Enviar resposta da IA primeiro
     await sendFacebookMessage(senderId, aiResponse, supabase);
     
-    // Se encontrou produtos com imagens E (usuário pediu explicitamente OU encontrou produtos relevantes), enviar automaticamente
-    if (hasProductsWithImages && (isRequestingImages || products.length > 0)) {
-      console.log('📸 Enviando imagens automaticamente dos produtos encontrados');
+    // CORRIGIDO: Só enviar produtos se explicitamente solicitado
+    if (isRequestingImages && await shouldSendProducts(senderId, messageText, supabase)) {
+      console.log('📸 Usuário solicitou produtos - enviando imagens');
       
       // Pequeno delay para não sobrepor mensagens
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Enviar imagens automaticamente
+      // Enviar imagens apenas quando solicitado
       await handleImageRequest(senderId, messageText, supabase);
+    } else {
+      console.log('ℹ️ Resposta apenas de texto - produtos não solicitados ou já enviados recentemente');
     }
     
     // Salvar resposta enviada
@@ -1028,5 +1026,50 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
     console.error('❌ Erro de rede ao enviar imagem:', error);
     // Fallback: enviar apenas a mensagem de texto
     await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
+}
+
+// NOVA FUNÇÃO: Verificar se deve enviar produtos (evitar spam)
+async function shouldSendProducts(senderId: string, messageText: string, supabase: any): Promise<boolean> {
+  try {
+    // Verificar se já enviou produtos recentemente (últimos 5 minutos)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    
+    const { data: recentProductSends } = await supabase
+      .from('ai_conversations')
+      .select('*')
+      .eq('user_id', senderId)
+      .eq('platform', 'facebook')
+      .eq('type', 'sent')
+      .gte('timestamp', fiveMinutesAgo)
+      .like('message', '%📸 Enviou%imagem%');
+    
+    if (recentProductSends && recentProductSends.length > 0) {
+      console.log('⛔ Produtos já enviados recentemente - evitando spam');
+      return false;
+    }
+    
+    // Verificar se a mensagem realmente solicita produtos
+    const messageLower = messageText.toLowerCase();
+    const productRequestKeywords = [
+      'mostra', 'ver produtos', 'produtos', 'imagens', 'fotos',
+      'que vocês têm', 'disponível', 'catálogo', 'quero ver',
+      'mostrar', 'opções', 'escolher', 'modelos', 'escutadores'
+    ];
+    
+    const hasProductRequest = productRequestKeywords.some(keyword => 
+      messageLower.includes(keyword)
+    );
+    
+    console.log('🔍 Análise de solicitação de produtos:', {
+      hasProductRequest,
+      messageText: messageLower,
+      recentSends: recentProductSends?.length || 0
+    });
+    
+    return hasProductRequest;
+    
+  } catch (error) {
+    console.error('❌ Erro ao verificar envio de produtos:', error);
+    return false; // Em caso de erro, não envia para evitar spam
   }
 }
