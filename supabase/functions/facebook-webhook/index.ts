@@ -650,7 +650,6 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
           productsInfo += `   📝 ${product.description.substring(0, 80)}...\n`;
         }
       });
-      });
     }
     
     if (outOfStockProducts.length > 0) {
