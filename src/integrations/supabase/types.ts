@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          admin_user_id: string
+          created_at: string
+          id: string
+          is_sent: boolean | null
+          message: string
+          metadata: Json | null
+          notification_type: string
+        }
+        Insert: {
+          admin_user_id: string
+          created_at?: string
+          id?: string
+          is_sent?: boolean | null
+          message: string
+          metadata?: Json | null
+          notification_type: string
+        }
+        Update: {
+          admin_user_id?: string
+          created_at?: string
+          id?: string
+          is_sent?: boolean | null
+          message?: string
+          metadata?: Json | null
+          notification_type?: string
+        }
+        Relationships: []
+      }
       ai_conversation_context: {
         Row: {
           context_data: Json
@@ -122,6 +152,48 @@ export type Database = {
           timestamp?: string | null
           type?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      ai_feedback: {
+        Row: {
+          ai_response: string
+          conversation_id: string | null
+          correction_provided: string | null
+          created_at: string
+          id: string
+          is_correct: boolean | null
+          learning_applied: boolean | null
+          updated_at: string
+          user_feedback: string | null
+          user_id: string
+          user_message: string
+        }
+        Insert: {
+          ai_response: string
+          conversation_id?: string | null
+          correction_provided?: string | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          learning_applied?: boolean | null
+          updated_at?: string
+          user_feedback?: string | null
+          user_id: string
+          user_message: string
+        }
+        Update: {
+          ai_response?: string
+          conversation_id?: string | null
+          correction_provided?: string | null
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          learning_applied?: boolean | null
+          updated_at?: string
+          user_feedback?: string | null
+          user_id?: string
+          user_message?: string
         }
         Relationships: []
       }
@@ -236,6 +308,45 @@ export type Database = {
           total_messages?: number | null
           updated_at?: string | null
           user_satisfaction_score?: number | null
+        }
+        Relationships: []
+      }
+      ai_response_feedback: {
+        Row: {
+          ai_response: string
+          created_at: string
+          effectiveness_score: number | null
+          id: string
+          improvement_applied: boolean | null
+          learned_pattern: string | null
+          original_message: string
+          platform: string
+          user_id: string
+          user_reaction: string | null
+        }
+        Insert: {
+          ai_response: string
+          created_at?: string
+          effectiveness_score?: number | null
+          id?: string
+          improvement_applied?: boolean | null
+          learned_pattern?: string | null
+          original_message: string
+          platform?: string
+          user_id: string
+          user_reaction?: string | null
+        }
+        Update: {
+          ai_response?: string
+          created_at?: string
+          effectiveness_score?: number | null
+          id?: string
+          improvement_applied?: boolean | null
+          learned_pattern?: string | null
+          original_message?: string
+          platform?: string
+          user_id?: string
+          user_reaction?: string | null
         }
         Relationships: []
       }
@@ -418,6 +529,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      detected_intentions: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          detected_intent: string
+          entities: Json | null
+          id: string
+          message: string
+          platform: string
+          response_generated: string | null
+          sentiment_label: string | null
+          sentiment_score: number | null
+          user_id: string
+          was_successful: boolean | null
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          detected_intent: string
+          entities?: Json | null
+          id?: string
+          message: string
+          platform?: string
+          response_generated?: string | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          user_id: string
+          was_successful?: boolean | null
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          detected_intent?: string
+          entities?: Json | null
+          id?: string
+          message?: string
+          platform?: string
+          response_generated?: string | null
+          sentiment_label?: string | null
+          sentiment_score?: number | null
+          user_id?: string
+          was_successful?: boolean | null
+        }
+        Relationships: []
       }
       facebook_products: {
         Row: {
@@ -1263,6 +1419,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preferences: {
+        Row: {
+          communication_style: string | null
+          created_at: string
+          id: string
+          interaction_history: Json | null
+          platform: string
+          preferences: Json | null
+          preferred_categories: string[] | null
+          purchase_intent: number | null
+          sentiment_profile: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          communication_style?: string | null
+          created_at?: string
+          id?: string
+          interaction_history?: Json | null
+          platform?: string
+          preferences?: Json | null
+          preferred_categories?: string[] | null
+          purchase_intent?: number | null
+          sentiment_profile?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          communication_style?: string | null
+          created_at?: string
+          id?: string
+          interaction_history?: Json | null
+          platform?: string
+          preferences?: Json | null
+          preferred_categories?: string[] | null
+          purchase_intent?: number | null
+          sentiment_profile?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       visitor_analytics: {
         Row: {
           browser: string | null
@@ -1343,6 +1541,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      analyze_sentiment: {
+        Args: { message_text: string }
+        Returns: Json
+      }
       get_recent_conversations: {
         Args: Record<PropertyKey, never>
         Returns: {
