@@ -334,20 +334,21 @@ const AdminAgentIA = () => {
     setSettingsLoading(true);
     
     try {
-      // Salvar configurações no Supabase
+      // Usar merge-upsert para evitar conflitos de constraint
       const settingsToSave = [
         { key: 'bot_enabled', value: botEnabled.toString(), description: 'Bot habilitado/desabilitado' },
         { key: 'knowledge_base_enabled', value: knowledgeBaseEnabled.toString(), description: 'Base de conhecimento ativa' }
       ];
 
-      // Salvar todas as configurações
-      for (const setting of settingsToSave) {
-        const { error } = await supabase
-          .from('ai_settings')
-          .upsert(setting);
-        
-        if (error) throw error;
-      }
+      // Salvar usando upsert corretamente
+      const { error } = await supabase
+        .from('ai_settings')
+        .upsert(settingsToSave, { 
+          onConflict: 'key',
+          ignoreDuplicates: false 
+        });
+      
+      if (error) throw error;
 
       // Notificar salvamento bem-sucedido
       await notifyConfigurationChanged(
@@ -981,34 +982,66 @@ const AdminAgentIA = () => {
                   </div>
                 </div>
 
-                {/* Escalation para Humano */}
+                {/* Escalation para Humano - EXPANDIDO */}
                 <div className="border-t pt-6 space-y-4">
                   <h3 className="text-lg font-semibold">👤 Escalation para Humano</h3>
-                  <div className="flex items-center justify-between mb-4">
-                    <Label>Habilitar Escalation Automático</Label>
-                    <Switch defaultChecked />
-                  </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>ID Facebook do Admin (carlosfox)</Label>
-                      <Input defaultValue="carlosfox" />
-                      <p className="text-xs text-muted-foreground">
-                        Este usuário receberá notificações quando clientes quiserem finalizar compras
-                      </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label>Habilitar Escalation Automático</Label>
+                        <Switch defaultChecked />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>ID Facebook do Admin Principal</Label>
+                        <Input 
+                          placeholder="Ex: 100012345678901"
+                          defaultValue=""
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          ID do administrador que receberá notificações
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Admin Backup (Opcional)</Label>
+                        <Input 
+                          placeholder="Ex: carlosfox_backup"
+                          defaultValue=""
+                        />
+                      </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label>Palavras-chave para Escalation</Label>
-                      <textarea 
-                        className="w-full p-2 border rounded-lg h-20"
-                        defaultValue="comprar,finalizar,problema,ajuda,atendente"
-                        placeholder="Separe palavras-chave por vírgula"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Separe palavras-chave por vírgula. Quando detectadas, admin será notificado.
-                      </p>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Palavras-chave para Escalation</Label>
+                        <textarea 
+                          className="w-full p-2 border rounded-lg h-20 resize-none"
+                          defaultValue="comprar,finalizar,problema,ajuda,atendente,humano,pessoa,gerente"
+                          placeholder="Separe palavras-chave por vírgula"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Tempo para Escalation (minutos)</Label>
+                        <Input type="number" defaultValue="10" min="1" max="60" />
+                        <p className="text-xs text-muted-foreground">
+                          Tempo sem resposta antes de notificar admin
+                        </p>
+                      </div>
                     </div>
+                  </div>
+                  
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">Como Funciona o Escalation</h4>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• IA detecta palavras-chave de escalation</li>
+                      <li>• Admin recebe notificação no Facebook Messenger</li>
+                      <li>• IA pausa automaticamente para 30 minutos</li>
+                      <li>• Admin pode responder diretamente no chat</li>
+                      <li>• Backup é notificado se admin principal não responder</li>
+                    </ul>
                   </div>
                 </div>
 
