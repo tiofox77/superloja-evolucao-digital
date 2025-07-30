@@ -167,30 +167,60 @@ async function callOpenAIDirectly(message: string, senderId: string, supabase: a
       return getFallbackResponse(message, products || []);
     }
 
+    // Construir lista de produtos formatada para a IA
+    let productsInfo = '';
+    if (products && products.length > 0) {
+      productsInfo = '\n\nPRODUTOS DISPONÍVEIS:\n';
+      products.forEach((product, index) => {
+        const price = parseFloat(product.price).toLocaleString('pt-AO');
+        productsInfo += `${index + 1}. ${product.name} - ${price} Kz\n`;
+        productsInfo += `   Link: https://superloja.vip/produto/${product.slug}\n`;
+        if (product.image_url) {
+          productsInfo += `   Imagem: ${product.image_url}\n`;
+        }
+        if (product.description) {
+          productsInfo += `   Descrição: ${product.description.substring(0, 100)}...\n`;
+        }
+      });
+    }
+
     const systemPrompt = `Você é um vendedor angolano simpático da SuperLoja (https://superloja.vip).
 
 PERSONALIDADE: Amigável, direto, conhece bem os produtos, fala como um angolano real.
 
-PRODUTOS EM STOCK:
-${(products || []).map(p => 
-  `• ${p.name} - ${p.price} Kz - ${p.description || 'Sem descrição'}`
-).join('\n')}
+${productsInfo}
 
 CONVERSA ANTERIOR:
 ${(history || []).reverse().map(h => `${h.type === 'received' ? 'Cliente' : 'Você'}: ${h.message}`).join('\n')}
 
-INSTRUÇÕES:
-- Fale português de Angola, seja natural e humano
-- Recomende produtos específicos da lista acima
-- Se cliente perguntar preço, use o valor exato da lista
-- Seja conciso (máximo 200 caracteres)
-- Se não souber algo, seja honesto
-- Para finalizar compra, peça nome e telefone do cliente
+INSTRUÇÕES CRÍTICAS:
+- Quando cliente perguntar sobre produtos, liste os produtos disponíveis no formato EXATO abaixo:
+- Use SEMPRE este formato para produtos:
 
-REGRAS:
-- SÓ mencione produtos da lista acima
-- Use preços EXATOS
-- Seja sempre simpático e prestativo`;
+FORMATO OBRIGATÓRIO PARA PRODUTOS:
+Olá! Tudo bem? 😊 Temos os seguintes [CATEGORIA] em stock:
+
+1. *[NOME DO PRODUTO]* - [PREÇO] Kz
+   🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
+   📸 ![Imagem]([URL_DA_IMAGEM])
+
+2. *[NOME DO PRODUTO]* - [PREÇO] Kz
+   🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
+   📸 ![Imagem]([URL_DA_IMAGEM])
+
+[Continue para todos os produtos relevantes]
+
+Se algum deles te interessar, avise-me! 😊
+
+REGRAS CRÍTICAS:
+- Use * para texto em negrito (*produto*)
+- Use exatamente ![Imagem](URL) para imagens
+- Use [Ver produto](URL) para links
+- Numere sempre os produtos (1., 2., 3...)
+- Use preços EXATOS da lista acima
+- SÓ mencione produtos da lista disponível
+- Máximo 5 produtos por resposta
+- Se não for sobre produtos, responda normalmente e de forma amigável`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -199,13 +229,13 @@ REGRAS:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 200,
-        temperature: 0.8,
+        max_tokens: 800,
+        temperature: 0.7,
       }),
     });
 
@@ -227,6 +257,26 @@ function getFallbackResponse(message: string, products: any[]): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('fone') || lowerMessage.includes('auricular')) {
+    // Buscar fones na lista de produtos
+    const headphones = products.filter(p => 
+      p.name.toLowerCase().includes('fone') || 
+      p.name.toLowerCase().includes('auricular')
+    );
+    
+    if (headphones.length > 0) {
+      let response = "Olá! Tudo bem? 😊 Temos os seguintes fones de ouvido em stock:\n\n";
+      headphones.slice(0, 3).forEach((product, index) => {
+        const price = parseFloat(product.price).toLocaleString('pt-AO');
+        response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
+        response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n`;
+        if (product.image_url) {
+          response += `   📸 ![Imagem](${product.image_url})\n`;
+        }
+        response += "\n";
+      });
+      response += "Se algum deles te interessar, avise-me! 😊";
+      return response;
+    }
     return `Temos fones de ouvido incríveis! Veja em https://superloja.vip 🎧`;
   }
   
