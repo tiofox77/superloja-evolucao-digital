@@ -126,20 +126,16 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
       .select('id, name, slug, price, description, image_url')
       .eq('active', true)
       .eq('in_stock', true)
-      .limit(15);
+      .limit(25);
 
-    // Construir informações dos produtos
+    // Construir informações dos produtos (sem imagens por padrão)
     let productsInfo = '';
     if (products && products.length > 0) {
       productsInfo = '\n\nPRODUTOS DISPONÍVEIS:\n';
       products.forEach((product: any, index: number) => {
         const price = parseFloat(product.price).toLocaleString('pt-AO');
         productsInfo += `${index + 1}. ${product.name} - ${price} Kz\n`;
-        productsInfo += `   Link: https://superloja.vip/produto/${product.slug}\n`;
-        if (product.image_url) {
-          productsInfo += `   Imagem: ${product.image_url}\n`;
-        }
-        productsInfo += '\n';
+        productsInfo += `   Link: https://superloja.vip/produto/${product.slug}\n\n`;
       });
     }
 
@@ -152,23 +148,23 @@ ${productsInfo}
 INSTRUÇÕES IMPORTANTES:
 - Seja natural e conversacional como um angolano
 - Recomende produtos específicos da lista acima quando relevante
-- Use SEMPRE este formato para produtos:
+- NUNCA inclua imagens (![Imagem]) no texto por padrão
+- Só mencione imagens se o cliente pedir especificamente para ver fotos
 
 FORMATO OBRIGATÓRIO PARA PRODUTOS:
 1. *[NOME DO PRODUTO]* - [PREÇO] Kz
    🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
-   📸 ![Imagem]([URL_DA_IMAGEM])
 
 REGRAS CRÍTICAS:
 - Use * para texto em negrito (*produto*)
-- Use exatamente ![Imagem](URL) para imagens
 - Use [Ver produto](URL) para links
 - Numere sempre os produtos (1., 2., 3...)
 - Use preços EXATOS da lista acima
 - SÓ mencione produtos da lista disponível
-- Máximo 5 produtos por resposta
+- Mostre TODOS os produtos relevantes disponíveis (não limite a 3 ou 5)
+- NÃO inclua ![Imagem](URL) a menos que o cliente peça fotos
 
-Se alguém perguntar sobre fones bluetooth, temos vários modelos disponíveis!`;
+Se alguém perguntar sobre fones bluetooth, mostre TODOS os modelos de fones disponíveis!`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -229,19 +225,21 @@ async function getFallbackResponse(message: string, supabase: any): Promise<stri
         .eq('active', true)
         .eq('in_stock', true)
         .ilike('name', '%fone%')
-        .limit(5);
+        .limit(10);
       
       if (headphones && headphones.length > 0) {
         let response = "Olá! Temos estes fones de ouvido em stock:\n\n";
         headphones.forEach((product: any, index: number) => {
           const price = parseFloat(product.price).toLocaleString('pt-AO');
           response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
-          response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n`;
-          if (product.image_url) {
-            response += `   📸 ![Imagem](${product.image_url})\n`;
-          }
-          response += "\n";
+          response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n\n`;
         });
+        
+        // Só adicionar imagens se forem múltiplos produtos (mais de 1) E se não pediram especificamente
+        if (headphones.length > 1 && !lowerMessage.includes('foto') && !lowerMessage.includes('imagem')) {
+          response += "Se quiseres ver as fotos dos produtos, é só pedir! 📸\n";
+        }
+        
         response += "Qual deles te interessa mais? 😊";
         return response;
       }
