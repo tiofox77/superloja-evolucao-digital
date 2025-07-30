@@ -728,3 +728,4 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
     // Fallback: enviar apenas a mensagem de texto
     await sendFacebookMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
   }
+}
