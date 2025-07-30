@@ -306,25 +306,74 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
       return;
     }
 
-    const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${pageAccessToken}`;
+    // Usar API v21 do Facebook
+    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
     
-    const payload = {
-      recipient: { id: recipientId },
-      message: { text: messageText },
-      messaging_type: 'RESPONSE'
-    };
+    // Verificar se a mensagem contém imagens para enviar como attachments
+    const imageRegex = /📸 !\[Imagem\]\(([^)]+)\)/g;
+    const images = [];
+    let match;
+    
+    while ((match = imageRegex.exec(messageText)) !== null) {
+      images.push(match[1]);
+    }
+    
+    // Remover markdown de imagem do texto
+    const cleanText = messageText.replace(/📸 !\[Imagem\]\([^)]+\)/g, '').trim();
+    
+    // Enviar texto primeiro
+    if (cleanText) {
+      const textPayload = {
+        recipient: { id: recipientId },
+        message: { text: cleanText },
+        messaging_type: 'RESPONSE'
+      };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+      const textResponse = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(textPayload),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Erro ao enviar mensagem Facebook:', response.status, errorText);
-    } else {
-      console.log('✅ Mensagem enviada para Facebook');
+      if (!textResponse.ok) {
+        const errorText = await textResponse.text();
+        console.error('❌ Erro ao enviar texto Facebook:', textResponse.status, errorText);
+      } else {
+        console.log('✅ Texto enviado para Facebook');
+      }
+    }
+    
+    // Enviar imagens como attachments
+    for (const imageUrl of images) {
+      const imagePayload = {
+        recipient: { id: recipientId },
+        message: {
+          attachment: {
+            type: 'image',
+            payload: {
+              url: imageUrl,
+              is_reusable: true
+            }
+          }
+        },
+        messaging_type: 'RESPONSE'
+      };
+
+      const imageResponse = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(imagePayload),
+      });
+
+      if (!imageResponse.ok) {
+        const errorText = await imageResponse.text();
+        console.error('❌ Erro ao enviar imagem Facebook:', imageResponse.status, errorText);
+      } else {
+        console.log('✅ Imagem enviada para Facebook');
+      }
+      
+      // Pequena pausa entre envios para evitar rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
   } catch (error) {
