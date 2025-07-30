@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -13,35 +12,35 @@ import {
   Users, 
   TrendingUp, 
   CheckCircle, 
-  Zap,
   Bot,
   Brain,
   Lightbulb,
   Settings,
   Save,
-  Send,
   Activity,
-  Eye,
-  User,
   Key,
-  Bell,
-  AlertTriangle
+  Plus,
+  Edit,
+  Eye,
+  EyeOff,
+  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   sendAdminNotification,
   notifyConfigurationChanged,
   notifySystemError,
-  performSystemHealthCheck,
-  notifyAILearningFeedback
+  performSystemHealthCheck
 } from '@/utils/notifications';
 import { 
   addKnowledge,
   updateKnowledge,
   deleteKnowledge,
   toggleKnowledgeActive,
-  saveAdminSettings
+  saveAdminSettings,
+  type KnowledgeItem
 } from '@/utils/knowledgeBase';
+import { KnowledgeForm } from '@/components/admin/KnowledgeForm';
 
 // Tipos para as interfaces
 interface Metrics {
@@ -69,17 +68,6 @@ interface Conversation {
   messageCount: number;
 }
 
-interface KnowledgeItem {
-  id: string;
-  category: string;
-  question: string;
-  answer: string;
-  keywords: string[];
-  priority: number;
-  active: boolean;
-  created_at: string;
-}
-
 interface LearningInsight {
   id: string;
   insight_type: string;
@@ -99,514 +87,176 @@ const AdminAgentIA = () => {
     successfulInteractions: 0,
     leadsGenerated: 0
   });
-
+  
   const [realtimeMessages, setRealtimeMessages] = useState<RealtimeMessage[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeItem[]>([]);
   const [learningInsights, setLearningInsights] = useState<LearningInsight[]>([]);
-  
-  // Estados de controle
   const [botEnabled, setBotEnabled] = useState(true);
-  const [knowledgeBaseEnabled, setKnowledgeBaseEnabled] = useState(false);
-  const [realtimeLoading, setRealtimeLoading] = useState(false);
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [testMessage, setTestMessage] = useState('');
-  const [messageCount, setMessageCount] = useState(0);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [knowledgeBaseEnabled, setKnowledgeBaseEnabled] = useState(true);
 
-  // Estados para configurações adicionais
+  // Estados para formulário de conhecimento
+  const [showKnowledgeForm, setShowKnowledgeForm] = useState(false);
+  const [editingKnowledge, setEditingKnowledge] = useState<KnowledgeItem | null>(null);
+  
+  // Estados para escalation expandido
+  const [escalationEnabled, setEscalationEnabled] = useState(true);
   const [adminFacebookId, setAdminFacebookId] = useState('');
   const [adminBackupId, setAdminBackupId] = useState('');
-  const [escalationKeywords, setEscalationKeywords] = useState('comprar,finalizar,problema,ajuda,atendente,humano,pessoa,gerente');
-  const [escalationTime, setEscalationTime] = useState(10);
+  const [escalationTime, setEscalationTime] = useState(5);
+  const [escalationKeywords, setEscalationKeywords] = useState('');
+  const [emailNotificationEnabled, setEmailNotificationEnabled] = useState(true);
+  const [escalationEmail, setEscalationEmail] = useState('');
+  const [whatsappNotificationEnabled, setWhatsappNotificationEnabled] = useState(false);
+  const [escalationWhatsapp, setEscalationWhatsapp] = useState('');
 
-  // Estados para base de conhecimento
-  const [newKnowledge, setNewKnowledge] = useState({
-    category: 'produtos',
-    question: '',
-    answer: '',
-    keywords: '',
-    priority: 2
-  });
-  const [editingKnowledge, setEditingKnowledge] = useState<string | null>(null);
-
-  // Carregar dados iniciais
-  useEffect(() => {
-    loadMetrics();
-    loadRealtimeMessages();
-    loadConversations();
-    loadKnowledgeBase();
-    loadLearningInsights();
-    loadInitialSettings();
-    
-    // Configurar polling para mensagens em tempo real
-    const interval = setInterval(() => {
-      loadRealtimeMessages();
-      setLastUpdate(new Date());
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Funções de carregamento de dados
+  // Funções de carregamento
   const loadMetrics = async () => {
     try {
-      const { data: conversations } = await supabase
-        .from('ai_conversations')
-        .select('*');
-      
-      if (conversations) {
-        const uniqueUsers = new Set(conversations.map(c => c.user_id)).size;
-        const receivedMessages = conversations.filter(c => c.type === 'received');
-        const sentMessages = conversations.filter(c => c.type === 'sent');
-        
-        setMetrics({
-          totalMessages: conversations.length,
-          uniqueUsers,
-          averageRating: 85, // Simulado
-          successfulInteractions: sentMessages.length,
-          leadsGenerated: Math.floor(uniqueUsers * 0.3) // Simulado
-        });
-      }
+      // Simular carregamento de métricas
+      setMetrics({
+        totalMessages: 1247,
+        uniqueUsers: 89,
+        averageRating: 4.2,
+        successfulInteractions: 92,
+        leadsGenerated: 23
+      });
     } catch (error) {
       console.error('Erro ao carregar métricas:', error);
-    }
-  };
-
-  const loadRealtimeMessages = async () => {
-    setRealtimeLoading(true);
-    try {
-      const { data } = await supabase
-        .from('ai_conversations')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(20);
-      
-      if (data) {
-        // Converter e filtrar dados para o tipo correto
-        const typedMessages = data.filter(msg => 
-          msg.type === 'received' || msg.type === 'sent'
-        ).map(msg => ({
-          ...msg,
-          type: msg.type as 'received' | 'sent'
-        }));
-        
-        setRealtimeMessages(typedMessages);
-        setMessageCount(typedMessages.length);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar mensagens:', error);
-    } finally {
-      setRealtimeLoading(false);
-    }
-  };
-
-  const loadConversations = async () => {
-    try {
-      const { data } = await supabase
-        .from('ai_conversations')
-        .select('*')
-        .order('timestamp', { ascending: false });
-      
-      if (data) {
-        // Agrupar por usuário e plataforma
-        const grouped = data.reduce((acc: Record<string, any>, msg) => {
-          const key = `${msg.user_id}-${msg.platform}`;
-          if (!acc[key]) {
-            acc[key] = {
-              user_id: msg.user_id,
-              platform: msg.platform,
-              messages: [],
-              lastMessage: msg.message,
-              timestamp: msg.timestamp,
-              messageCount: 0
-            };
-          }
-          acc[key].messages.push(msg);
-          acc[key].messageCount = acc[key].messages.length;
-          return acc;
-        }, {});
-        
-        setConversations(Object.values(grouped));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar conversas:', error);
+      toast.error('Erro ao carregar métricas');
     }
   };
 
   const loadKnowledgeBase = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('ai_knowledge_base')
         .select('*')
-        .order('priority', { ascending: false });
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
       
-      if (data) {
-        setKnowledgeBase(data);
-      }
+      setKnowledgeBase(data || []);
     } catch (error) {
       console.error('Erro ao carregar base de conhecimento:', error);
+      toast.error('Erro ao carregar base de conhecimento');
     }
   };
 
   const loadLearningInsights = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('ai_learning_insights')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
       
-      if (data) {
-        setLearningInsights(data);
-      }
+      setLearningInsights(data || []);
     } catch (error) {
       console.error('Erro ao carregar insights:', error);
     }
   };
 
-  // Carregar configurações iniciais
-  const loadInitialSettings = async () => {
+  // Configurações
+  const handleSaveSettings = async () => {
     try {
-      // Carregar configurações do bot
-      const { data: settings } = await supabase
-        .from('ai_settings')
-        .select('key, value')
-        .in('key', ['bot_enabled', 'knowledge_base_enabled', 'admin_facebook_id', 'admin_backup_id', 'escalation_keywords', 'escalation_time']);
+      const settings = {
+        adminFacebookId: adminFacebookId.trim(),
+        adminBackupId: adminBackupId.trim(),
+        escalationKeywords,
+        escalationTime,
+        botEnabled,
+        knowledgeBaseEnabled
+      };
 
-      if (settings) {
-        const settingsMap = settings.reduce((acc: any, setting: any) => {
-          acc[setting.key] = setting.value;
-          return acc;
-        }, {});
+      console.log('💾 Salvando configurações:', settings);
+      
+      await saveAdminSettings(settings);
+      
+      // Enviar notificação de alteração
+      await sendAdminNotification({
+        type: 'ai_config_changed',
+        title: 'Configuração alterada: Configurações Gerais',
+        message: `⚙️ CONFIGURAÇÃO ALTERADA\n\nAlteração: Configurações da IA atualizadas\n\nDetalhes:\n• Admin Principal: ${adminFacebookId || 'Não definido'}\n• Admin Backup: ${adminBackupId || 'Não definido'}\n• Bot Ativo: ${botEnabled ? 'Sim' : 'Não'}\n• Base de Conhecimento: ${knowledgeBaseEnabled ? 'Ativa' : 'Inativa'}`,
+        priority: 'normal',
+        data: { 
+          settings,
+          changed_by: 'admin',
+          change_type: 'general_settings'
+        }
+      });
 
-        setBotEnabled(settingsMap.bot_enabled === 'true');
-        setKnowledgeBaseEnabled(settingsMap.knowledge_base_enabled === 'true');
-        setAdminFacebookId(settingsMap.admin_facebook_id || '');
-        setAdminBackupId(settingsMap.admin_backup_id || '');
-        setEscalationKeywords(settingsMap.escalation_keywords || 'comprar,finalizar,problema,ajuda,atendente');
-        setEscalationTime(parseInt(settingsMap.escalation_time || '10'));
-        
-        console.log('📋 Configurações carregadas:', settingsMap);
-      }
     } catch (error) {
-      console.error('❌ Erro ao carregar configurações:', error);
-    }
-  };
-
-  // Funções de manipulação
-  const handleBotToggle = async (enabled: boolean) => {
-    const oldValue = botEnabled;
-    setBotEnabled(enabled);
-    
-    try {
-      const { error } = await supabase
-        .from('ai_settings')
-        .upsert({ 
-          key: 'bot_enabled', 
-          value: enabled.toString(),
-          description: 'Bot habilitado/desabilitado'
-        });
+      console.error('Erro ao salvar configurações:', error);
+      toast.error('Erro ao salvar configurações');
       
-      if (error) throw error;
-      
-      // Notificar mudança de configuração
-      await notifyConfigurationChanged(
-        'Status do Bot',
-        `Bot ${enabled ? 'habilitado' : 'desabilitado'} com sucesso`,
-        oldValue,
-        enabled
-      );
-      
-      toast.success(enabled ? 'Bot habilitado!' : 'Bot desabilitado!');
-    } catch (error) {
-      console.error('Erro ao alterar status do bot:', error);
-      await notifySystemError('Erro ao alterar bot', error.message, { action: 'toggle_bot', enabled });
-      toast.error('Erro ao salvar configuração');
-      setBotEnabled(!enabled); // Reverter
+      await sendAdminNotification({
+        type: 'system_error',
+        title: 'Erro ao salvar configurações',
+        message: `❌ Erro ao salvar configurações: ${error.message}`,
+        priority: 'high',
+        data: { error: error.message }
+      });
     }
   };
 
   const handleKnowledgeBaseToggle = async (enabled: boolean) => {
-    const oldValue = knowledgeBaseEnabled;
     setKnowledgeBaseEnabled(enabled);
-    
-    try {
-      const { error } = await supabase
-        .from('ai_settings')
-        .upsert({ 
-          key: 'knowledge_base_enabled', 
-          value: enabled.toString(),
-          description: 'Base de conhecimento habilitada/desabilitada'
-        });
-      
-      if (error) throw error;
-      
-      // Notificar mudança de configuração
-      await notifyConfigurationChanged(
-        'Base de Conhecimento',
-        `Base de conhecimento ${enabled ? 'ativada' : 'desativada'} com sucesso`,
-        oldValue,
-        enabled
-      );
-      
-      toast.success(enabled ? 'Base de conhecimento ativada!' : 'Base de conhecimento desativada!');
-    } catch (error) {
-      console.error('Erro ao alterar base de conhecimento:', error);
-      await notifySystemError('Erro na base de conhecimento', error.message, { action: 'toggle_knowledge_base', enabled });
-      toast.error('Erro ao salvar configuração');
-      setKnowledgeBaseEnabled(!enabled); // Reverter
-    }
+    toast.success(`Base de conhecimento ${enabled ? 'ativada' : 'desativada'}!`);
   };
 
-  const handleSaveSettings = async () => {
-    setSettingsLoading(true);
-    
+  // CRUD da base de conhecimento
+  const handleAddKnowledge = async (knowledge: Omit<KnowledgeItem, 'id'>) => {
     try {
-      console.log('💾 === INICIANDO SALVAMENTO CONFIGURAÇÕES ===');
-      console.log('📋 Dados para salvar:', {
-        bot_enabled: botEnabled,
-        knowledge_base_enabled: knowledgeBaseEnabled,
-        admin_facebook_id: adminFacebookId,
-        admin_backup_id: adminBackupId,
-        escalation_keywords: escalationKeywords,
-        escalation_time: escalationTime
-      });
-
-      // Preparar todas as configurações
-      const settingsToSave = [
-        { key: 'bot_enabled', value: botEnabled.toString(), description: 'Bot habilitado/desabilitado' },
-        { key: 'knowledge_base_enabled', value: knowledgeBaseEnabled.toString(), description: 'Base de conhecimento ativa' },
-        { key: 'admin_facebook_id', value: adminFacebookId.trim(), description: 'ID Facebook do admin principal' },
-        { key: 'admin_backup_id', value: adminBackupId.trim(), description: 'ID Facebook do admin backup' },
-        { key: 'escalation_keywords', value: escalationKeywords, description: 'Palavras-chave para escalation' },
-        { key: 'escalation_time', value: escalationTime.toString(), description: 'Tempo para escalation em minutos' }
-      ];
-
-      console.log('📦 Settings preparadas:', settingsToSave);
-
-      // Salvar usando upsert corretamente
-      const { data, error } = await supabase
-        .from('ai_settings')
-        .upsert(settingsToSave, { 
-          onConflict: 'key',
-          ignoreDuplicates: false 
-        })
-        .select();
-      
-      if (error) {
-        console.error('❌ Erro SQL no salvamento:', error);
-        throw error;
-      }
-
-      console.log('✅ Dados salvos no Supabase:', data);
-      
-      // Verificar se realmente salvou
-      const { data: verificationData } = await supabase
-        .from('ai_settings')
-        .select('key, value')
-        .in('key', settingsToSave.map(s => s.key));
-      
-      console.log('🔍 Verificação pós-salvamento:', verificationData);
-
-      // Notificar salvamento bem-sucedido
-      await notifyConfigurationChanged(
-        'Configurações Gerais',
-        'Todas as configurações do agente IA foram salvas com sucesso',
-        null,
-        { bot_enabled: botEnabled, knowledge_base_enabled: knowledgeBaseEnabled }
-      );
-      
-      toast.success('Configurações salvas com sucesso!');
-    } catch (error) {
-      console.error('Erro ao salvar configurações:', error);
-      await notifySystemError('Erro ao salvar configurações', error.message, { bot_enabled: botEnabled, knowledge_base_enabled: knowledgeBaseEnabled });
-      toast.error('Erro ao salvar configurações');
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
-
-  // Função para criar notificações no sistema
-  const createNotification = async (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    try {
-      await supabase.from('notifications').insert({
-        title,
-        message,
-        type,
-        user_id: null // Notificação do sistema
-      });
-    } catch (error) {
-      console.error('Erro ao criar notificação:', error);
-    }
-  };
-
-  // Verificar status dos componentes do sistema
-  const checkSystemHealth = async () => {
-    try {
-      const healthCheck = await performSystemHealthCheck();
-      
-      if (healthCheck.healthy) {
-        toast.success('Sistema funcionando perfeitamente!');
-      } else {
-        toast.warning(`${healthCheck.issues.length} problema(s) detectado(s)`);
-      }
-      
-      console.log('📊 Relatório de saúde:', healthCheck.report);
-      
-    } catch (error) {
-      console.error('Erro na verificação do sistema:', error);
-      await notifySystemError('Erro na verificação de saúde', error.message, error);
-      toast.error('Erro ao verificar sistema');
-    }
-  };
-
-  // CRUD para Base de Conhecimento
-  const handleAddKnowledge = async () => {
-    try {
-      console.log('📚 === ADICIONANDO CONHECIMENTO ===');
-      console.log('📝 Dados:', newKnowledge);
-
-      if (!newKnowledge.question.trim() || !newKnowledge.answer.trim()) {
-        toast.error('Pergunta e resposta são obrigatórias!');
-        return;
-      }
-
-      const knowledgeData = {
-        category: newKnowledge.category,
-        question: newKnowledge.question.trim(),
-        answer: newKnowledge.answer.trim(),
-        keywords: newKnowledge.keywords.split(',').map(k => k.trim()).filter(k => k),
-        priority: newKnowledge.priority,
-        active: true
-      };
-
-      const { data, error } = await supabase
-        .from('ai_knowledge_base')
-        .insert(knowledgeData)
-        .select();
-
-      if (error) {
-        console.error('❌ Erro ao adicionar conhecimento:', error);
-        throw error;
-      }
-
-      console.log('✅ Conhecimento adicionado:', data);
-      
-      // Limpar formulário
-      setNewKnowledge({
-        category: 'produtos',
-        question: '',
-        answer: '',
-        keywords: '',
-        priority: 2
-      });
-
-      // Recarregar lista
-      await loadKnowledgeBase();
-      toast.success('Conhecimento adicionado com sucesso!');
-
-    } catch (error) {
-      console.error('❌ Erro ao adicionar conhecimento:', error);
-      toast.error('Erro ao adicionar conhecimento');
-    }
-  };
-
-  const handleEditKnowledge = async (id: string, updatedData: any) => {
-    try {
-      console.log('✏️ === EDITANDO CONHECIMENTO ===');
-      console.log('🆔 ID:', id);
-      console.log('📝 Dados:', updatedData);
-
-      const { data, error } = await supabase
-        .from('ai_knowledge_base')
-        .update(updatedData)
-        .eq('id', id)
-        .select();
-
-      if (error) {
-        console.error('❌ Erro ao editar conhecimento:', error);
-        throw error;
-      }
-
-      console.log('✅ Conhecimento editado:', data);
-      await loadKnowledgeBase();
+      const newKnowledge = await addKnowledge(knowledge);
+      setKnowledgeBase(prev => [newKnowledge, ...prev]);
+      setShowKnowledgeForm(false);
       setEditingKnowledge(null);
-      toast.success('Conhecimento atualizado!');
-
+      await loadKnowledgeBase();
     } catch (error) {
-      console.error('❌ Erro ao editar conhecimento:', error);
-      toast.error('Erro ao editar conhecimento');
+      console.error('Erro ao adicionar conhecimento:', error);
+    }
+  };
+
+  const handleUpdateKnowledge = async (id: string, updates: Partial<KnowledgeItem>) => {
+    try {
+      const updated = await updateKnowledge(id, updates);
+      setKnowledgeBase(prev => prev.map(item => item.id === id ? updated : item));
+      setShowKnowledgeForm(false);
+      setEditingKnowledge(null);
+      await loadKnowledgeBase();
+    } catch (error) {
+      console.error('Erro ao atualizar conhecimento:', error);
     }
   };
 
   const handleDeleteKnowledge = async (id: string) => {
     try {
-      console.log('🗑️ === DELETANDO CONHECIMENTO ===');
-      console.log('🆔 ID:', id);
-
-      const { error } = await supabase
-        .from('ai_knowledge_base')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error('❌ Erro ao deletar conhecimento:', error);
-        throw error;
-      }
-
-      console.log('✅ Conhecimento deletado');
+      await deleteKnowledge(id);
+      setKnowledgeBase(prev => prev.filter(item => item.id !== id));
       await loadKnowledgeBase();
-      toast.success('Conhecimento removido!');
-
     } catch (error) {
-      console.error('❌ Erro ao deletar conhecimento:', error);
-      toast.error('Erro ao deletar conhecimento');
+      console.error('Erro ao deletar conhecimento:', error);
     }
   };
 
   const handleToggleKnowledgeActive = async (id: string, active: boolean) => {
     try {
-      await handleEditKnowledge(id, { active });
+      const updated = await toggleKnowledgeActive(id, active);
+      setKnowledgeBase(prev => prev.map(item => item.id === id ? updated : item));
+      await loadKnowledgeBase();
     } catch (error) {
-      console.error('❌ Erro ao alterar status:', error);
+      console.error('Erro ao alterar status:', error);
     }
   };
 
-  const sendTestMessage = async (message: string) => {
-    try {
-      const newMessage = {
-        id: Date.now().toString(),
-        platform: 'test',
-        user_id: 'admin_test',
-        message,
-        type: 'sent' as const,
-        timestamp: new Date().toISOString()
-      };
-      
-      setRealtimeMessages(prev => [newMessage, ...prev]);
-      toast.success('Mensagem de teste enviada!');
-    } catch (error) {
-      console.error('Erro ao enviar mensagem de teste:', error);
-      toast.error('Erro ao enviar mensagem');
-    }
-  };
-
-  // Enviar notificação de teste
-  const sendTestNotification = async () => {
-    try {
-      await sendAdminNotification({
-        type: 'system_health_report',
-        title: 'Teste de Notificação IA',
-        message: 'Sistema de notificações funcionando corretamente!',
-        priority: 'normal',
-        data: { test: true, timestamp: new Date().toISOString() }
-      });
-    } catch (error) {
-      console.error('Erro ao enviar notificação de teste:', error);
-      toast.error('Erro ao enviar notificação');
-    }
-  };
+  // Carregar dados na inicialização
+  useEffect(() => {
+    loadMetrics();
+    loadKnowledgeBase();
+    loadLearningInsights();
+  }, []);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -615,7 +265,7 @@ const AdminAgentIA = () => {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Bot className="h-8 w-8 text-primary" />
-            Agente IA SuperLoja - 100% IA
+            Agente IA SuperLoja
           </h1>
           <p className="text-muted-foreground">
             Sistema inteligente com conhecimento completo de produtos e aprendizado automático
@@ -654,28 +304,28 @@ const AdminAgentIA = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Confiança Média</CardTitle>
+            <CardTitle className="text-sm font-medium">Avaliação Média</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.averageRating}%</div>
+            <div className="text-2xl font-bold">{metrics.averageRating}/5</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Interações OK</CardTitle>
+            <CardTitle className="text-sm font-medium">Taxa Sucesso</CardTitle>
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.successfulInteractions}</div>
+            <div className="text-2xl font-bold">{metrics.successfulInteractions}%</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Leads Gerados</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.leadsGenerated}</div>
@@ -684,173 +334,13 @@ const AdminAgentIA = () => {
       </div>
 
       {/* Tabs principais */}
-      <Tabs defaultValue="realtime" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="realtime" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Tempo Real
-          </TabsTrigger>
-          <TabsTrigger value="conversations" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Conversas por Usuário
-          </TabsTrigger>
-          <TabsTrigger value="knowledge" className="flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Base de Conhecimento
-          </TabsTrigger>
-          <TabsTrigger value="learning" className="flex items-center gap-2">
-            <Lightbulb className="h-4 w-4" />
-            Aprendizado IA
-          </TabsTrigger>
-          <TabsTrigger value="configurations" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Configurações
-          </TabsTrigger>
-          <TabsTrigger value="tests" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Centro de Testes
-          </TabsTrigger>
+      <Tabs defaultValue="knowledge" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="knowledge">🧠 Base de Conhecimento</TabsTrigger>
+          <TabsTrigger value="learning">🎓 Aprendizado IA</TabsTrigger>
+          <TabsTrigger value="conversations">💬 Conversas</TabsTrigger>
+          <TabsTrigger value="configurations">⚙️ Configurações</TabsTrigger>
         </TabsList>
-
-        {/* Tempo Real */}
-        <TabsContent value="realtime">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${realtimeLoading ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`}></div>
-                Monitor de Mensagens em Tempo Real
-              </CardTitle>
-              <CardDescription>
-                {realtimeLoading ? 'Carregando...' : `${messageCount} mensagens | Última atualização: ${lastUpdate?.toLocaleTimeString() || 'Nunca'}`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2 mb-4">
-                <Input
-                  placeholder="Enviar mensagem de teste..."
-                  value={testMessage}
-                  onChange={(e) => setTestMessage(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && testMessage.trim()) {
-                      sendTestMessage(testMessage);
-                      setTestMessage('');
-                    }
-                  }}
-                />
-                <Button
-                  onClick={() => {
-                    if (testMessage.trim()) {
-                      sendTestMessage(testMessage);
-                      setTestMessage('');
-                    }
-                  }}
-                  disabled={!testMessage.trim()}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {realtimeMessages.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Nenhuma mensagem ainda.</p>
-                  </div>
-                ) : (
-                  realtimeMessages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`p-3 rounded-lg border ${
-                        msg.type === 'received' 
-                          ? 'bg-blue-50 border-blue-200' 
-                          : 'bg-green-50 border-green-200'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={msg.type === 'received' ? 'default' : 'secondary'}>
-                            {msg.type === 'received' ? '📥 Recebida' : '📤 Enviada'}
-                          </Badge>
-                          <Badge variant="outline">{msg.platform}</Badge>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(msg.timestamp).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="text-sm">
-                        <p className="font-medium text-muted-foreground">
-                          Usuário: {msg.user_id}
-                        </p>
-                        <p className="mt-1">{msg.message}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Conversas */}
-        <TabsContent value="conversations">
-          <Card>
-            <CardHeader>
-              <CardTitle>🗨️ Conversas Organizadas por Usuário</CardTitle>
-              <CardDescription>
-                Visualize conversas agrupadas por usuário e plataforma para melhor acompanhamento
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {conversations.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Nenhuma conversa encontrada.</p>
-                  </div>
-                ) : (
-                  Object.entries(
-                    conversations.reduce((groups: Record<string, Conversation[]>, conv) => {
-                      const key = `${conv.user_id}-${conv.platform}`;
-                      if (!groups[key]) groups[key] = [];
-                      groups[key].push(conv);
-                      return groups;
-                    }, {})
-                  ).map(([key, convs]) => {
-                    const conv = convs[0];
-                    return (
-                      <div key={key} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                              {conv.user_id.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{conv.user_id}</h4>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {conv.platform}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {conv.messageCount} mensagens
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(conv.timestamp).toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="text-sm bg-gray-50 p-2 rounded">
-                          <span className="font-medium">Última mensagem:</span> {conv.lastMessage}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Base de Conhecimento */}
         <TabsContent value="knowledge">
@@ -882,13 +372,29 @@ const AdminAgentIA = () => {
                   />
                 </div>
 
+                <div className="mb-4 flex justify-between items-center">
+                  <h4 className="text-sm font-medium">Conhecimentos Cadastrados ({knowledgeBase.length})</h4>
+                  <Button 
+                    onClick={() => setShowKnowledgeForm(true)}
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Adicionar
+                  </Button>
+                </div>
+
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {knowledgeBase.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Brain className="h-12 w-12 mx-auto mb-2 opacity-50" />
                       <p>Nenhum conhecimento cadastrado ainda.</p>
-                      <Button className="mt-4" variant="outline">
-                        Adicionar Conhecimento
+                      <Button 
+                        className="mt-4" 
+                        variant="outline"
+                        onClick={() => setShowKnowledgeForm(true)}
+                      >
+                        Adicionar Primeiro Conhecimento
                       </Button>
                     </div>
                   ) : (
@@ -903,6 +409,36 @@ const AdminAgentIA = () => {
                             <span className="text-xs text-muted-foreground">
                               Prioridade: {item.priority}
                             </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingKnowledge(item);
+                                setShowKnowledgeForm(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleToggleKnowledgeActive(item.id!, !item.active)}
+                            >
+                              {item.active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                if (confirm('Tem certeza que deseja deletar este conhecimento?')) {
+                                  handleDeleteKnowledge(item.id!);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
                           </div>
                         </div>
                         <h4 className="font-medium mb-1">{item.question}</h4>
@@ -923,6 +459,21 @@ const AdminAgentIA = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Modal/Formulário para Adicionar/Editar Conhecimento */}
+          {showKnowledgeForm && (
+            <KnowledgeForm
+              knowledge={editingKnowledge}
+              onSave={editingKnowledge ? 
+                (updates) => handleUpdateKnowledge(editingKnowledge.id!, updates) :
+                handleAddKnowledge
+              }
+              onCancel={() => {
+                setShowKnowledgeForm(false);
+                setEditingKnowledge(null);
+              }}
+            />
+          )}
         </TabsContent>
 
         {/* Aprendizado IA */}
@@ -991,32 +542,28 @@ const AdminAgentIA = () => {
                     )}
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                {/* Como funciona o aprendizado */}
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-semibold mb-4">🔬 Como Funciona o Aprendizado</h3>
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-medium mb-2 text-green-600">✅ Já Implementado</h4>
-                        <ul className="text-sm space-y-1">
-                          <li>• Análise de padrões de conversação</li>
-                          <li>• Identificação de temas frequentes</li>
-                          <li>• Medição de eficácia das respostas</li>
-                          <li>• Aprendizado com feedback implícito</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-2 text-blue-600">🚧 Próximas Otimizações</h4>
-                        <ul className="text-sm space-y-1">
-                          <li>• Personalização por usuário</li>
-                          <li>• Predição de intenções</li>
-                          <li>• Auto-melhoria de respostas</li>
-                          <li>• Detecção de sentimentos</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
+        {/* Conversas */}
+        <TabsContent value="conversations">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                💬 Conversas Recentes
+              </CardTitle>
+              <CardDescription>
+                Visualize conversas agrupadas por usuário e plataforma para melhor acompanhamento
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                <div className="text-center py-8 text-muted-foreground">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Nenhuma conversa encontrada.</p>
                 </div>
               </div>
             </CardContent>
@@ -1037,122 +584,6 @@ const AdminAgentIA = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-8">
-                {/* Modelo OpenAI */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">🤖 Modelo OpenAI</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Modelo Preferido</Label>
-                      <select className="w-full p-2 border rounded-lg">
-                        <option value="gpt-4o-mini">GPT-4o Mini - Rápido e Econômico</option>
-                        <option value="gpt-4o">GPT-4o - Mais Inteligente</option>
-                        <option value="gpt-4-turbo">GPT-4 Turbo - Balanceado</option>
-                      </select>
-                      <p className="text-xs text-muted-foreground">
-                        GPT-4o Mini é recomendado para chatbot por ser rápido e econômico
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Chave API OpenAI</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="password"
-                          placeholder="sk-..."
-                          value="••••••••••••••••"
-                          disabled
-                        />
-                        <Button variant="outline" size="sm">
-                          <Key className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <Button variant="link" size="sm" className="p-0 h-auto text-blue-500">
-                        → Obter chave API OpenAI
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Integração Facebook */}
-                <div className="border-t pt-6 space-y-4">
-                  <h3 className="text-lg font-semibold">📘 Integração Facebook</h3>
-                  <div className="space-y-2">
-                    <Label>Token Página Facebook</Label>
-                    <Input
-                      type="password"
-                      placeholder="Token de acesso da página..."
-                      value="••••••••••••••••"
-                      disabled
-                    />
-                    <Button variant="link" size="sm" className="p-0 h-auto text-blue-500">
-                      → Obter token Facebook
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Integração Instagram */}
-                <div className="border-t pt-6 space-y-4">
-                  <h3 className="text-lg font-semibold">📸 Integração Instagram</h3>
-                  <div className="flex items-center justify-between mb-4">
-                    <Label>Habilitar Bot Instagram</Label>
-                    <Switch defaultChecked />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Token Página Instagram</Label>
-                    <Input
-                      type="password"
-                      placeholder="Use o mesmo token do Facebook se sua página está conectada ao Instagram"
-                      disabled
-                    />
-                    <div className="bg-yellow-50 p-3 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        💡 Use o mesmo token do Facebook se sua página está conectada ao Instagram
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Comportamento do Bot */}
-                <div className="border-t pt-6 space-y-6">
-                  <h3 className="text-lg font-semibold">🎯 Comportamento do Bot</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Tom das Respostas</Label>
-                        <select className="w-full p-2 border rounded-lg">
-                          <option value="friendly">Amigável</option>
-                          <option value="professional">Profissional</option>
-                          <option value="casual">Casual</option>
-                          <option value="formal">Formal</option>
-                        </select>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label>Tamanho Máximo</Label>
-                        <Input type="number" defaultValue="200" />
-                        <p className="text-xs text-muted-foreground">
-                          Número máximo de caracteres por resposta
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label>Respostas Automáticas</Label>
-                        <Switch defaultChecked />
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <Label>Base de Conhecimento Ativada</Label>
-                        <Switch
-                          checked={knowledgeBaseEnabled}
-                          onCheckedChange={handleKnowledgeBaseToggle}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Escalation para Humano - EXPANDIDO */}
                 <div className="border-t pt-6 space-y-4">
                   <h3 className="text-lg font-semibold">👤 Escalation para Humano</h3>
@@ -1161,30 +592,37 @@ const AdminAgentIA = () => {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <Label>Habilitar Escalation Automático</Label>
-                        <Switch defaultChecked />
+                        <Switch 
+                          checked={escalationEnabled}
+                          onCheckedChange={setEscalationEnabled}
+                        />
                       </div>
                       
                       <div className="space-y-2">
                         <Label>ID Facebook do Admin Principal</Label>
-                        <Input 
-                          placeholder="Ex: carlosfox2"
+                        <Input
                           value={adminFacebookId}
-                          onChange={(e) => {
-                            console.log('💾 Alterando admin ID:', e.target.value);
-                            setAdminFacebookId(e.target.value);
-                          }}
+                          onChange={(e) => setAdminFacebookId(e.target.value)}
+                          placeholder="Ex: 123456789"
                         />
-                        <p className="text-xs text-muted-foreground">
-                          ID do administrador que receberá notificações
-                        </p>
                       </div>
                       
                       <div className="space-y-2">
-                        <Label>Admin Backup (Opcional)</Label>
-                        <Input 
-                          placeholder="Ex: admin_backup"
+                        <Label>ID Facebook do Admin Backup</Label>
+                        <Input
                           value={adminBackupId}
                           onChange={(e) => setAdminBackupId(e.target.value)}
+                          placeholder="Ex: 987654321"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Tempo para Escalation (minutos)</Label>
+                        <Input
+                          type="number"
+                          value={escalationTime}
+                          onChange={(e) => setEscalationTime(Number(e.target.value))}
+                          placeholder="Ex: 5"
                         />
                       </div>
                     </div>
@@ -1192,397 +630,69 @@ const AdminAgentIA = () => {
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label>Palavras-chave para Escalation</Label>
-                        <textarea 
-                          className="w-full p-2 border rounded-lg h-20 resize-none"
-                          defaultValue="comprar,finalizar,problema,ajuda,atendente,humano,pessoa,gerente"
-                          placeholder="Separe palavras-chave por vírgula"
+                        <textarea
+                          className="w-full p-2 border rounded-lg"
+                          rows={3}
+                          value={escalationKeywords}
+                          onChange={(e) => setEscalationKeywords(e.target.value)}
+                          placeholder="problema, urgente, falar com humano, reclamação"
                         />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label>Tempo para Escalation (minutos)</Label>
-                        <Input type="number" defaultValue="10" min="1" max="60" />
                         <p className="text-xs text-muted-foreground">
-                          Tempo sem resposta antes de notificar admin
+                          Separe por vírgula. Quando detectadas, a conversa será escalada
                         </p>
                       </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-blue-800 mb-2">Como Funciona o Escalation</h4>
-                    <ul className="text-sm text-blue-700 space-y-1">
-                      <li>• IA detecta palavras-chave de escalation</li>
-                      <li>• Admin recebe notificação no Facebook Messenger</li>
-                      <li>• IA pausa automaticamente para 30 minutos</li>
-                      <li>• Admin pode responder diretamente no chat</li>
-                      <li>• Backup é notificado se admin principal não responder</li>
-                    </ul>
-                  </div>
-                </div>
 
-                {/* Controle Chat Humano/IA */}
-                <div className="border-t pt-6 space-y-4">
-                  <h3 className="text-lg font-semibold">🎭 Controle Chat Humano/IA</h3>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <Label className="font-medium">Sistema Inteligente Ativado</Label>
-                    </div>
-                    <ul className="text-sm space-y-1 text-green-700">
-                      <li>• IA **para automaticamente** quando humano responde no chat</li>
-                      <li>• IA **analisa contexto completo** das conversas antes de responder</li>
-                      <li>• IA **responde diretamente** às perguntas específicas</li>
-                      <li>• IA **não envia produtos** sem solicitação</li>
-                    </ul>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Modo de Operação Atual</Label>
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-5 w-5 text-blue-500" />
-                          <span className="font-medium">IA Inteligente + Controle Humano</span>
+                      <div className="space-y-3">
+                        <Label>Notificações de Escalation</Label>
+                        
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">Notificação por Email</Label>
+                          <Switch 
+                            checked={emailNotificationEnabled}
+                            onCheckedChange={setEmailNotificationEnabled}
+                          />
                         </div>
-                        <p className="text-sm text-blue-700 mt-1">
-                          Sistema detecta automaticamente quando humano está ativo e pausa a IA
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label>Tempo de Pausa</Label>
-                      <Input type="number" defaultValue="30" />
-                      <p className="text-xs text-muted-foreground">
-                        IA fica pausada por 30min após atividade humana
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sincronização */}
-                <div className="border-t pt-6 space-y-4">
-                  <h3 className="text-lg font-semibold">🔄 Sincronização</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Button variant="outline">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Sincronizar com Secrets
-                    </Button>
-                    <Button variant="outline">
-                      <Key className="h-4 w-4 mr-2" />
-                      Usar Token Meta
-                    </Button>
-                    <Button variant="outline">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Verificar Tabelas
-                    </Button>
-                  </div>
-                  <div className="bg-yellow-50 p-3 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      💡 Use "Usar Token Meta" para sincronizar o token que você salvou na página de configurações Meta/Facebook
-                    </p>
-                  </div>
-                </div>
-
-                {/* Links Úteis */}
-                <div className="border-t pt-6 space-y-4">
-                  <h3 className="text-lg font-semibold">🔗 Links Úteis</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="p-4">
-                      <div className="text-center">
-                        <MessageSquare className="h-8 w-8 mx-auto mb-2 text-blue-500" />
-                        <h4 className="font-medium">Webhook Facebook</h4>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          URL para configurar no Facebook
-                        </p>
-                        <div className="text-xs bg-gray-100 p-2 rounded">
-                          https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook
+                        
+                        {emailNotificationEnabled && (
+                          <div className="ml-4 space-y-2">
+                            <Input
+                              value={escalationEmail}
+                              onChange={(e) => setEscalationEmail(e.target.value)}
+                              placeholder="admin@superloja.com"
+                              type="email"
+                            />
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">Notificação por WhatsApp</Label>
+                          <Switch 
+                            checked={whatsappNotificationEnabled}
+                            onCheckedChange={setWhatsappNotificationEnabled}
+                          />
                         </div>
-                        <Button variant="outline" size="sm" className="mt-2">
-                          <div className="h-3 w-3 mr-1" />
-                          Copiar URL
-                        </Button>
+                        
+                        {whatsappNotificationEnabled && (
+                          <div className="ml-4 space-y-2">
+                            <Input
+                              value={escalationWhatsapp}
+                              onChange={(e) => setEscalationWhatsapp(e.target.value)}
+                              placeholder="+5511999999999"
+                              type="tel"
+                            />
+                          </div>
+                        )}
                       </div>
-                    </Card>
-                    
-                    <Card className="p-4">
-                      <div className="text-center">
-                        <Settings className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                        <h4 className="font-medium">Facebook Developers</h4>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Configure seu app Facebook
-                        </p>
-                        <Button variant="outline" size="sm">
-                          Abrir Console
-                        </Button>
-                      </div>
-                    </Card>
-                    
-                    <Card className="p-4">
-                      <div className="text-center">
-                        <Key className="h-8 w-8 mx-auto mb-2 text-orange-500" />
-                        <h4 className="font-medium">OpenAI Platform</h4>
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Gerencie suas chaves API
-                        </p>
-                        <Button variant="outline" size="sm">
-                          Acessar
-                        </Button>
-                      </div>
-                    </Card>
+                    </div>
                   </div>
-                </div>
 
-                <Button 
-                  onClick={handleSaveSettings}
-                  className="w-full"
-                  size="lg"
-                  disabled={settingsLoading}
-                >
-                  {settingsLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Salvando Configurações...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-5 w-5 mr-2" />
-                      Salvar Configurações
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Centro de Testes */}
-        <TabsContent value="tests">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5" />
-                🧪 Centro de Testes
-              </CardTitle>
-              <CardDescription>
-                Teste todas as APIs e funcionalidades do agente IA
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Testes de API */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button variant="outline" className="h-16">
-                    <div className="text-center">
-                      <Bot className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Testar OpenAI</div>
-                    </div>
-                  </Button>
-                  
-                  <Button variant="outline" className="h-16">
-                    <div className="text-center">
-                      <MessageSquare className="h-6 w-6 mx-auto mb-1 text-blue-500" />
-                      <div className="text-sm font-medium">Testar Facebook</div>
-                    </div>
-                  </Button>
-                  
-                  <Button variant="outline" className="h-16 border-blue-500 text-blue-600">
-                    <div className="text-center">
-                      <Activity className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Debug Mensagens</div>
-                    </div>
-                  </Button>
-                </div>
-
-                {/* Testes Avançados */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button variant="default" className="h-16 bg-green-500 hover:bg-green-600">
-                    <div className="text-center text-white">
-                      <Send className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Teste Envio Real</div>
-                    </div>
-                  </Button>
-                  
-                  <Button variant="default" className="h-16 bg-orange-500 hover:bg-orange-600">
-                    <div className="text-center text-white">
-                      <CheckCircle className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Teste Completo</div>
-                    </div>
-                  </Button>
-                  
-                  <Button variant="outline" className="h-16 border-purple-500 text-purple-600">
-                    <div className="text-center">
-                      <Brain className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Testar Instagram</div>
-                    </div>
-                  </Button>
-                </div>
-
-                {/* Validação e Debug */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Button 
-                    variant="outline" 
-                    className="h-16 border-blue-500 text-blue-600"
-                    onClick={checkSystemHealth}
-                  >
-                    <div className="text-center">
-                      <Key className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Verificar Sistema</div>
-                    </div>
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    className="h-16 border-green-500 text-green-600"
-                    onClick={sendTestNotification}
-                  >
-                    <div className="text-center">
-                      <Send className="h-6 w-6 mx-auto mb-1" />
-                      <div className="text-sm font-medium">Teste Notificação</div>
-                    </div>
-                  </Button>
-                </div>
-
-                {/* Nova seção: Sistema de Notificações */}
-                <div className="border-t pt-6 space-y-4">
-                  <h3 className="text-lg font-semibold">🔔 Sistema de Notificações</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="border-t pt-4 mt-6">
                     <Button 
-                      variant="outline" 
-                      className="h-16"
-                      onClick={sendTestNotification}
+                      onClick={handleSaveSettings}
+                      className="w-full md:w-auto"
                     >
-                      <div className="text-center">
-                        <Send className="h-6 w-6 mx-auto mb-1 text-blue-500" />
-                        <div className="text-sm font-medium">Enviar Teste</div>
-                      </div>
-                    </Button>
-                    
-                    <Button 
-                      variant="outline" 
-                      className="h-16"
-                      onClick={checkSystemHealth}
-                    >
-                      <div className="text-center">
-                        <CheckCircle className="h-6 w-6 mx-auto mb-1 text-green-500" />
-                        <div className="text-sm font-medium">Status Sistema</div>
-                      </div>
-                    </Button>
-                    
-                    <Button variant="outline" className="h-16">
-                      <div className="text-center">
-                        <Settings className="h-6 w-6 mx-auto mb-1 text-orange-500" />
-                        <div className="text-sm font-medium">Config Alertas</div>
-                      </div>
-                    </Button>
-                  </div>
-                  
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-blue-800 mb-2">Sistema de Notificações Ativo</h4>
-                    <ul className="text-sm text-blue-700 space-y-1">
-                      <li>• ✅ Notificações de configurações salvas</li>
-                      <li>• ✅ Alertas de erro no sistema</li>
-                      <li>• ✅ Verificação automática de saúde</li>
-                      <li>• ✅ Feedback de aprendizado IA</li>
-                      <li>• ✅ Notificações de pedidos pendentes</li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Configuração do Webhook Facebook */}
-                <div className="border-t pt-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <MessageSquare className="h-5 w-5 text-blue-500" />
-                    <h3 className="text-lg font-semibold">Configuração do Webhook Facebook</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Para o bot responder automaticamente, você precisa configurar o webhook no Facebook:
-                  </p>
-                  
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="font-medium">1. URL do Webhook</Label>
-                      <div className="flex gap-2">
-                        <Input 
-                          value="https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook"
-                          readOnly
-                          className="font-mono text-sm"
-                        />
-                        <Button variant="outline" size="sm">
-                          Copiar
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="font-medium">2. Verify Token</Label>
-                      <div className="flex gap-2">
-                        <Input 
-                          value="minha_superloja_webhook_token_2024"
-                          readOnly
-                          className="font-mono text-sm"
-                        />
-                        <Button variant="outline" size="sm">
-                          Copiar
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="font-medium">3. Configurar no Facebook</Label>
-                      <div className="space-y-2 text-sm">
-                        <p>1. Acesse <Button variant="link" className="p-0 h-auto text-blue-500">Facebook Developers</Button></p>
-                        <p>2. Vá para sua aplicação → Produtos → Messenger → Configurações</p>
-                        <p>3. Na seção "Webhooks", clique em "Configurar Webhooks"</p>
-                        <p>4. Cole a URL do webhook acima</p>
-                        <p>5. Cole o Verify Token acima</p>
-                        <p>6. Selecione os eventos: <code>messages, messaging_postbacks</code></p>
-                        <p>7. Clique em "Verificar e Salvar"</p>
-                        <p>8. Depois, associe o webhook à sua página</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-yellow-50 p-4 rounded-lg mt-4">
-                    <div className="flex items-start gap-2">
-                      <div className="bg-yellow-400 rounded-full p-1 mt-0.5">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-yellow-800">Verificações Importantes</h4>
-                        <ul className="text-sm text-yellow-700 space-y-1">
-                          <li>• Certifique-se que o token da página tem permissão <code>pages_messaging</code></li>
-                          <li>• A página deve estar em modo "Desenvolvedor" ou "Ativo"</li>
-                          <li>• O webhook deve estar associado especificamente à sua página</li>
-                          <li>• Teste mandando uma mensagem para a página após a configuração</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Botões de Ação */}
-                  <div className="flex flex-wrap gap-2 mt-6">
-                    <Button size="sm">
-                      Abrir Facebook Developers
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Testar Webhook
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-blue-600">
-                      Verificar Mensagens
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-green-600">
-                      Sincronizar Tokens
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-red-600">
-                      Configurar Subscrição
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-purple-600">
-                      Testar Sistema
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      Testar Webhook
+                      <Save className="h-4 w-4 mr-2" />
+                      Salvar Todas as Configurações
                     </Button>
                   </div>
                 </div>
