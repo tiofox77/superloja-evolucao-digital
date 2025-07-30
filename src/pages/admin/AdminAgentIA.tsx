@@ -35,6 +35,14 @@ import {
   performSystemHealthCheck,
   notifyAILearningFeedback
 } from '@/utils/notifications';
+import { 
+  addKnowledge,
+  updateKnowledge,
+  deleteKnowledge,
+  toggleKnowledgeActive,
+  saveAdminSettings,
+  type KnowledgeItem
+} from '@/utils/knowledgeBase';
 
 // Tipos para as interfaces
 interface Metrics {
@@ -106,6 +114,22 @@ const AdminAgentIA = () => {
   const [testMessage, setTestMessage] = useState('');
   const [messageCount, setMessageCount] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  // Estados para configurações adicionais
+  const [adminFacebookId, setAdminFacebookId] = useState('');
+  const [adminBackupId, setAdminBackupId] = useState('');
+  const [escalationKeywords, setEscalationKeywords] = useState('comprar,finalizar,problema,ajuda,atendente,humano,pessoa,gerente');
+  const [escalationTime, setEscalationTime] = useState(10);
+
+  // Estados para base de conhecimento
+  const [newKnowledge, setNewKnowledge] = useState({
+    category: 'produtos',
+    question: '',
+    answer: '',
+    keywords: '',
+    priority: 2
+  });
+  const [editingKnowledge, setEditingKnowledge] = useState<string | null>(null);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -249,7 +273,7 @@ const AdminAgentIA = () => {
       const { data: settings } = await supabase
         .from('ai_settings')
         .select('key, value')
-        .in('key', ['bot_enabled', 'knowledge_base_enabled']);
+        .in('key', ['bot_enabled', 'knowledge_base_enabled', 'admin_facebook_id', 'admin_backup_id', 'escalation_keywords', 'escalation_time']);
 
       if (settings) {
         const settingsMap = settings.reduce((acc: any, setting: any) => {
@@ -259,9 +283,15 @@ const AdminAgentIA = () => {
 
         setBotEnabled(settingsMap.bot_enabled === 'true');
         setKnowledgeBaseEnabled(settingsMap.knowledge_base_enabled === 'true');
+        setAdminFacebookId(settingsMap.admin_facebook_id || '');
+        setAdminBackupId(settingsMap.admin_backup_id || '');
+        setEscalationKeywords(settingsMap.escalation_keywords || 'comprar,finalizar,problema,ajuda,atendente');
+        setEscalationTime(parseInt(settingsMap.escalation_time || '10'));
+        
+        console.log('📋 Configurações carregadas:', settingsMap);
       }
     } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
+      console.error('❌ Erro ao carregar configurações:', error);
     }
   };
 
@@ -334,21 +364,51 @@ const AdminAgentIA = () => {
     setSettingsLoading(true);
     
     try {
-      // Usar merge-upsert para evitar conflitos de constraint
+      console.log('💾 === INICIANDO SALVAMENTO CONFIGURAÇÕES ===');
+      console.log('📋 Dados para salvar:', {
+        bot_enabled: botEnabled,
+        knowledge_base_enabled: knowledgeBaseEnabled,
+        admin_facebook_id: adminFacebookId,
+        admin_backup_id: adminBackupId,
+        escalation_keywords: escalationKeywords,
+        escalation_time: escalationTime
+      });
+
+      // Preparar todas as configurações
       const settingsToSave = [
         { key: 'bot_enabled', value: botEnabled.toString(), description: 'Bot habilitado/desabilitado' },
-        { key: 'knowledge_base_enabled', value: knowledgeBaseEnabled.toString(), description: 'Base de conhecimento ativa' }
+        { key: 'knowledge_base_enabled', value: knowledgeBaseEnabled.toString(), description: 'Base de conhecimento ativa' },
+        { key: 'admin_facebook_id', value: adminFacebookId.trim(), description: 'ID Facebook do admin principal' },
+        { key: 'admin_backup_id', value: adminBackupId.trim(), description: 'ID Facebook do admin backup' },
+        { key: 'escalation_keywords', value: escalationKeywords, description: 'Palavras-chave para escalation' },
+        { key: 'escalation_time', value: escalationTime.toString(), description: 'Tempo para escalation em minutos' }
       ];
 
+      console.log('📦 Settings preparadas:', settingsToSave);
+
       // Salvar usando upsert corretamente
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('ai_settings')
         .upsert(settingsToSave, { 
           onConflict: 'key',
           ignoreDuplicates: false 
-        });
+        })
+        .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro SQL no salvamento:', error);
+        throw error;
+      }
+
+      console.log('✅ Dados salvos no Supabase:', data);
+      
+      // Verificar se realmente salvou
+      const { data: verificationData } = await supabase
+        .from('ai_settings')
+        .select('key, value')
+        .in('key', settingsToSave.map(s => s.key));
+      
+      console.log('🔍 Verificação pós-salvamento:', verificationData);
 
       // Notificar salvamento bem-sucedido
       await notifyConfigurationChanged(
@@ -402,32 +462,117 @@ const AdminAgentIA = () => {
     }
   };
 
-  // Enviar notificação de teste
-  const sendTestNotification = async () => {
+  // CRUD para Base de Conhecimento
+  const handleAddKnowledge = async () => {
     try {
-      await sendAdminNotification({
-        type: 'system_health_report',
-        title: 'Teste de Notificação IA',
-        message: 'Sistema de notificações funcionando corretamente!',
-        priority: 'normal',
-        data: { test: true, timestamp: new Date().toISOString() }
+      console.log('📚 === ADICIONANDO CONHECIMENTO ===');
+      console.log('📝 Dados:', newKnowledge);
+
+      if (!newKnowledge.question.trim() || !newKnowledge.answer.trim()) {
+        toast.error('Pergunta e resposta são obrigatórias!');
+        return;
+      }
+
+      const knowledgeData = {
+        category: newKnowledge.category,
+        question: newKnowledge.question.trim(),
+        answer: newKnowledge.answer.trim(),
+        keywords: newKnowledge.keywords.split(',').map(k => k.trim()).filter(k => k),
+        priority: newKnowledge.priority,
+        active: true
+      };
+
+      const { data, error } = await supabase
+        .from('ai_knowledge_base')
+        .insert(knowledgeData)
+        .select();
+
+      if (error) {
+        console.error('❌ Erro ao adicionar conhecimento:', error);
+        throw error;
+      }
+
+      console.log('✅ Conhecimento adicionado:', data);
+      
+      // Limpar formulário
+      setNewKnowledge({
+        category: 'produtos',
+        question: '',
+        answer: '',
+        keywords: '',
+        priority: 2
       });
+
+      // Recarregar lista
+      await loadKnowledgeBase();
+      toast.success('Conhecimento adicionado com sucesso!');
+
     } catch (error) {
-      console.error('Erro ao enviar notificação de teste:', error);
-      toast.error('Erro ao enviar notificação');
+      console.error('❌ Erro ao adicionar conhecimento:', error);
+      toast.error('Erro ao adicionar conhecimento');
     }
   };
 
-  const sendTestMessage = async (message: string) => {
+  const handleEditKnowledge = async (id: string, updatedData: any) => {
     try {
-      const newMessage = {
-        id: Date.now().toString(),
-        platform: 'test',
-        user_id: 'admin_test',
-        message,
-        type: 'sent' as const,
-        timestamp: new Date().toISOString()
-      };
+      console.log('✏️ === EDITANDO CONHECIMENTO ===');
+      console.log('🆔 ID:', id);
+      console.log('📝 Dados:', updatedData);
+
+      const { data, error } = await supabase
+        .from('ai_knowledge_base')
+        .update(updatedData)
+        .eq('id', id)
+        .select();
+
+      if (error) {
+        console.error('❌ Erro ao editar conhecimento:', error);
+        throw error;
+      }
+
+      console.log('✅ Conhecimento editado:', data);
+      await loadKnowledgeBase();
+      setEditingKnowledge(null);
+      toast.success('Conhecimento atualizado!');
+
+    } catch (error) {
+      console.error('❌ Erro ao editar conhecimento:', error);
+      toast.error('Erro ao editar conhecimento');
+    }
+  };
+
+  const handleDeleteKnowledge = async (id: string) => {
+    try {
+      console.log('🗑️ === DELETANDO CONHECIMENTO ===');
+      console.log('🆔 ID:', id);
+
+      const { error } = await supabase
+        .from('ai_knowledge_base')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ Erro ao deletar conhecimento:', error);
+        throw error;
+      }
+
+      console.log('✅ Conhecimento deletado');
+      await loadKnowledgeBase();
+      toast.success('Conhecimento removido!');
+
+    } catch (error) {
+      console.error('❌ Erro ao deletar conhecimento:', error);
+      toast.error('Erro ao deletar conhecimento');
+    }
+  };
+
+  const handleToggleKnowledgeActive = async (id: string, active: boolean) => {
+    try {
+      await handleEditKnowledge(id, { active });
+    } catch (error) {
+      console.error('❌ Erro ao alterar status:', error);
+    }
+  };
       
       setRealtimeMessages(prev => [newMessage, ...prev]);
       toast.success('Mensagem de teste enviada!');
@@ -996,8 +1141,12 @@ const AdminAgentIA = () => {
                       <div className="space-y-2">
                         <Label>ID Facebook do Admin Principal</Label>
                         <Input 
-                          placeholder="Ex: 100012345678901"
-                          defaultValue=""
+                          placeholder="Ex: carlosfox2"
+                          value={adminFacebookId}
+                          onChange={(e) => {
+                            console.log('💾 Alterando admin ID:', e.target.value);
+                            setAdminFacebookId(e.target.value);
+                          }}
                         />
                         <p className="text-xs text-muted-foreground">
                           ID do administrador que receberá notificações
@@ -1007,8 +1156,9 @@ const AdminAgentIA = () => {
                       <div className="space-y-2">
                         <Label>Admin Backup (Opcional)</Label>
                         <Input 
-                          placeholder="Ex: carlosfox_backup"
-                          defaultValue=""
+                          placeholder="Ex: admin_backup"
+                          value={adminBackupId}
+                          onChange={(e) => setAdminBackupId(e.target.value)}
                         />
                       </div>
                     </div>
