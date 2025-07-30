@@ -154,15 +154,6 @@ serve(async (req) => {
             for (const messaging of entry.messaging) {
               console.log('💬 Processando messaging:', Object.keys(messaging));
               
-              // PRIMEIRO: Verificar se é comando administrativo
-              if (messaging.message && messaging.message.text) {
-                const isAdminCommand = await processAdminCommands(messaging, supabase);
-                if (isAdminCommand) {
-                  console.log('🔧 Comando administrativo processado');
-                  continue; // Pular processamento normal
-                }
-              }
-
               // MENSAGEM DE TEXTO
               if (messaging.message && messaging.message.text) {
                 console.log('📝 Mensagem de texto encontrada');
@@ -172,14 +163,6 @@ serve(async (req) => {
               // POSTBACK (botões)
               else if (messaging.postback) {
                 console.log('🔘 Postback encontrado:', messaging.postback);
-                // Tratar postback como mensagem de texto
-                const textMessage = {
-                  ...messaging,
-                  message: {
-                    text: messaging.postback.payload
-                  }
-                };
-                await handleMessage(textMessage, supabase);
               }
               
               // OUTROS TIPOS
@@ -248,12 +231,27 @@ async function handleMessage(messaging: any, supabase: any) {
     
     console.log('💾 Mensagem salva no banco');
     
-    // LÓGICA SIMPLIFICADA: Apenas ChatGPT direto
-    const aiResponse = await callOpenAIDirectly(messageText, senderId, supabase);
+    // NOVA LÓGICA: 100% IA - Sem verificações automáticas
+    const aiResponse = await processWithPureAI(messageText, senderId, supabase);
     console.log(`🤖 Resposta IA: ${aiResponse}`);
     
-    // Enviar resposta direta - sem verificações extras
+    // Verificar se a IA solicitou envio de imagem
+    const imageResponse = await checkAndSendProductImage(messageText, aiResponse, senderId, supabase);
+    
+    // Verificar se precisa finalizar compra
+    const needsOrderProcessing = await checkForOrderCompletion(aiResponse, senderId, supabase);
+    if (needsOrderProcessing) {
+      console.log('🛒 Detectado pedido finalizado - notificando administrador');
+      await notifyAdminOfNewOrder(needsOrderProcessing.orderData, supabase);
+    }
+    
+    // Enviar a resposta da IA
     await sendFacebookMessage(senderId, aiResponse, supabase);
+    
+    // Se houve envio de imagem, aguardar para não sobrecarregar
+    if (imageResponse.imageSent) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Delay de 1s
+    }
     
     // Salvar resposta enviada
     await supabase.from('ai_conversations').insert({
@@ -272,33 +270,22 @@ async function handleMessage(messaging: any, supabase: any) {
   }
 }
 
-// NOVA FUNÇÃO: 100% IA - Sem automações com aprendizado
+// NOVA FUNÇÃO: 100% IA - Sem automações
 async function processWithPureAI(userMessage: string, senderId: string, supabase: any): Promise<string> {
-  console.log('🤖 === PROCESSAMENTO 100% IA COM APRENDIZADO ===');
+  console.log('🤖 === PROCESSAMENTO 100% IA ===');
   console.log('👤 Usuário:', senderId);
   console.log('💬 Mensagem:', userMessage);
   
   try {
-    // 1. Verificar se é feedback negativo ou correção do usuário
-    const feedbackDetected = await detectUserFeedback(userMessage, senderId, supabase);
-    if (feedbackDetected) {
-      return await handleUserFeedback(userMessage, senderId, supabase);
-    }
-
-    // 2. Buscar contexto do usuário 
+    // 1. Buscar contexto do usuário 
     let userContext = await getOrCreateUserContext(senderId, supabase);
     console.log('📋 Contexto:', { messageCount: userContext.message_count });
 
-    // 3. Verificar se há aprendizado aplicável
-    const learnedResponse = await improveProductSearch(userMessage, supabase);
-    if (learnedResponse) {
-      return learnedResponse;
-    }
-
-    // 4. Buscar TODOS os produtos disponíveis (com stock) com categorização melhorada
-    const availableProducts = await getAllAvailableProductsImproved(supabase);
+    // 2. Buscar TODOS os produtos disponíveis (com stock)
+    const availableProducts = await getAllAvailableProducts(supabase);
     
-    // Base de conhecimento desabilitada - usando apenas ChatGPT
+    // 3. Buscar na base de conhecimento
+    const knowledgeResponse = await searchKnowledgeBase(userMessage, supabase);
 
     // 4. Buscar configurações de IA
     const { data: aiSettings } = await supabase
@@ -320,7 +307,7 @@ async function processWithPureAI(userMessage: string, senderId: string, supabase
     }
 
     // 5. Construir prompt 100% IA com todos os produtos
-    const systemPrompt = buildHumanAIPrompt(userContext, availableProducts);
+    const systemPrompt = buildAdvancedAIPrompt(userContext, knowledgeResponse, availableProducts);
     const conversationHistory = await getRecentConversationHistory(senderId, supabase);
 
     console.log('🧠 Chamando OpenAI (100% IA)...');
@@ -388,76 +375,9 @@ async function getAllAvailableProducts(supabase: any) {
       .order('name', { ascending: true });
     
     console.log('📦 Total de produtos carregados:', products?.length || 0);
-    console.log('📦 Produtos em stock:', products?.filter(p => p.in_stock).length || 0);
-    console.log('📦 Produtos sem stock:', products?.filter(p => !p.in_stock).length || 0);
-    
     return products || [];
   } catch (error) {
     console.error('❌ Erro ao buscar produtos:', error);
-    return [];
-  }
-}
-
-// FUNÇÃO MELHORADA: Buscar produtos com categorização aprimorada
-async function getAllAvailableProductsImproved(supabase: any) {
-  try {
-    const { data: products } = await supabase
-      .from('products')
-      .select(`
-        id, name, slug, price, original_price, description, 
-        image_url, in_stock, stock_quantity, featured,
-        category_id, categories(name), variants, colors, sizes
-      `)
-      .eq('active', true)
-      .order('name', { ascending: true });
-
-    if (!products) return [];
-
-    // Categorizar produtos por tipo para evitar confusão entre fones e cabos
-    const categorizedProducts = products.map(product => {
-      const name = product.name.toLowerCase();
-      let aiCategory = 'outros';
-      let specificType = '';
-      
-      // Categorização específica para fones de ouvido
-      if (name.includes('fone') || name.includes('auricular') || name.includes('headphone') || 
-          name.includes('earphone') || name.includes('auscultador')) {
-        aiCategory = 'fones_audio';
-        specificType = 'dispositivo_audio';
-      } 
-      // Categorização específica para cabos (excluindo fones)
-      else if ((name.includes('cabo') || name.includes('cable')) && 
-               !name.includes('fone') && !name.includes('auricular')) {
-        aiCategory = 'cabos_conexao';
-        specificType = 'cabo_conectividade';
-      } 
-      // Carregadores
-      else if (name.includes('carregador') || name.includes('fonte') || name.includes('charger')) {
-        aiCategory = 'carregadores';
-        specificType = 'dispositivo_alimentacao';
-      } 
-      // Adaptadores
-      else if (name.includes('adaptador') || name.includes('conversor') || name.includes('adapter')) {
-        aiCategory = 'adaptadores';
-        specificType = 'conversor_sinais';
-      }
-      
-      return { 
-        ...product, 
-        ai_category: aiCategory,
-        ai_specific_type: specificType,
-        ai_search_keywords: name.split(' ').filter(word => word.length > 2)
-      };
-    });
-
-    console.log('📦 Produtos categorizados:', categorizedProducts.length);
-    console.log('📦 Fones de áudio:', categorizedProducts.filter(p => p.ai_category === 'fones_audio').length);
-    console.log('📦 Cabos:', categorizedProducts.filter(p => p.ai_category === 'cabos_conexao').length);
-    console.log('📦 Carregadores:', categorizedProducts.filter(p => p.ai_category === 'carregadores').length);
-    
-    return categorizedProducts;
-  } catch (error) {
-    console.error('❌ Erro ao buscar produtos melhorados:', error);
     return [];
   }
 }
@@ -485,11 +405,10 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
   const companyInfo = `
 📍 LOCALIZAÇÃO: Angola, Luanda
 💰 MOEDA: Kz (Kwanza Angolano)
-🚚 ENTREGA: ✅ GRÁTIS em Luanda | 💰 PAGA fora de Luanda (calcular frete)
+🚚 ENTREGA: Grátis em toda Angola
 📞 CONTATO: WhatsApp/Telegram: +244 930 000 000
 🌐 SITE: https://superloja.vip
-⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h
-⚠️ IMPORTANTE: Entregas fora de Luanda têm custo adicional - solicitar contato para calcular frete`;
+⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h`;
 
   // CATÁLOGO COMPLETO DE PRODUTOS - CRÍTICO PARA PRECISÃO
   let productsInfo = '';
@@ -533,10 +452,6 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
     productsInfo += '\n• Quando cliente escolher um produto ESPECÍFICO, use o LINK DIRETO do produto';
     productsInfo += '\n• Se cliente pedir imagem/foto, use a URL da imagem do produto';
     productsInfo += '\n• Se cliente mencionar número da lista (ex: "produto 5"), identifique qual produto é';
-    productsInfo += '\n• ⚠️ ATENÇÃO CATEGORIA: FONES ≠ CABOS (são produtos diferentes!)';
-    productsInfo += '\n• Se cliente pedir FONES/AURICULARES: mostre apenas produtos de ÁUDIO';
-    productsInfo += '\n• Se cliente pedir CABOS: mostre apenas produtos de CONEXÃO/CARREGAMENTO';
-    productsInfo += '\n• Se não tiver certeza do que cliente quer, PERGUNTE especificamente';
   }
 
   // CONTEXTO DA CONVERSA
@@ -545,75 +460,57 @@ function buildAdvancedAIPrompt(userContext: any, knowledgeResponse: any, product
     conversationContext = `\n\n📋 CONTEXTO: Esta conversa tem ${userContext.message_count} mensagens.`;
   }
 
-  // Base de conhecimento desabilitada - focando em respostas mais humanas
-
-// Função para construir prompt mais humano e natural
-function buildHumanAIPrompt(userContext: any, products: any[]): string {
-  
-  // INFORMAÇÕES DA EMPRESA
-  const companyInfo = `
-📍 LOCALIZAÇÃO: Angola, Luanda
-💰 MOEDA: Kz (Kwanza Angolano)  
-🚚 ENTREGA: Grátis em toda Angola
-📞 CONTATO: WhatsApp/Telegram: +244 930 000 000
-🌐 SITE: https://superloja.vip
-⏰ HORÁRIO: Segunda a Sexta: 8h-18h | Sábado: 8h-14h`;
-
-  // PRODUTOS DISPONÍVEIS (apenas os em stock)
-  let productsInfo = '';
-  if (products.length > 0) {
-    const inStockProducts = products.filter(p => p.in_stock);
-    
-    if (inStockProducts.length > 0) {
-      productsInfo = '\n\n📦 PRODUTOS EM STOCK:\n';
-      inStockProducts.forEach((product, index) => {
-        const price = parseFloat(product.price).toLocaleString('pt-AO');
-        productsInfo += `${index + 1}. ${product.name} - ${price} Kz\n`;
-        productsInfo += `   🔗 https://superloja.vip/produto/${product.slug}\n`;
-        if (product.image_url) {
-          productsInfo += `   📸 ${product.image_url}\n`;
-        }
-      });
-    }
+  // BASE DE CONHECIMENTO
+  let knowledgeInfo = '';
+  if (knowledgeResponse) {
+    knowledgeInfo = `\n\n💡 INFORMAÇÃO RELEVANTE: ${knowledgeResponse.answer}`;
   }
 
-  // CONTEXTO DA CONVERSA
-  let conversationContext = '';
-  if (userContext.message_count > 0) {
-    conversationContext = `\n\n📋 CONTEXTO: Esta conversa tem ${userContext.message_count} mensagens.`;
-  }
+  return `Você é o assistente virtual oficial da SUPERLOJA, uma loja de tecnologia em Angola.
+MISSÃO: Atender clientes com informações PRECISAS e ATUALIZADAS sobre nossos produtos.
 
-  return `Você é o assistente virtual da SUPERLOJA, uma loja de tecnologia em Angola.
-Seja MUITO HUMANO e natural nas respostas - como um vendedor real conversando com o cliente.
+INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}${knowledgeInfo}
 
-INFORMAÇÕES DA EMPRESA:${companyInfo}${productsInfo}${conversationContext}
+🎯 INSTRUÇÕES CRÍTICAS DE VENDAS:
+- Sempre confirme se um produto ESTÁ EM STOCK antes de mencionar
+- Use os preços EXATOS da lista acima - não invente preços
+- Se perguntarem sobre um produto inexistente, responda: "Não temos esse produto no momento"
+- Para auriculares/fones, mostre apenas os que estão EM STOCK
+- Sugira produtos similares se o desejado estiver indisponível
 
-🗣️ TOM DE CONVERSA:
-- Seja caloroso e amigável como um angolano
-- Use "Olá! Como está?" ou "Oi! Tudo bem?"
-- Responda de forma conversacional e natural
-- Use emojis com moderação (1-2 por mensagem)
-- Máximo 2-3 frases por resposta (seja direto)
+🔗 LINKS E IMAGENS:
+- Quando cliente escolher produto ESPECÍFICO, use LINK DIRETO: https://superloja.vip/produto/[slug]
+- Se cliente pedir foto/imagem, envie URL da imagem do produto
+- Para lista geral, pode usar https://superloja.vip
 
-🛒 QUANDO CLIENTE PEDIR PRODUTOS:
-- Mostre apenas produtos EM STOCK
-- Use preços EXATOS da lista
-- Para produto específico: envie link direto + imagem se disponível
-- Se não tiver o que procura: "No momento não temos esse produto"
+🛒 PROCESSO DE COMPRA:
+- Se cliente quiser comprar, pergunte: nome, telefone, endereço
+- Confirme produto, preço e dados antes de finalizar
+- Informe sobre entrega grátis em Angola
+- Diga: "Vou processar seu pedido e entrar em contato!"
 
-💬 EXEMPLOS DE RESPOSTAS HUMANAS:
-❌ Robótico: "Temos os seguintes produtos disponíveis..."
-✅ Humano: "Olá! Temos alguns fones bacanas aqui. Quer ver?"
+💬 COMUNICAÇÃO NATURAL:
+- Se perguntarem "como está", responda: "Estou bem, obrigado! E você?"
+- Quando mencionarem número da lista (ex: "produto 29"), identifique corretamente
+- Seja simpático: "Olá! Tudo bem?" ou "Bom dia!"
+- Máximo 3 frases por resposta
+- Use 1-2 emojis
+- Português de Angola
 
-❌ Robótico: "Para finalizar o pedido, preciso dos seus dados..."
-✅ Humano: "Perfeito! Me passa teu nome e telefone que processo o pedido 😊"
+🚫 NUNCA FAÇA:
+- Mencionar produtos sem stock
+- Inventar preços ou produtos
+- Enviar link geral quando cliente escolheu produto específico
+- Ignorar quando cliente menciona número da lista
 
-🎯 VENDAS:
-- Para compra: pedir nome, telefone, endereço
-- Confirmar produto e preço escolhido
-- "Vou processar e te contacto!"
+✅ SEMPRE FAÇA:
+- Verificar stock antes de recomendar
+- Dar preços corretos da lista
+- Usar link específico do produto quando cliente escolher
+- Responder de forma humana e natural
+- Identificar números de produtos mencionados
 
-SEJA HUMANO, DIRETO E SIMPÁTICO!
+SEJA PRECISO, HONESTO E NATURAL!`;
 }
 
 // Função para construir prompt 100% IA (manter para compatibilidade)
@@ -848,7 +745,7 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
   
   try {
     const response = await fetch(
-      `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -884,7 +781,7 @@ async function sendFacebookMessage(recipientId: string, message: string, supabas
   } catch (error) {
     console.error('❌ Erro de rede/conexão ao enviar mensagem:');
     console.error('🌐 Network error:', error.message);
-    console.error('🔗 URL tentativa:', `https://graph.facebook.com/v21.0/me/messages`);
+    console.error('🔗 URL tentativa:', `https://graph.facebook.com/v18.0/me/messages`);
     console.error('🔑 Token usado (primeiros 20 chars):', PAGE_ACCESS_TOKEN.substring(0, 20) + '...');
   }
 }
@@ -943,7 +840,7 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
   
   try {
     const response = await fetch(
-      `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -986,170 +883,112 @@ async function sendFacebookImage(recipientId: string, imageUrl: string, caption:
   }
 }
 
-// FUNÇÃO: Detectar e enviar imagens APENAS quando solicitado explicitamente
+// NOVA FUNÇÃO: Detectar e enviar imagens de produtos
 async function checkAndSendProductImage(userMessage: string, aiResponse: string, recipientId: string, supabase: any): Promise<{imageSent: boolean, productFound?: any}> {
   console.log('📸 === VERIFICANDO SOLICITAÇÃO DE IMAGEM ===');
   
-  // APENAS detectar se o usuário pediu EXPLICITAMENTE uma imagem
-  const explicitImageKeywords = [
-    'foto', 'imagem', 'ver foto', 'mostrar foto', 'mostrar imagem', 'picture', 'pic', 
-    'como é', 'aspecto', 'ver como é', 'quero ver', 'me mostra', 'photo',
-    'aparência', 'visual do produto'
+  // Detectar se o usuário está pedindo foto/imagem
+  const imageKeywords = [
+    'foto', 'imagem', 'ver', 'mostrar', 'picture', 'pic', 'visual', 'aparência', 
+    'como é', 'aspecto', 'mostra', 'vê', 'visualizar', 'observar', 'photo'
   ];
   
-  const userWantsImage = explicitImageKeywords.some(keyword => 
+  const userWantsImage = imageKeywords.some(keyword => 
     userMessage.toLowerCase().includes(keyword)
   );
 
   if (!userWantsImage) {
-    console.log('📸 Usuário NÃO solicitou imagem explicitamente');
+    console.log('📸 Usuário não solicitou imagem');
     return { imageSent: false };
   }
 
-  console.log('📸 Usuário solicitou imagem EXPLICITAMENTE - buscando produto...');
+  console.log('📸 Usuário solicitou imagem - buscando produto...');
 
   try {
-    let selectedProduct = null;
+    // Extrair nome/palavra-chave do produto da mensagem
+    let productKeyword = '';
     
-    // 1. Detectar número da lista primeiro (ex: "produto 29", "número 5", "foto do produto 1", etc)
+    // Detectar número da lista primeiro (ex: "produto 29", "número 5", etc)
     const numberMatch = userMessage.match(/(?:produto|número|item|n[ºo°]?\.?)\s*(\d+)/i);
     if (numberMatch) {
       const productNumber = parseInt(numberMatch[1]);
       console.log(`📸 Detectado número do produto: ${productNumber}`);
       
+      // Buscar produto pelo índice na lista (ordenada por nome)
       const { data: products } = await supabase
         .from('products')
         .select('*')
         .eq('active', true)
         .eq('in_stock', true)
         .order('name', { ascending: true })
-        .limit(50);
+        .limit(50); // Buscar até 50 produtos
       
       if (products && products.length >= productNumber && productNumber > 0) {
-        selectedProduct = products[productNumber - 1];
+        const selectedProduct = products[productNumber - 1];
         console.log(`📸 Produto encontrado pelo número: ${selectedProduct.name}`);
+        
+        if (selectedProduct.image_url) {
+          // Converter URL da imagem para URL público do Supabase se necessário
+          let imageUrl = selectedProduct.image_url;
+          if (imageUrl.includes('product-images/') && !imageUrl.startsWith('http')) {
+            imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/${imageUrl}`;
+          }
+          
+          await sendFacebookImage(
+            recipientId,
+            imageUrl,
+            `📸 ${selectedProduct.name}\n💰 ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz\n🔗 https://superloja.vip/produto/${selectedProduct.slug}`,
+            supabase
+          );
+          return { imageSent: true, productFound: selectedProduct };
+        }
       }
     }
 
-    // 2. Se não achou por número, buscar em TODOS os produtos disponíveis
-    if (!selectedProduct) {
-      console.log('📸 Buscando em TODOS os produtos disponíveis...');
+    // Se não achou por número, buscar por palavras-chave
+    const keywords = ['fones', 'auricular', 'tws', 'bluetooth', 'cabo', 'carregador', 'adaptador'];
+    productKeyword = keywords.find(keyword => 
+      userMessage.toLowerCase().includes(keyword)
+    ) || '';
+
+    if (productKeyword) {
+      console.log(`📸 Buscando produto com palavra-chave: ${productKeyword}`);
       
-      // Buscar por QUALQUER palavra mencionada pelo usuário
-      const userWords = userMessage.toLowerCase().split(' ').filter(word => word.length > 2);
-      console.log(`📸 Palavras extraídas do usuário: ${userWords.join(', ')}`);
-      
-      const { data: allProducts } = await supabase
+      const { data: product } = await supabase
         .from('products')
         .select('*')
         .eq('active', true)
-        .eq('in_stock', true);
-      
-      if (allProducts) {
-        console.log(`📸 Verificando ${allProducts.length} produtos disponíveis...`);
-        
-        // Buscar produto que contenha qualquer palavra mencionada
-        for (const word of userWords) {
-          if (word.length > 2) { // Ignorar palavras muito pequenas
-            const foundProduct = allProducts.find(product => 
-              product.name.toLowerCase().includes(word) ||
-              (product.description && product.description.toLowerCase().includes(word))
-            );
-            
-            if (foundProduct) {
-              selectedProduct = foundProduct;
-              console.log(`📸 Produto encontrado por palavra "${word}": ${selectedProduct.name}`);
-              break;
-            }
-          }
-        }
-        
-        // Se ainda não achou, pegar o primeiro produto com imagem disponível
-        if (!selectedProduct) {
-          const productWithImage = allProducts.find(p => p.image_url);
-          if (productWithImage) {
-            selectedProduct = productWithImage;
-            console.log(`📸 Usando primeiro produto com imagem: ${selectedProduct.name}`);
-          }
-        }
-      }
-    }
+        .eq('in_stock', true)
+        .ilike('name', `%${productKeyword}%`)
+        .limit(1)
+        .maybeSingle();
 
-    // 3. Se encontrou produto, verificar se imagem está acessível e enviar
-    if (selectedProduct && selectedProduct.image_url) {
-      console.log(`📸 Enviando imagem do produto: ${selectedProduct.name}`);
-      
-      // Garantir URL completa para Supabase Storage
-      let imageUrl = selectedProduct.image_url;
-      if (!imageUrl.startsWith('http')) {
-        if (imageUrl.startsWith('product-images/')) {
+      if (product && product.image_url) {
+        console.log(`📸 Produto encontrado: ${product.name}`);
+        
+        // Converter URL da imagem para URL público do Supabase se necessário
+        let imageUrl = product.image_url;
+        if (imageUrl.includes('product-images/') && !imageUrl.startsWith('http')) {
           imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/${imageUrl}`;
-        } else {
-          imageUrl = `https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/product-images/${imageUrl}`;
-        }
-      }
-      
-      console.log(`📸 URL da imagem: ${imageUrl}`);
-      
-      // Verificar se imagem está acessível antes de enviar
-      try {
-        const imageCheck = await fetch(imageUrl, { method: 'HEAD' });
-        if (!imageCheck.ok) {
-          throw new Error('Imagem não acessível');
         }
         
-        // Enviar imagem diretamente com resposta integrada
         await sendFacebookImage(
           recipientId,
           imageUrl,
-          `📸 ${selectedProduct.name}
-💰 Preço: ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz
-🔗 Ver mais: https://superloja.vip/produto/${selectedProduct.slug}
-
-✨ Interessado? Me diga seu nome, telefone e endereço para processar seu pedido!`,
+          `📸 ${product.name}\n💰 ${parseFloat(product.price).toLocaleString('pt-AO')} Kz\n🔗 https://superloja.vip/produto/${product.slug}`,
           supabase
         );
-        
-        return { imageSent: true, productFound: selectedProduct };
-        
-      } catch (imageError) {
-        console.log('❌ Erro ao acessar imagem, enviando link:', imageError);
-        
-        // Fallback: enviar texto com link da imagem
-        await sendFacebookMessage(
-          recipientId,
-          `📸 ${selectedProduct.name}
-💰 Preço: ${parseFloat(selectedProduct.price).toLocaleString('pt-AO')} Kz
-🔗 Ver mais: https://superloja.vip/produto/${selectedProduct.slug}
-🖼️ Imagem: ${imageUrl}
-
-✨ Interessado? Me diga seu nome, telefone e endereço para processar seu pedido!`,
-          supabase
-        );
-        
-        return { imageSent: true, productFound: selectedProduct };
+        return { imageSent: true, productFound: product };
+      } else {
+        console.log('📸 Produto não encontrado ou sem imagem');
       }
-    } else {
-      console.log('📸 Produto não encontrado ou sem imagem disponível');
-      // Informar que não encontrou o produto para mostrar foto
-      await sendFacebookMessage(
-        recipientId,
-        `🤔 Desculpe, não consegui identificar qual produto você quer ver a foto. 
-
-📋 Você pode me dizer:
-- "foto do produto 1" (usando o número da lista)
-- "foto dos fones" (mencionando o tipo)
-
-Ou consulte nossa lista de produtos disponíveis! 😊`,
-        supabase
-      );
-      return { imageSent: true }; // Marcar como enviado para evitar resposta dupla
     }
+
+    return { imageSent: false };
     
   } catch (error) {
     console.error('❌ Erro ao processar solicitação de imagem:', error);
-    return { imageSent: false };
-  }
+  return { imageSent: false };
 }
 
 // NOVA FUNÇÃO: Verificar se pedido foi finalizado
@@ -1201,30 +1040,8 @@ async function notifyAdminOfNewOrder(orderData: any, supabase: any): Promise<voi
   console.log('📢 === NOTIFICANDO ADMINISTRADOR ===');
   
   try {
-    // Buscar ID do administrador no Facebook das configurações
-    let adminFacebookId = "";
-    
-    try {
-      const { data: adminIdSetting } = await supabase
-        .from('ai_settings')
-        .select('value')
-        .eq('key', 'admin_facebook_id')
-        .limit(1)
-        .maybeSingle();
-      
-      if (adminIdSetting?.value) {
-        adminFacebookId = adminIdSetting.value;
-        console.log(`📞 Admin Facebook ID encontrado: ${adminFacebookId}`);
-      }
-    } catch (error) {
-      console.error('❌ Erro ao buscar admin ID:', error);
-    }
-
-    // Fallback para ID padrão se não encontrar nas configurações
-    if (!adminFacebookId) {
-      adminFacebookId = "carlosfox"; // ID padrão
-      console.log(`📞 Usando admin ID padrão: ${adminFacebookId}`);
-    }
+    // ID do administrador no Facebook (carlosfox)
+    const adminFacebookId = "carlosfox"; // Pode precisar ser ajustado para o ID real
     
     const orderMessage = `🚨 NOVO PEDIDO RECEBIDO! 🚨
 
@@ -1237,11 +1054,6 @@ async function notifyAdminOfNewOrder(orderData: any, supabase: any): Promise<voi
 
 🔗 ID do cliente no Messenger: ${orderData.recipientId}
 
-🎯 AÇÕES RÁPIDAS:
-✅ Responda "CONFIRMAR ${orderData.recipientId}" para confirmar o pedido
-❌ Responda "CANCELAR ${orderData.recipientId}" para cancelar
-📱 Responda "CONTATO ${orderData.recipientId}" para enviar seus dados de contato
-
 Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
 
     // Tentar enviar via Facebook Messenger para o admin
@@ -1252,36 +1064,32 @@ Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
       console.error('❌ Erro ao enviar para admin via Facebook:', error);
     }
 
-    // Salvar pedido no banco de dados com informações detalhadas
-    const priceClean = orderData.preco.toString().replace(/[^\d,.]/g, '').replace(',', '.');
-    const totalAmount = parseFloat(priceClean) || 0;
-
+    // Salvar pedido no banco de dados
     const { data: orderInsert, error: orderError } = await supabase
       .from('orders')
       .insert({
         customer_name: orderData.nome,
         customer_phone: orderData.telefone,
         customer_email: '', // Não temos email do Facebook
-        total_amount: totalAmount,
+        total_amount: parseFloat(orderData.preco.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
         order_status: 'pending',
         order_source: 'facebook_messenger',
         payment_status: 'pending',
-        payment_method: 'to_be_defined',
-        notes: `Endereço: ${orderData.endereco}\nProduto: ${orderData.produto}\nMessenger ID: ${orderData.recipientId}\nDetalhes: Pedido recebido via Facebook Messenger às ${orderData.timestamp}`
+        notes: `Endereço: ${orderData.endereco}\nProduto: ${orderData.produto}\nMessenger ID: ${orderData.recipientId}`
       });
 
     if (orderError) {
       console.error('❌ Erro ao salvar pedido no banco:', orderError);
     } else {
-      console.log('✅ Pedido salvo no banco de dados:', orderInsert);
+      console.log('✅ Pedido salvo no banco de dados');
     }
 
-    // Criar notificação no sistema para admins
+    // Criar notificação no sistema
     const { error: notificationError } = await supabase
       .from('notifications')
       .insert({
         title: 'Novo Pedido Via Messenger',
-        message: `Cliente: ${orderData.nome} | Produto: ${orderData.produto} | Valor: ${orderData.preco}`,
+        message: `Pedido de ${orderData.nome} - ${orderData.produto}`,
         type: 'order',
         user_id: null // Notificação para todos os admins
       });
@@ -1292,289 +1100,8 @@ Por favor, entre em contato com o cliente para confirmar a entrega! 📦✨`;
       console.log('✅ Notificação criada no sistema');
     }
 
-    // Log detalhado para rastreamento
-    const { error: logError } = await supabase
-      .from('notification_logs')
-      .insert({
-        notification_type: 'order_facebook',
-        recipient: adminFacebookId,
-        subject: 'Novo Pedido Facebook',
-        message: orderMessage,
-        status: 'sent',
-        provider: 'facebook_messenger',
-        metadata: {
-          order_data: orderData,
-          timestamp: new Date().toISOString(),
-          admin_id: adminFacebookId
-        }
-      });
-
-    if (logError) {
-      console.error('❌ Erro ao criar log de notificação:', logError);
-    }
-
   } catch (error) {
     console.error('❌ Erro geral ao notificar administrador:', error);
-  }
-}
-
-// NOVA FUNÇÃO: Detectar feedback negativo do usuário
-async function detectUserFeedback(userMessage: string, senderId: string, supabase: any): Promise<boolean> {
-  console.log('🧠 === DETECTANDO FEEDBACK DO USUÁRIO ===');
-  
-  const feedbackKeywords = [
-    'errado', 'incorreto', 'não é isso', 'não quero', 'não era isso',
-    'quero fones', 'eu pedi fones', 'não cabos', 'pedi auriculares',
-    'isso está errado', 'você enviou errado', 'não é o que pedi',
-    'queria outro produto', 'não quero cabo', 'eu disse fones',
-    'por que cabo', 'pedi headphones', 'quero earphones',
-    'não mandou certo', 'enviou produto errado'
-  ];
-  
-  const userMsgLower = userMessage.toLowerCase();
-  const hasFeedback = feedbackKeywords.some(keyword => userMsgLower.includes(keyword));
-  
-  if (hasFeedback) {
-    console.log('🧠 Feedback negativo detectado!');
-    
-    // Buscar últimas conversas para contexto
-    const { data: recentConversations } = await supabase
-      .from('ai_conversations')
-      .select('message, type')
-      .eq('user_id', senderId)
-      .eq('platform', 'facebook')
-      .order('timestamp', { ascending: false })
-      .limit(4);
-    
-    if (recentConversations && recentConversations.length >= 2) {
-      const lastAiResponse = recentConversations.find(c => c.type === 'sent')?.message || '';
-      const userPreviousMessage = recentConversations.find(c => c.type === 'received')?.message || '';
-      
-      // Salvar feedback para aprendizado
-      await supabase.from('ai_feedback').insert({
-        user_id: senderId,
-        user_message: userPreviousMessage,
-        ai_response: lastAiResponse,
-        user_feedback: userMessage,
-        is_correct: false,
-        learning_applied: false
-      });
-      
-      console.log('💾 Feedback negativo salvo para aprendizado');
-    }
-  }
-  
-  return hasFeedback;
-}
-
-// NOVA FUNÇÃO: Tratar feedback do usuário e aprender
-async function handleUserFeedback(userMessage: string, senderId: string, supabase: any): Promise<string> {
-  console.log('🎓 === TRATANDO FEEDBACK E APRENDENDO ===');
-  
-  // Detectar produto correto que o usuário quer
-  const productKeywords = {
-    'fones': ['fones', 'auriculares', 'headphones', 'earphones', 'auscultadores'],
-    'cabos': ['cabo', 'cabos', 'carregador', 'adaptador'],
-    'carregadores': ['carregador', 'fonte', 'alimentação'],
-    'adaptadores': ['adaptador', 'conversor', 'hub']
-  };
-  
-  let desiredCategory = '';
-  const userMsgLower = userMessage.toLowerCase();
-  
-  for (const [category, keywords] of Object.entries(productKeywords)) {
-    if (keywords.some(keyword => userMsgLower.includes(keyword))) {
-      desiredCategory = category;
-      break;
-    }
-  }
-  
-  if (desiredCategory) {
-    console.log(`🎓 Usuário quer categoria: ${desiredCategory}`);
-    
-    // Buscar produtos da categoria correta
-    const { data: correctProducts } = await supabase
-      .from('products')
-      .select('*')
-      .eq('active', true)
-      .eq('in_stock', true)
-      .ilike('name', `%${desiredCategory}%`)
-      .limit(5);
-    
-    if (correctProducts && correctProducts.length > 0) {
-      let response = `🎯 Peço desculpas pelo erro! Você quer ${desiredCategory}. Aqui estão os disponíveis:\n\n`;
-      
-      correctProducts.forEach((product, index) => {
-        const price = parseFloat(product.price).toLocaleString('pt-AO');
-        response += `${index + 1}. ${product.name} - ${price} Kz\n`;
-        response += `   🔗 https://superloja.vip/produto/${product.slug}\n\n`;
-      });
-      
-      response += '✨ Qual destes produtos lhe interessa? Posso mostrar mais detalhes!';
-      
-      // Marcar feedback como aprendido
-      await supabase
-        .from('ai_feedback')
-        .update({ learning_applied: true, correction_provided: response })
-        .eq('user_id', senderId)
-        .eq('learning_applied', false)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      return response;
-    }
-  }
-  
-  // Se não conseguiu identificar produto específico, pedir clarificação
-  return `🤔 Peço desculpas pelo erro! Para te ajudar melhor, pode me dizer exatamente qual produto você procura?
-
-📋 Temos essas categorias:
-• Fones de ouvido e auriculares
-• Cabos e adaptadores  
-• Carregadores
-• Acessórios para smartphone
-
-O que você gostaria de ver? 😊`;
-}
-
-// NOVA FUNÇÃO: Melhorar busca de produtos com base no aprendizado
-async function improveProductSearch(userMessage: string, supabase: any) {
-  console.log('🎓 === MELHORANDO BUSCA COM APRENDIZADO ===');
-  
-  // Buscar feedbacks anteriores para melhorar precisão
-  const { data: learningData } = await supabase
-    .from('ai_feedback')
-    .select('user_message, correction_provided, user_feedback')
-    .eq('is_correct', false)
-    .eq('learning_applied', true)
-    .limit(10);
-  
-  if (learningData && learningData.length > 0) {
-    console.log(`🎓 Aplicando ${learningData.length} insights de aprendizado`);
-    
-    // Verificar se mensagem atual é similar a erros passados
-    const userMsgLower = userMessage.toLowerCase();
-    
-    for (const feedback of learningData) {
-      const similarityKeywords = feedback.user_message.toLowerCase().split(' ').filter(w => w.length > 2);
-      const hasSimilarity = similarityKeywords.some(keyword => userMsgLower.includes(keyword));
-      
-      if (hasSimilarity && feedback.correction_provided) {
-        console.log('🎓 Aplicando correção aprendida anteriormente');
-        return feedback.correction_provided;
-      }
-    }
-  }
-  
-  return null; // Continuar com busca normal
-}
-
-// NOVA FUNÇÃO: Processar comandos administrativos
-async function processAdminCommands(messaging: any, supabase: any): Promise<boolean> {
-  const senderId = messaging.sender.id;
-  const userMessage = messaging.message?.text?.trim() || '';
-  
-  // Verificar se é comando administrativo
-  const commandPatterns = [
-    /^CONFIRMAR\s+(.+)$/i,
-    /^CANCELAR\s+(.+)$/i,
-    /^CONTATO\s+(.+)$/i
-  ];
-
-  let isAdminCommand = false;
-  let customerId = '';
-  let command = '';
-
-  for (const pattern of commandPatterns) {
-    const match = userMessage.match(pattern);
-    if (match) {
-      isAdminCommand = true;
-      customerId = match[1].trim();
-      command = userMessage.split(' ')[0].toUpperCase();
-      break;
-    }
-  }
-
-  if (!isAdminCommand) {
-    return false;
-  }
-
-  console.log(`🔧 Comando administrativo detectado: ${command} para ${customerId}`);
-
-  try {
-    switch (command) {
-      case 'CONFIRMAR':
-        await sendFacebookMessage(
-          customerId,
-          `✅ Ótima notícia! Seu pedido foi CONFIRMADO! 🎉
-
-🚚 Nossa equipe entrará em contato em breve para coordenar a entrega.
-📞 Mantenha seu telefone disponível para confirmarmos os detalhes.
-
-Obrigado por escolher a SuperLoja! 💙`,
-          supabase
-        );
-        
-        await sendFacebookMessage(
-          senderId,
-          `✅ Confirmação enviada para o cliente ${customerId}`,
-          supabase
-        );
-        break;
-
-      case 'CANCELAR':
-        await sendFacebookMessage(
-          customerId,
-          `❌ Infelizmente não conseguimos processar seu pedido no momento.
-
-🔄 Por favor, entre em contato novamente ou visite nosso site: https://superloja.vip
-
-Pedimos desculpas pelo inconveniente. 🙏`,
-          supabase
-        );
-        
-        await sendFacebookMessage(
-          senderId,
-          `❌ Cancelamento enviado para o cliente ${customerId}`,
-          supabase
-        );
-        break;
-
-      case 'CONTATO':
-        await sendFacebookMessage(
-          customerId,
-          `📞 Dados para contato direto:
-
-👤 Atendimento: Carlos
-📱 WhatsApp: +244 939 729 902
-📧 Email: carlos@superloja.vip
-🌐 Site: https://superloja.vip
-
-🕒 Horário de atendimento:
-Segunda a Sexta: 8h às 18h
-Sábado: 8h às 14h
-
-Entre em contato quando for melhor para você! 😊`,
-          supabase
-        );
-        
-        await sendFacebookMessage(
-          senderId,
-          `📞 Dados de contato enviados para ${customerId}`,
-          supabase
-        );
-        break;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('❌ Erro ao processar comando administrativo:', error);
-    await sendFacebookMessage(
-      senderId,
-      `❌ Erro ao executar comando. Tente novamente.`,
-      supabase
-    );
-    return true;
   }
 }
 
