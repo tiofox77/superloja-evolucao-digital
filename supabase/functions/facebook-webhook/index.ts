@@ -152,12 +152,12 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     
     // Buscar por modelos específicos mencionados (X83, Pro6, T19, etc.)
     const productPatterns = [
-      { pattern: /x83|x 83/, searchTerms: ['x83'] },
-      { pattern: /pro6|pro 6/, searchTerms: ['pro6', 'tws'] },
-      { pattern: /t19|t 19/, searchTerms: ['t19', 'disney'] },
-      { pattern: /disney/, searchTerms: ['disney'] },
-      { pattern: /transparente/, searchTerms: ['transparente', 'led'] },
-      { pattern: /numero\s*(\d+)|item\s*(\d+)|opção\s*(\d+)|opcao\s*(\d+)/, isNumber: true }
+      { pattern: /x83|x 83/g, searchTerms: ['x83'] },
+      { pattern: /pro6|pro 6/g, searchTerms: ['pro6', 'tws'] },
+      { pattern: /t19|t 19/g, searchTerms: ['t19', 'disney'] },
+      { pattern: /disney/g, searchTerms: ['disney'] },
+      { pattern: /transparente/g, searchTerms: ['transparente', 'led'] },
+      { pattern: /numero\s*(\d+)|item\s*(\d+)|opção\s*(\d+)|opcao\s*(\d+)/g, isNumber: true }
     ];
     
     // Detectar categoria/tipo de produto
@@ -173,22 +173,30 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     let searchQuery = '';
     let categoryFound = '';
     let specificProductSearchTerms = [];
+    let requestedNumbers = [];
     
-    // Detectar produto específico primeiro
+    // Detectar TODOS os produtos específicos mencionados (não parar no primeiro)
     for (const { pattern, searchTerms, isNumber } of productPatterns) {
-      const match = lowerMessage.match(pattern);
-      if (match) {
-        if (isNumber) {
+      if (isNumber) {
+        const matches = [...lowerMessage.matchAll(pattern)];
+        matches.forEach(match => {
           const number = match[1] || match[2] || match[3] || match[4];
-          console.log('🔢 Usuário mencionou número:', number);
-          specificProductRequested = number;
-        } else if (searchTerms) {
-          specificProductSearchTerms = searchTerms;
+          if (number) {
+            requestedNumbers.push(number);
+            console.log('🔢 Usuário mencionou número:', number);
+          }
+        });
+      } else if (searchTerms) {
+        const matches = [...lowerMessage.matchAll(pattern)];
+        if (matches.length > 0) {
+          specificProductSearchTerms.push(...searchTerms);
           console.log('🎯 Produto específico detectado:', searchTerms);
         }
-        break;
       }
     }
+    
+    // Remover duplicatas dos termos de busca
+    specificProductSearchTerms = [...new Set(specificProductSearchTerms)];
     
     // Detectar categoria geral
     for (const [category, keywords] of Object.entries(productKeywords)) {
@@ -204,6 +212,7 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     console.log('🎯 Categoria detectada:', categoryFound);
     console.log('🔍 Query de busca:', searchQuery);
     console.log('🎯 Produto específico:', specificProductSearchTerms);
+    console.log('🔢 Números solicitados:', requestedNumbers);
     
     // Buscar produtos de forma mais específica
     let productsQuery = supabase
@@ -360,12 +369,17 @@ MEMÓRIA DE PRODUTO ESCOLHIDO:
 DETECÇÃO DE FOTOS:
 Usuário pediu fotos: ${wantsPhotos}
 
-COMPORTAMENTO HUMANO AVANÇADO:
-- Se cliente pergunta "fones pro6" e não temos, seja honesto e ofereça alternativas similares
-- Se cliente pergunta sobre stock, seja específico sobre o que tem
-- Se cliente quer algo que não existe, sugira o mais próximo com explicação
-- Use linguagem natural: "Olha, esse modelo específico não temos, mas tenho aqui uns que são parecidos..."
-- Faça perguntas quando não tiver certeza: "Quando diz 'pro6', está a falar de que marca?"
+REGRAS CRÍTICAS PARA MÚLTIPLOS PRODUTOS:
+- Se cliente menciona vários produtos (ex: "pro6 e t19"), verifique TODOS na lista acima
+- NUNCA diga que não tem um produto se ele está listado acima
+- Se cliente quer múltiplos produtos, confirme TODOS os que estão disponíveis
+- Se algum não está disponível, seja específico sobre qual não tem
+
+INSTRUÇÃO ESPECIAL PARA SELEÇÃO MÚLTIPLA:
+- Cliente mencionou os termos: ${specificProductSearchTerms.join(', ')}
+- Procure CADA UM desses termos na lista de produtos acima
+- Confirme TODOS os produtos que EXISTEM na lista
+- Se algum não existir, seja honesto sobre esse específico
 
 PROCESSO DE VENDA HUMANIZADO:
 - Se cliente quer comprar algo, explique: "Óptimo! Para confirmar a sua compra, preciso só de alguns dados..."
