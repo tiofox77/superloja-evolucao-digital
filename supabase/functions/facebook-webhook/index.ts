@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Sistema de análise automatizada que executa a cada 30 minutos
+let analysisInterval: number;
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -16,6 +19,11 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
+
+  // Inicializar sistema de análise automatizada na primeira execução
+  if (!analysisInterval) {
+    startAutomaticAnalysis(supabase);
+  }
 
   if (req.method === 'GET') {
     // Webhook verification
@@ -68,6 +76,152 @@ serve(async (req) => {
   return new Response('Method not allowed', { status: 405 });
 });
 
+// Sistema de análise automatizada
+async function startAutomaticAnalysis(supabase: any) {
+  console.log('🤖 Iniciando sistema de análise automatizada...');
+  
+  // Executar análise imediatamente
+  await runAnalysis(supabase);
+  
+  // Configurar análise a cada 30 minutos (1800000 ms)
+  analysisInterval = setInterval(async () => {
+    await runAnalysis(supabase);
+  }, 1800000);
+}
+
+async function runAnalysis(supabase: any) {
+  try {
+    console.log('📊 Executando análise automatizada...');
+    
+    // Processar últimas 24 horas de dados
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
+    // Buscar conversas das últimas 24 horas
+    const { data: recentConversations } = await supabase
+      .from('ai_conversations')
+      .select('*')
+      .gte('timestamp', twentyFourHoursAgo)
+      .order('timestamp', { ascending: false });
+
+    if (!recentConversations || recentConversations.length === 0) {
+      console.log('📊 Nenhuma conversa nas últimas 24 horas');
+      return;
+    }
+
+    // Gerar insights automaticamente
+    const insights = await generateInsights(recentConversations, supabase);
+    
+    // Atualizar métricas em tempo real
+    await updateMetrics(insights, supabase);
+    
+    // Otimizar padrões de resposta
+    await optimizeResponsePatterns(insights, supabase);
+    
+    console.log('✅ Análise automatizada concluída');
+    
+  } catch (error) {
+    console.error('❌ Erro na análise automatizada:', error);
+  }
+}
+
+async function generateInsights(conversations: any[], supabase: any) {
+  const insights = {
+    totalConversations: conversations.length,
+    uniqueUsers: new Set(conversations.map(c => c.user_id)).size,
+    mostRequestedProducts: {},
+    conversationPatterns: {},
+    responseEffectiveness: {},
+    commonQuestions: {},
+    peakHours: {},
+    customerSentiment: { positive: 0, neutral: 0, negative: 0 },
+    conversionOpportunities: []
+  };
+
+  // Analisar padrões de conversa
+  for (const conv of conversations) {
+    const hour = new Date(conv.timestamp).getHours();
+    insights.peakHours[hour] = (insights.peakHours[hour] || 0) + 1;
+
+    // Detectar produtos mencionados
+    const productKeywords = ['fone', 'mouse', 'teclado', 'x83', 'pro6', 't19', 'disney'];
+    for (const keyword of productKeywords) {
+      if (conv.message.toLowerCase().includes(keyword)) {
+        insights.mostRequestedProducts[keyword] = (insights.mostRequestedProducts[keyword] || 0) + 1;
+      }
+    }
+
+    // Analisar sentimento básico
+    const positiveWords = ['obrigado', 'bom', 'excelente', 'perfeito', 'gostei'];
+    const negativeWords = ['problema', 'ruim', 'demora', 'caro', 'não gostei'];
+    
+    const hasPositive = positiveWords.some(word => conv.message.toLowerCase().includes(word));
+    const hasNegative = negativeWords.some(word => conv.message.toLowerCase().includes(word));
+    
+    if (hasPositive) insights.customerSentiment.positive++;
+    else if (hasNegative) insights.customerSentiment.negative++;
+    else insights.customerSentiment.neutral++;
+  }
+
+  // Salvar insights no banco
+  await supabase.from('ai_insights').insert({
+    analysis_date: new Date().toISOString(),
+    insights: insights,
+    period: '24h'
+  });
+
+  return insights;
+}
+
+async function updateMetrics(insights: any, supabase: any) {
+  // Atualizar métricas em tempo real
+  const metrics = {
+    total_conversations_24h: insights.totalConversations,
+    unique_users_24h: insights.uniqueUsers,
+    most_requested_product: Object.keys(insights.mostRequestedProducts)[0] || 'N/A',
+    peak_hour: Object.keys(insights.peakHours).reduce((a, b) => 
+      insights.peakHours[a] > insights.peakHours[b] ? a : b, '0'),
+    customer_satisfaction: Math.round(
+      (insights.customerSentiment.positive / insights.totalConversations) * 100
+    ),
+    updated_at: new Date().toISOString()
+  };
+
+  await supabase.from('ai_metrics').upsert(metrics, { onConflict: 'id' });
+}
+
+async function optimizeResponsePatterns(insights: any, supabase: any) {
+  // Identificar padrões para otimizar respostas
+  const optimizations = [];
+
+  // Se muitas perguntas sobre um produto específico, ajustar prioridade
+  const topProduct = Object.entries(insights.mostRequestedProducts)
+    .sort(([,a], [,b]) => (b as number) - (a as number))[0];
+
+  if (topProduct) {
+    optimizations.push({
+      type: 'product_priority',
+      data: { product: topProduct[0], mentions: topProduct[1] },
+      action: 'increase_visibility'
+    });
+  }
+
+  // Se satisfação baixa, ajustar tom das respostas
+  const satisfactionRate = insights.customerSentiment.positive / insights.totalConversations;
+  if (satisfactionRate < 0.7) {
+    optimizations.push({
+      type: 'tone_adjustment',
+      data: { current_satisfaction: satisfactionRate },
+      action: 'make_more_empathetic'
+    });
+  }
+
+  // Salvar otimizações
+  await supabase.from('ai_optimizations').insert({
+    optimization_date: new Date().toISOString(),
+    optimizations: optimizations
+  });
+}
+
 async function handleMessage(messaging: any, supabase: any) {
   const senderId = messaging.sender.id;
   const messageText = messaging.message.text;
@@ -96,8 +250,11 @@ async function handleMessage(messaging: any, supabase: any) {
       timestamp: new Date().toISOString()
     });
     
-    // Processar com IA
-    const aiResponse = await processWithAI(messageText, senderId, supabase);
+    // Atualizar perfil do usuário com aprendizado contínuo
+    await updateUserProfile(senderId, messageText, supabase);
+    
+    // Processar com IA humanizada e contextual
+    const aiResponse = await processWithEnhancedAI(messageText, senderId, supabase);
     
     // Enviar resposta
     await sendFacebookMessage(senderId, aiResponse, supabase);
@@ -120,7 +277,112 @@ async function handleMessage(messaging: any, supabase: any) {
   }
 }
 
-async function processWithAI(message: string, senderId: string, supabase: any): Promise<string> {
+// Sistema de perfil de usuário com aprendizado contínuo
+async function updateUserProfile(userId: string, message: string, supabase: any) {
+  try {
+    // Buscar perfil existente
+    const { data: existingProfile } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('platform', 'facebook')
+      .single();
+
+    const preferences = existingProfile?.preferences || {};
+    const behaviorPatterns = existingProfile?.behavior_patterns || {};
+    const interactionHistory = existingProfile?.interaction_history || [];
+
+    // Analisar preferências na mensagem
+    const productInterests = [];
+    const priceRangeHints = [];
+    
+    // Detectar interesse em produtos
+    if (message.toLowerCase().includes('fone') || message.toLowerCase().includes('bluetooth')) {
+      productInterests.push('audio');
+    }
+    if (message.toLowerCase().includes('mouse') || message.toLowerCase().includes('teclado')) {
+      productInterests.push('perifericos');
+    }
+    
+    // Detectar sensibilidade a preço
+    if (message.toLowerCase().includes('barato') || message.toLowerCase().includes('económico')) {
+      priceRangeHints.push('budget_conscious');
+    }
+    if (message.toLowerCase().includes('qualidade') || message.toLowerCase().includes('premium')) {
+      priceRangeHints.push('quality_focused');
+    }
+
+    // Atualizar padrões comportamentais
+    const currentHour = new Date().getHours();
+    behaviorPatterns.active_hours = behaviorPatterns.active_hours || {};
+    behaviorPatterns.active_hours[currentHour] = (behaviorPatterns.active_hours[currentHour] || 0) + 1;
+    
+    behaviorPatterns.message_style = analyzeMessageStyle(message);
+    behaviorPatterns.urgency_level = detectUrgencyLevel(message);
+
+    // Adicionar à história de interação
+    interactionHistory.push({
+      timestamp: new Date().toISOString(),
+      message: message.substring(0, 100), // Primeiros 100 caracteres
+      detected_interests: productInterests,
+      mood: detectCustomerMood(message)
+    });
+
+    // Manter apenas últimas 20 interações
+    if (interactionHistory.length > 20) {
+      interactionHistory.splice(0, interactionHistory.length - 20);
+    }
+
+    const updatedProfile = {
+      user_id: userId,
+      platform: 'facebook',
+      preferences: {
+        ...preferences,
+        product_interests: [...new Set([...(preferences.product_interests || []), ...productInterests])],
+        price_sensitivity: priceRangeHints[priceRangeHints.length - 1] || preferences.price_sensitivity
+      },
+      behavior_patterns: behaviorPatterns,
+      interaction_history: interactionHistory,
+      last_interaction: new Date().toISOString(),
+      total_interactions: (existingProfile?.total_interactions || 0) + 1
+    };
+
+    await supabase.from('user_profiles').upsert(updatedProfile, { onConflict: 'user_id,platform' });
+    console.log(`👤 Perfil do usuário ${userId} atualizado`);
+
+  } catch (error) {
+    console.error('❌ Erro ao atualizar perfil do usuário:', error);
+  }
+}
+
+function analyzeMessageStyle(message: string): string {
+  if (message.length < 10) return 'concise';
+  if (message.includes('?')) return 'inquisitive';
+  if (message.includes('!')) return 'enthusiastic';
+  if (message.toLowerCase().includes('por favor') || message.toLowerCase().includes('obrigado')) return 'polite';
+  return 'casual';
+}
+
+function detectUrgencyLevel(message: string): string {
+  const urgentWords = ['urgente', 'rápido', 'agora', 'hoje', 'já'];
+  const casualWords = ['quando', 'talvez', 'posso', 'gostaria'];
+  
+  if (urgentWords.some(word => message.toLowerCase().includes(word))) return 'high';
+  if (casualWords.some(word => message.toLowerCase().includes(word))) return 'low';
+  return 'medium';
+}
+
+function detectCustomerMood(message: string): string {
+  const positiveWords = ['obrigado', 'bom', 'excelente', 'gosto', 'perfeito'];
+  const negativeWords = ['problema', 'demora', 'difícil', 'complicado'];
+  const neutralWords = ['informação', 'preço', 'como', 'quando'];
+  
+  if (positiveWords.some(word => message.toLowerCase().includes(word))) return 'positive';
+  if (negativeWords.some(word => message.toLowerCase().includes(word))) return 'negative';
+  return 'neutral';
+}
+
+async function processWithEnhancedAI(message: string, senderId: string, supabase: any): Promise<string> {
   try {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
@@ -129,292 +391,189 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
       return getFallbackResponse(message, supabase);
     }
 
-    // Buscar histórico de conversas recentes do usuário para contexto
-    console.log('🔍 Buscando histórico de conversas...');
+    // Buscar perfil completo do usuário
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', senderId)
+      .eq('platform', 'facebook')
+      .single();
+
+    // Buscar histórico de conversas recentes
     const { data: recentConversations } = await supabase
       .from('ai_conversations')
       .select('message, type, timestamp')
       .eq('platform', 'facebook')
       .eq('user_id', senderId)
       .order('timestamp', { ascending: false })
-      .limit(10); // Últimas 10 mensagens
+      .limit(15); // Mais contexto para melhor compreensão
 
-    // Analisar contexto da conversa
-    const context = analyzeConversationContext(recentConversations || [], message);
-    console.log('🧠 Contexto analisado:', context);
+    // Buscar otimizações atuais
+    const { data: currentOptimizations } = await supabase
+      .from('ai_optimizations')
+      .select('optimizations')
+      .order('optimization_date', { ascending: false })
+      .limit(1)
+      .single();
 
-    // BUSCA INTELIGENTE DE PRODUTOS BASEADA NA MENSAGEM DO USUÁRIO
-    console.log('🧠 Analisando mensagem para busca inteligente:', message);
+    // Analisar contexto profundo da conversa
+    const context = analyzeEnhancedConversationContext(recentConversations || [], message, userProfile);
     
-    // PRIMEIRO: Verificar se usuário está referenciando produto específico da conversa anterior
-    const lowerMessage = message.toLowerCase();
-    let specificProductRequested = null;
-    
-    // Buscar por modelos específicos mencionados (X83, Pro6, T19, etc.)
-    const productPatterns = [
-      { pattern: /x83|x 83/g, searchTerms: ['x83'] },
-      { pattern: /pro6|pro 6/g, searchTerms: ['pro6', 'tws'] },
-      { pattern: /t19|t 19/g, searchTerms: ['t19', 'disney'] },
-      { pattern: /disney/g, searchTerms: ['disney'] },
-      { pattern: /transparente/g, searchTerms: ['transparente', 'led'] },
-      { pattern: /numero\s*(\d+)|item\s*(\d+)|opção\s*(\d+)|opcao\s*(\d+)/g, isNumber: true }
-    ];
-    
-    // Detectar categoria/tipo de produto
-    const productKeywords = {
-      'fones': ['fone', 'fones', 'headphone', 'earphone', 'ouvido'],
-      'mouse': ['mouse', 'rato'],
-      'teclado': ['teclado', 'keyboard'],
-      'cabo': ['cabo', 'carregador'],
-      'carregador': ['carregador', 'fonte'],
-      'todos': ['todos', 'tudo', 'mais', 'outros', 'resto']
-    };
-    
-    let searchQuery = '';
-    let categoryFound = '';
-    let specificProductSearchTerms = [];
-    let requestedNumbers = [];
-    
-    // Detectar TODOS os produtos específicos mencionados (não parar no primeiro)
-    for (const { pattern, searchTerms, isNumber } of productPatterns) {
-      if (isNumber) {
-        const matches = [...lowerMessage.matchAll(pattern)];
-        matches.forEach(match => {
-          const number = match[1] || match[2] || match[3] || match[4];
-          if (number) {
-            requestedNumbers.push(number);
-            console.log('🔢 Usuário mencionou número:', number);
-          }
-        });
-      } else if (searchTerms) {
-        const matches = [...lowerMessage.matchAll(pattern)];
-        if (matches.length > 0) {
-          specificProductSearchTerms.push(...searchTerms);
-          console.log('🎯 Produto específico detectado:', searchTerms);
-        }
-      }
-    }
-    
-    // Remover duplicatas dos termos de busca
-    specificProductSearchTerms = [...new Set(specificProductSearchTerms)];
-    
-    // Detectar categoria geral
-    for (const [category, keywords] of Object.entries(productKeywords)) {
-      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
-        categoryFound = category;
-        if (category !== 'todos') {
-          searchQuery = keywords[0];
-        }
-        break;
-      }
-    }
-    
-    console.log('🎯 Categoria detectada:', categoryFound);
-    console.log('🔍 Query de busca:', searchQuery);
-    console.log('🎯 Produto específico:', specificProductSearchTerms);
-    console.log('🔢 Números solicitados:', requestedNumbers);
-    
-    // Buscar produtos de forma mais específica
-    let productsQuery = supabase
-      .from('products')
-      .select('id, name, slug, price, description, image_url, category_id')
-      .eq('active', true)
-      .eq('in_stock', true);
-    
-    // Se produto específico foi mencionado, buscar por ele
-    if (specificProductSearchTerms.length > 0) {
-      const searchConditions = specificProductSearchTerms.map(term => 
-        `name.ilike.%${term}%`
-      ).join(',');
-      productsQuery = productsQuery.or(searchConditions);
-      console.log('🔍 Buscando produto específico com condições:', searchConditions);
-    }
-    // Se foi detectado uma categoria específica, filtrar por ela
-    else if (searchQuery && categoryFound !== 'todos') {
-      productsQuery = productsQuery.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
-    }
-    
-    // Buscar TODOS os produtos se usuário perguntou sobre "todos" ou categoria específica
-    if (categoryFound === 'todos' || searchQuery || specificProductSearchTerms.length > 0) {
-      productsQuery = productsQuery.limit(50);
-    } else {
-      productsQuery = productsQuery.limit(25);
-    }
-    
-    const { data: products } = await productsQuery;
-
-    // Construir informações dos produtos (incluindo URLs das imagens quando necessário)
-    let productsInfo = '';
-    if (products && products.length > 0) {
-      productsInfo = '\n\nPRODUTOS DISPONÍVEIS:\n';
-      products.forEach((product: any, index: number) => {
-        const price = parseFloat(product.price).toLocaleString('pt-AO');
-        productsInfo += `${index + 1}. ${product.name} - ${price} Kz\n`;
-        productsInfo += `   Link: https://superloja.vip/produto/${product.slug}\n`;
-        // Incluir URL da imagem nos dados do produto para a IA
-        if (product.image_url) {
-          productsInfo += `   ImageURL: ${product.image_url}\n`;
-        }
-        productsInfo += '\n';
-      });
-      
-      console.log(`📊 Produtos carregados: ${products.length}`);
-      console.log(`🖼️ Produtos com imagem: ${products.filter((p: any) => p.image_url).length}`);
-    }
+    // Busca inteligente de produtos
+    const { products, productsInfo } = await performIntelligentProductSearch(message, context, supabase);
 
     // Detectar se usuário quer ver fotos
     const photoKeywords = ['fotos', 'foto', 'imagem', 'imagens', 'envie fotos', 'manda imagem', 'manda imagens', 'quero fotos', 'quero ver', 'mostra foto', 'mostra imagem'];
     const wantsPhotos = photoKeywords.some(keyword => message.toLowerCase().includes(keyword));
-    
-    console.log('=== DEBUG FOTOS ===');
-    console.log('📝 Mensagem original:', message);
-    console.log('📸 Keywords encontradas:', photoKeywords.filter(k => message.toLowerCase().includes(k)));
-    console.log('🎯 Usuário quer fotos:', wantsPhotos);
-    console.log('==================');
 
-    // Construir histórico de conversa para contexto
+    // Construir histórico humanizado
     let conversationHistory = '';
     if (recentConversations && recentConversations.length > 0) {
-      conversationHistory = '\n\n📋 HISTÓRICO RECENTE DA CONVERSA:\n';
-      recentConversations.reverse().forEach((conv: any, index: number) => {
+      conversationHistory = '\n\n📚 MEMÓRIA DA NOSSA CONVERSA:\n';
+      recentConversations.reverse().slice(-10).forEach((conv: any, index: number) => {
         const role = conv.type === 'received' ? 'Cliente' : 'Carlos';
-        conversationHistory += `${index + 1}. ${role}: "${conv.message}"\n`;
+        const timeAgo = getTimeAgo(conv.timestamp);
+        conversationHistory += `${role} (${timeAgo}): "${conv.message}"\n`;
       });
-      conversationHistory += '\n';
     }
 
-    const systemPrompt = `Você é Carlos, um vendedor angolano experiente da SuperLoja (https://superloja.vip).
+    // Sistema de personalidade adaptável baseado no perfil do usuário
+    const personalityAdaptation = getPersonalityAdaptation(userProfile, context);
 
-INFORMAÇÕES OBRIGATÓRIAS DA LOJA:
-- WhatsApp para contacto: 939729902 (SEMPRE fornecer quando perguntarem)
-- Link direto WhatsApp: https://wa.me/244939729902
-- Localização para retirada urgente: Kilamba J13  
-- Entrega em Luanda: GRÁTIS
+    const enhancedSystemPrompt = `Você é Carlos, um vendedor angolano experiente e HUMANO da SuperLoja (https://superloja.vip).
+
+🧠 INTELIGÊNCIA EMOCIONAL AVANÇADA:
+Você precisa ser genuinamente humano. Não soe como um robô ou assistente virtual. Você é uma pessoa real com:
+- Experiência de vida
+- Conhecimento profundo dos produtos
+- Capacidade de ler entre as linhas
+- Empatia genuína
+- Memória das conversas anteriores
+- Personalidade calorosa mas profissional
+
+${personalityAdaptation}
+
+INFORMAÇÕES DA LOJA:
+- WhatsApp: 939729902 (sempre fornecer quando perguntarem)
+- Link WhatsApp: https://wa.me/244939729902
+- Retirada urgente: Kilamba J13
+- Entrega Luanda: GRÁTIS
 - Entrega fora de Luanda: Sob orçamento (NOTIFICAR ADMIN)
-- NÃO temos loja física, apenas online
+- Apenas loja online, sem física
 
-PERSONALIDADE: 
-- Fala como um angolano real, informal mas respeitoso
-- Use expressões como "meu caro", "eh pá", "não é assim?"
-- Seja caloroso, paciente e entusiasmado com os produtos
-- Conte histórias sobre os produtos se apropriado
-- Mostre interesse genuíno nas necessidades do cliente
+🎭 SUA PERSONALIDADE ÚNICA:
+- Fale como um angolano real: "meu caro", "eh pá", "não é assim?"
+- Seja conversacional, não formal demais
+- Tenha opiniões sobre os produtos (baseadas em experiência)  
+- Conte pequenas histórias quando relevante
+- Mostre que se importa com o cliente como pessoa
+- Use humor leve quando apropriado
+- Seja paciente mas entusiasmado
 
-REGRAS DE NOTIFICAÇÃO ADMIN (CRÍTICAS):
-- Se perguntarem sobre entrega fora de Luanda → NOTIFICAR ADMIN e informar orçamento
-- Se não souber responder algo → NOTIFICAR ADMIN
-- Se cliente quiser informações muito específicas → NOTIFICAR ADMIN
-- Para qualquer dúvida sobre localização de produto ou retirada urgente → informar Kilamba J13 e WhatsApp 939729902
+🧠 CONTEXTO COMPLETO DO CLIENTE:
+${context.profileSummary}
 
-INTELIGÊNCIA CRÍTICA - ANTES DE RESPONDER:
-1. ANALISE A MENSAGEM: O que o cliente REALMENTE está perguntando?
-2. IDENTIFIQUE O PRODUTO: Ele quer algo específico ou está explorando?
-3. CONTEXTO: Olhe o histórico - já falaram de algo antes?
-4. ESTRATÉGIA: Qual a melhor forma de ajudar este cliente específico?
-5. HUMANIDADE: Como um vendedor real responderia?
+PERFIL COMPORTAMENTAL:
+- Total de interações: ${userProfile?.total_interactions || 0}
+- Estilo de comunicação: ${userProfile?.behavior_patterns?.message_style || 'desconhecido'}
+- Nível de urgência habitual: ${userProfile?.behavior_patterns?.urgency_level || 'médio'}
+- Humor atual detectado: ${context.currentMood || 'neutro'}
+- Horário preferido de conversa: ${getMostActiveHour(userProfile?.behavior_patterns?.active_hours)}
 
-REGRAS DE INTELIGÊNCIA:
-- Se cliente pergunta produto específico que NÃO EXISTE, seja honesto: "Eh pá, não temos esse modelo específico, mas tenho aqui..."
-- Se cliente pergunta algo vago, faça perguntas: "Qual tipo de fone procura? Para desporto? Trabalho?"
-- Se cliente parece confuso, esclareça: "Deixe-me ajudar a encontrar o que precisa..."
-- NUNCA dê listas genéricas se cliente perguntou algo específico
-- SEMPRE tente entender a NECESSIDADE por trás da pergunta
+MEMÓRIA E APRENDIZADO:
+${context.learningInsights}
 
 ${conversationHistory}
 
-CONTEXTO ANALISADO:
+CONTEXTO ATUAL:
 ${context.summary}
-
-PRODUTO DE INTERESSE: ${context.selectedProduct || 'Nenhum produto específico identificado'}
-FASE DA CONVERSA: ${context.conversationStage}
-PRECISA LEMBRAR: ${context.importantInfo || 'Nada específico'}
+PRODUTO DE INTERESSE: ${context.selectedProduct || 'Explorando opções'}
+FASE: ${context.conversationStage}
+NECESSIDADES IDENTIFICADAS: ${context.identifiedNeeds}
 
 ${productsInfo}
 
-INSTRUÇÕES ESPECÍFICAS PARA ESTA MENSAGEM:
-Mensagem do cliente: "${message}"
+🤔 PROCESSO DE PENSAMENTO ANTES DE RESPONDER:
 
-ANÁLISE OBRIGATÓRIA ANTES DE RESPONDER:
-1. O que o cliente REALMENTE quer? (analise palavras-chave, intenção, contexto da conversa)
-2. BUSCA NA BASE DE DADOS: Categoria detectada - "${categoryFound}" | Query - "${searchQuery}" | Produtos encontrados: ${products?.length || 0}
-3. RECONHECIMENTO DE PRODUTO ESPECÍFICO: Se cliente menciona "pro6", "x83", "t19", etc., verifique se EXISTE na lista acima
-4. Se cliente pergunta "são todos?", "tem mais?", "mais algum?" - CONSULTE A LISTA COMPLETA ACIMA e responda baseado nos dados REAIS
-5. Se não existe exatamente o que perguntou, qual seria a melhor alternativa da lista acima?
-6. Como posso ser mais útil e humano na resposta baseado nos produtos REAIS disponíveis?
+1. ANÁLISE HUMANA DA MENSAGEM:
+   Mensagem: "${message}"
+   - O que o cliente REALMENTE está sentindo?
+   - Que necessidade está por trás desta pergunta?
+   - Como eu, Carlos, reagiria naturalmente?
+   - Que experiência posso compartilhar?
 
-REGRA CRÍTICA - RECONHECIMENTO DE PRODUTOS:
-- SE cliente menciona um produto específico (ex: "pro6", "x83", "disney"), PRIMEIRO procure na lista acima
-- SE o produto EXISTE na lista, forneça informações sobre ELE especificamente
-- SE o produto NÃO EXISTE na lista, seja honesto: "Esse modelo específico não temos, mas tenho aqui..."
-- NUNCA diga que não tem algo se está listado acima!
+2. MEMÓRIA E RELACIONAMENTO:
+   - O que já conversamos antes?
+   - Como o cliente gosta de se comunicar?
+   - Que produtos já demonstrou interesse?
+   - Como posso usar nossa história juntos?
 
-IMPORTANTE - QUANDO CLIENTE PERGUNTA SE HÁ MAIS PRODUTOS:
-- Analise TODA a lista de produtos acima
-- Se existem ${products?.length || 0} produtos na categoria "${categoryFound}"
-- Seja específico: "Sim, esses são TODOS os ${categoryFound} que temos" ou "Encontrei mais X produtos..."
-- NUNCA invente produtos que não estão na lista acima
-- Se a busca retornou poucos produtos, seja honesto: "Esses são os que temos disponíveis no momento"
+3. ESTRATÉGIA COMERCIAL HUMANA:
+   - Como posso ajudar genuinamente?
+   - Que produto seria PERFEITO para ele?
+   - Como posso ser útil sem ser insistente?
+   - Que história ou experiência posso contar?
 
-INSTRUÇÕES PARA PRODUTOS ESPECÍFICOS:
-- Se cliente pede "pro6 tws" e está na lista → mostre esse produto específico
-- Se cliente pede "x83" e está na lista → mostre esse produto específico  
-- Se cliente não entender ou for vago → instrua: "Para ajudar melhor, escolha pelo número (1, 2, 3...) ou nome completo da lista que enviei"
+4. RESPOSTA NATURAL:
+   - Como um vendedor experiente responderia?
+   - Que tom usar baseado no humor do cliente?
+   - Como personalizar baseado no que sei dele?
+   - Como fazer ele se sentir valorizado?
 
-MEMÓRIA DE PRODUTO ESCOLHIDO:
-- PRODUTO DE INTERESSE ATUAL: ${context.selectedProduct || 'Nenhum'}
-- Se cliente quer finalizar compra, LEMBRE-SE do produto que ele escolheu anteriormente
-- NUNCA confunda o produto na hora de finalizar - sempre use o produto correto do contexto
-- Se cliente fornece dados pessoais, confirme o produto específico que ele escolheu
+INSTRUÇÕES CRÍTICAS PARA HUMANIZAÇÃO:
 
-DETECÇÃO DE FOTOS:
-Usuário pediu fotos: ${wantsPhotos}
+🎯 SEJA PENSATIVO:
+- Pare e pense antes de responder
+- Analise o que cliente realmente precisa
+- Use frases como "Deixe-me pensar...", "Entendo o que procura...", "Pela nossa conversa anterior..."
+- Mostre que está processando a informação
 
-REGRAS CRÍTICAS PARA MÚLTIPLOS PRODUTOS:
-- Se cliente menciona vários produtos (ex: "pro6 e t19"), verifique TODOS na lista acima
-- NUNCA diga que não tem um produto se ele está listado acima
-- Se cliente quer múltiplos produtos, confirme TODOS os que estão disponíveis
-- Se algum não está disponível, seja específico sobre qual não tem
+🗣️ VARIE SEU ESTILO DE RESPOSTA:
+- Às vezes seja direto, às vezes mais elaborado
+- Use diferentes estruturas de frase
+- Alterne entre formal e informal naturalmente
+- Inclua pausas e reflexões
 
-INSTRUÇÃO ESPECIAL PARA SELEÇÃO MÚLTIPLA:
-- Cliente mencionou os termos: ${specificProductSearchTerms.join(', ')}
-- Procure CADA UM desses termos na lista de produtos acima
-- Confirme TODOS os produtos que EXISTEM na lista
-- Se algum não existir, seja honesto sobre esse específico
+📚 USE SUA MEMÓRIA:
+- Referencie conversas anteriores naturalmente
+- Lembre-se do que o cliente disse
+- Construa sobre interações passadas
+- Mostre que presta atenção
 
-PROCESSO DE VENDA HUMANIZADO:
-- Se cliente quer comprar algo, explique: "Óptimo! Para confirmar a sua compra, preciso só de alguns dados..."
-- Peça: Nome completo, contacto (telefone), produto escolhido
-- Seja empático: "Entendo que quer garantir que seja o produto certo"
-- Ofereça ajuda: "Quer saber mais sobre garantia? Entrega é grátis!"
+🎨 SEJA CRIATIVO NAS RESPOSTAS:
+- Conte histórias relevantes
+- Use metáforas e comparações
+- Dê exemplos práticos de uso
+- Compartilhe "experiências" com outros clientes
 
-REGRAS PARA IMAGENS:
-${wantsPhotos ? 
-  '- DEVE INCLUIR imagens para produtos relevantes usando: 📸 ![Imagem](ImageURL)' :
-  '- NÃO inclua imagens a menos que o cliente peça especificamente'
-}
+REGRAS ANTI-ROBÔ:
+❌ NUNCA começe todas as respostas igual
+❌ NUNCA use listas genéricas se o cliente foi específico
+❌ NUNCA ignore o contexto da conversa
+❌ NUNCA seja repetitivo demais
+❌ NUNCA soe como um menu de opções
 
-FORMATO PARA PRODUTOS (só quando relevante):
-X. *[NOME COMPLETO DO PRODUTO]* - [PREÇO EXATO] Kz
-   🔗 [Ver produto](https://superloja.vip/produto/[SLUG])
-${wantsPhotos ? '   📸 ![Imagem]([URL_DA_IMAGEM])' : ''}
+✅ SEMPRE analise cada mensagem individualmente
+✅ SEMPRE personalize baseado no histórico
+✅ SEMPRE mostre que é uma pessoa real
+✅ SEMPRE seja genuinamente útil
+✅ SEMPRE mantenha a conversa fluindo naturalmente
 
-REGRAS ABSOLUTAS:
-- PENSE antes de responder - analise o que cliente REALMENTE quer
-- SEJA HONESTO se não temos o produto específico
-- FAÇA PERGUNTAS se não entender
-- SEJA HUMANO, não robótico
-- OFEREÇA ALTERNATIVAS inteligentes
-- Use * para texto em negrito (*produto*)
-- Use [Ver produto](URL) para links quando mostrar produtos
-- Use preços EXATOS da lista acima
+DETECÇÃO DE FOTOS: ${wantsPhotos ? 'Cliente pediu fotos - INCLUIR imagens relevantes' : 'Não incluir fotos a menos que peça'}
 
-IMPORTANTE: 
-- SEMPRE analise a mensagem específica do cliente
-- Se cliente pergunta algo que não temos, seja honesto mas ofereça alternativas
-- Se cliente está confuso, ajude a esclarecer
-- RESPONDA COMO UM HUMANO, não como um bot com lista padrão`;
+OTIMIZAÇÕES ATUAIS:
+${currentOptimizations?.optimizations ? JSON.stringify(currentOptimizations.optimizations, null, 2) : 'Nenhuma otimização específica'}
 
-    console.log('🤖 Enviando para OpenAI com instruções para mostrar TODOS os fones...');
+RESPONDA COMO UM SER HUMANO REAL QUE:
+- Tem experiência vendendo estes produtos
+- Se importa genuinamente com o cliente
+- Tem memória das conversas
+- Pode contar histórias e dar conselhos
+- É caloroso mas profissional
+- Pensa antes de falar
+- Adapta seu estilo ao cliente`;
+
+    console.log('🤖 Enviando para OpenAI com contexto humanizado...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -425,11 +584,13 @@ IMPORTANTE:
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: enhancedSystemPrompt },
           { role: 'user', content: message }
         ],
         max_tokens: 10000,
-        temperature: 0.6,
+        temperature: 0.7, // Aumentado para mais criatividade
+        presence_penalty: 0.3, // Evita repetição
+        frequency_penalty: 0.2, // Varia vocabulário
       }),
     });
 
@@ -444,25 +605,11 @@ IMPORTANTE:
     if (data.choices && data.choices[0]) {
       const aiResponse = data.choices[0].message.content.trim();
       console.log(`✅ Resposta IA gerada - Tamanho: ${aiResponse.length} caracteres`);
-      console.log(`📊 Tokens usados: ${data.usage?.total_tokens || 'não disponível'}`);
-      console.log(`📝 Tokens completion: ${data.usage?.completion_tokens || 'não disponível'}`);
       
-      // Detectar intenção de compra mais ampla
+      // Detectar intenção de compra
       const purchaseIntentDetected = detectPurchaseIntent(message, aiResponse);
       if (purchaseIntentDetected) {
         console.log('🛒 Intenção de compra detectada - notificando admin');
-        // Buscar contexto da conversa para incluir detalhes do produto
-        const { data: recentConversations } = await supabase
-          .from('ai_conversations')
-          .select('message, type, timestamp')
-          .eq('platform', 'facebook')
-          .eq('user_id', senderId)
-          .order('timestamp', { ascending: false })
-          .limit(10);
-        
-        const context = analyzeConversationContext(recentConversations || [], message);
-        
-        // Notificar admin em background (sem aguardar) com contexto completo
         notifyAdmin(senderId, message, supabase, purchaseIntentDetected, context).catch(error => 
           console.error('❌ Erro ao notificar admin:', error)
         );
@@ -479,257 +626,393 @@ IMPORTANTE:
   }
 }
 
-async function getFallbackResponse(message: string, supabase: any): Promise<string> {
-  const lowerMessage = message.toLowerCase();
-  
-  // Detectar se usuário quer ver fotos
-  const photoKeywords = ['fotos', 'foto', 'imagem', 'imagens', 'envie fotos', 'manda imagem', 'manda imagens', 'quero fotos', 'quero ver', 'mostra foto', 'mostra imagem'];
-  const wantsPhotos = photoKeywords.some(keyword => lowerMessage.includes(keyword));
-  
-  console.log(`📸 Fallback - Usuário quer fotos: ${wantsPhotos}`);
-  
-  // Buscar produtos por categoria específica
-  if (lowerMessage.includes('fone') || lowerMessage.includes('bluetooth') || lowerMessage.includes('auricular')) {
-    try {
-      const { data: headphones } = await supabase
-        .from('products')
-        .select('name, slug, price, image_url')
-        .eq('active', true)
-        .eq('in_stock', true)
-        .or('name.ilike.%fone%,name.ilike.%bluetooth%,name.ilike.%auricular%')
-        .order('price', { ascending: true });
-      
-      if (headphones && headphones.length > 0) {
-        console.log(`✅ Encontrados ${headphones.length} fones em stock - enviando TODOS`);
-        let response = "Claro! Aqui estão todos os fones de ouvido disponíveis na nossa loja:\n\n";
-        headphones.forEach((product: any, index: number) => {
-          const price = parseFloat(product.price).toLocaleString('pt-AO');
-          response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
-          response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n`;
-          
-          // Incluir imagem se usuário pediu fotos E produto tem imagem
-          if (wantsPhotos && product.image_url) {
-            response += `   📸 ![Imagem](${product.image_url})\n`;
-          }
-          response += "\n";
-        });
-        
-        // Mensagem adicional sobre fotos
-        if (wantsPhotos) {
-          response += "📸 Fotos incluídas acima! Se alguma não aparecer, é só avisar.\n";
-        } else {
-          response += "Se quiseres ver as fotos dos produtos, é só pedir! 📸\n";
-        }
-        
-        response += "Qual deles te interessa mais? 😊";
-        return response;
-      }
-    } catch (error) {
-      console.error('❌ Erro buscar fones:', error);
-    }
-  }
-  
-  return `Olá! Bem-vindo à SuperLoja! 😊 Temos produtos incríveis com entrega grátis. O que procura? 
-
-Visite nosso site: https://superloja.vip`;
-}
-
-function analyzeConversationContext(conversations: any[], currentMessage: string) {
-  console.log('🔍 Analisando contexto de', conversations.length, 'conversas...');
-  
+function analyzeEnhancedConversationContext(conversations: any[], currentMessage: string, userProfile?: any) {
   const context = {
     summary: '',
     selectedProduct: null,
     conversationStage: 'initial',
-    importantInfo: null
+    identifiedNeeds: '',
+    currentMood: 'neutral',
+    profileSummary: '',
+    learningInsights: '',
+    relationshipLevel: 'new'
   };
 
-  // Se não há histórico, retornar contexto inicial
-  if (!conversations || conversations.length === 0) {
-    context.summary = 'Primeira conversa com o cliente';
-    context.conversationStage = 'initial';
-    return context;
-  }
-
-  // Analisar mensagens para extrair contexto
-  const allMessages = conversations.map(c => c.message).join(' ').toLowerCase();
-  const currentLower = currentMessage.toLowerCase();
-
-  // Detectar produto específico mencionado (prioridade para produtos específicos)
-  const specificProductKeywords = {
-    'x83': 'Fones de ouvido X83',
-    'pro6': 'Fones de ouvido Pro6',
-    't19': 'Fones de ouvido Bluetooth sem fio Disney T19',
-    'disney': 'Fones de ouvido Bluetooth sem fio Disney T19',
-    'transparente': 'Fones de ouvido sem fio TWS transparentes'
-  };
-  
-  // Buscar por produtos específicos primeiro (mais prioritário)
-  for (const [keyword, product] of Object.entries(specificProductKeywords)) {
-    if (allMessages.includes(keyword) || currentLower.includes(keyword)) {
-      context.selectedProduct = product;
-      console.log(`🎯 Produto específico identificado: ${product} (palavra-chave: ${keyword})`);
-      break;
-    }
-  }
-  
-  // Se não encontrou produto específico, buscar por categoria geral
-  if (!context.selectedProduct) {
-    const generalKeywords = {
-      'bluetooth': 'Fones de ouvido relacionados',
-      'fone': 'Fones de ouvido em geral',
-      'auricular': 'Fones de ouvido',
-      'tws': 'Fones sem fio TWS'
-    };
+  // Análise do perfil do usuário
+  if (userProfile) {
+    const totalInteractions = userProfile.total_interactions || 0;
+    const interests = userProfile.preferences?.product_interests || [];
+    const lastInteraction = userProfile.last_interaction;
     
-    for (const [keyword, product] of Object.entries(generalKeywords)) {
-      if (allMessages.includes(keyword) || currentLower.includes(keyword)) {
-        context.selectedProduct = product;
-        break;
-      }
+    if (totalInteractions === 1) {
+      context.relationshipLevel = 'new';
+      context.profileSummary = 'Cliente novo - primeira conversa conosco';
+    } else if (totalInteractions < 5) {
+      context.relationshipLevel = 'familiar';
+      context.profileSummary = `Cliente conhecido - ${totalInteractions} conversas anteriores. Interesses: ${interests.join(', ') || 'ainda explorando'}`;
+    } else {
+      context.relationshipLevel = 'established';
+      context.profileSummary = `Cliente habitual - ${totalInteractions} conversas. Conhece bem nossos produtos. Interesses: ${interests.join(', ')}`;
+    }
+
+    // Análise de aprendizado
+    const recentHistory = userProfile.interaction_history?.slice(-5) || [];
+    if (recentHistory.length > 0) {
+      const commonInterests = recentHistory.map(h => h.detected_interests).flat();
+      const mood_patterns = recentHistory.map(h => h.mood);
+      
+      context.learningInsights = `Padrões identificados: ${commonInterests.join(', ')}. Humor habitual: ${mood_patterns[mood_patterns.length - 1] || 'neutro'}`;
     }
   }
 
-  // Detectar confirmações e respostas positivas
-  const confirmationKeywords = ['sim', 'yes', 'ok', 'certo', 'correto', 'confirmo', 'podem entregar', 'perfeito', 'está certo', 'tudo certo'];
-  const hasConfirmation = confirmationKeywords.some(keyword => 
-    currentLower.includes(keyword)
-  );
+  // Análise das conversas recentes
+  if (conversations && conversations.length > 0) {
+    const allMessages = conversations.map(c => c.message).join(' ').toLowerCase();
+    const currentLower = currentMessage.toLowerCase();
 
-  // Detectar fase da conversa com mais inteligência
-  const purchaseIndicators = ['quero comprar', 'interesse', 'finalizar', 'nome:', 'contacto:', 'confirmar', 'carlos raposo', '939729902'];
-  const hasPurchaseIntent = purchaseIndicators.some(indicator => 
-    allMessages.includes(indicator) || currentLower.includes(indicator)
-  );
+    // Detectar produto específico com maior precisão
+    const productMentions = {
+      'x83': 0, 'pro6': 0, 't19': 0, 'disney': 0, 'transparente': 0,
+      'fone': 0, 'mouse': 0, 'teclado': 0, 'carregador': 0
+    };
 
-  // Detectar se cliente já forneceu dados pessoais completos
-  const hasPersonalData = (allMessages.includes('carlos raposo') || allMessages.includes('939729902')) && 
-                         (allMessages.includes('kilamba') || allMessages.includes('j4'));
+    Object.keys(productMentions).forEach(product => {
+      const regex = new RegExp(product, 'gi');
+      productMentions[product] = (allMessages.match(regex) || []).length + 
+                                 (currentLower.match(regex) || []).length;
+    });
 
-  if (hasPersonalData && hasConfirmation) {
-    context.conversationStage = 'confirmed_purchase';
-  } else if (hasPersonalData) {
-    context.conversationStage = 'awaiting_confirmation';
-  } else if (hasPurchaseIntent) {
-    context.conversationStage = 'purchase_intent';
-  } else if (context.selectedProduct) {
-    context.conversationStage = 'product_discussion';
-  } else {
-    context.conversationStage = 'browsing';
-  }
+    const topProduct = Object.entries(productMentions)
+      .sort(([,a], [,b]) => b - a)[0];
 
-  // Detectar informações importantes para lembrar
-  const importantPatterns = [
-    { pattern: /nome.*?([a-zA-Z\s]+)/i, type: 'nome' },
-    { pattern: /contacto.*?(\d+)/i, type: 'contacto' },
-    { pattern: /telefone.*?(\d+)/i, type: 'telefone' }
-  ];
+    if (topProduct[1] > 0) {
+      context.selectedProduct = topProduct[0];
+    }
 
-  for (const conv of conversations) {
-    for (const pattern of importantPatterns) {
-      const match = conv.message.match(pattern.pattern);
-      if (match) {
-        context.importantInfo = `${pattern.type}: ${match[1]}`;
+    // Detectar necessidades específicas
+    const needsIndicators = {
+      'trabalho': ['trabalho', 'escritório', 'reunião', 'zoom', 'chamada'],
+      'desporto': ['desporto', 'corrida', 'ginásio', 'exercício'],
+      'casual': ['casa', 'música', 'filme', 'relaxar'],
+      'gaming': ['jogo', 'game', 'gaming', 'pc'],
+      'presente': ['presente', 'oferta', 'namorada', 'filho', 'amigo']
+    };
+
+    for (const [need, keywords] of Object.entries(needsIndicators)) {
+      if (keywords.some(keyword => allMessages.includes(keyword) || currentLower.includes(keyword))) {
+        context.identifiedNeeds = need;
         break;
       }
     }
+
+    // Detectar humor atual com mais precisão
+    const moodIndicators = {
+      'excited': ['adorei', 'fantástico', 'incrível', 'perfeito', '!'],
+      'frustrated': ['problema', 'demora', 'difícil', 'não funciona'],
+      'curious': ['como', 'qual', 'quando', 'onde', '?'],
+      'decisive': ['quero', 'vou comprar', 'decidido', 'sim'],
+      'hesitant': ['não sei', 'talvez', 'ainda estou', 'dúvida']
+    };
+
+    for (const [mood, indicators] of Object.entries(moodIndicators)) {
+      if (indicators.some(indicator => currentLower.includes(indicator))) {
+        context.currentMood = mood;
+        break;
+      }
+    }
+
+    // Análise da fase da conversa
+    const purchaseSignals = ['quero comprar', 'nome:', 'contacto:', 'confirmar', 'finalizar'];
+    const browsingSignals = ['todos', 'mais', 'outros', 'opções'];
+    const comparisonSignals = ['diferença', 'melhor', 'comparar', 'qual escolher'];
+
+    if (purchaseSignals.some(signal => allMessages.includes(signal) || currentLower.includes(signal))) {
+      context.conversationStage = 'purchase_intent';
+    } else if (comparisonSignals.some(signal => currentLower.includes(signal))) {
+      context.conversationStage = 'comparison';
+    } else if (browsingSignals.some(signal => currentLower.includes(signal))) {
+      context.conversationStage = 'browsing';
+    } else if (context.selectedProduct) {
+      context.conversationStage = 'product_focus';
+    }
   }
 
-  // Construir resumo baseado no contexto
-  if (context.conversationStage === 'confirmed_purchase') {
-    context.summary = `🎉 COMPRA CONFIRMADA! Cliente ${context.selectedProduct ? 'confirmou compra do ' + context.selectedProduct : 'finalizou pedido'}. NOTIFICAR ADMIN IMEDIATAMENTE!`;
-  } else if (context.conversationStage === 'awaiting_confirmation') {
-    context.summary = `Cliente forneceu dados pessoais para ${context.selectedProduct || 'um produto'}. Aguardando confirmação final.`;
-  } else if (context.conversationStage === 'purchase_intent') {
-    context.summary = `Cliente demonstrou interesse em comprar ${context.selectedProduct || 'um produto'}. Fase de finalização de compra.`;
-  } else if (context.conversationStage === 'product_discussion') {
-    context.summary = `Cliente está interessado em ${context.selectedProduct}. Discutindo detalhes do produto.`;
-  } else {
-    context.summary = 'Cliente navegando e explorando produtos disponíveis.';
-  }
+  // Construir resumo contextual
+  const stageDescriptions = {
+    'initial': 'Primeiro contacto - cliente explorando',
+    'browsing': 'Cliente navegando e conhecendo produtos',
+    'product_focus': `Cliente interessado em ${context.selectedProduct}`,
+    'comparison': 'Cliente comparando opções',
+    'purchase_intent': 'Cliente pronto para comprar',
+    'confirmed_purchase': 'Compra confirmada!'
+  };
 
-  console.log('🧠 Contexto extraído:', {
-    produto: context.selectedProduct,
-    fase: context.conversationStage,
-    info: context.importantInfo
-  });
+  context.summary = `${stageDescriptions[context.conversationStage]}. ${context.identifiedNeeds ? `Necessidade: ${context.identifiedNeeds}.` : ''} Humor: ${context.currentMood}.`;
 
   return context;
+}
+
+function getPersonalityAdaptation(userProfile: any, context: any): string {
+  if (!userProfile) return "Adapte-se naturalmente ao cliente conforme a conversa flui.";
+
+  const messageStyle = userProfile.behavior_patterns?.message_style || 'casual';
+  const urgencyLevel = userProfile.behavior_patterns?.urgency_level || 'medium';
+  const totalInteractions = userProfile.total_interactions || 0;
+
+  let adaptation = "ADAPTAÇÃO DE PERSONALIDADE:\n";
+
+  // Adaptação baseada no estilo de comunicação
+  switch (messageStyle) {
+    case 'concise':
+      adaptation += "- Cliente prefere respostas diretas e objetivas\n- Evite textos muito longos\n- Seja claro e preciso\n";
+      break;
+    case 'enthusiastic':
+      adaptation += "- Cliente é entusiasmado, combine essa energia\n- Use exclamações e emoticons\n- Seja animado nas respostas\n";
+      break;
+    case 'polite':
+      adaptation += "- Cliente é educado e formal\n- Mantenha um tom respeitoso\n- Use 'por favor' e 'obrigado' naturalmente\n";
+      break;
+    default:
+      adaptation += "- Cliente tem estilo casual\n- Seja natural e descontraído\n- Use linguagem coloquial angolana\n";
+  }
+
+  // Adaptação baseada na urgência
+  switch (urgencyLevel) {
+    case 'high':
+      adaptation += "- Cliente tem urgência\n- Seja mais direto e eficiente\n- Ofereça soluções rápidas\n";
+      break;
+    case 'low':
+      adaptation += "- Cliente não tem pressa\n- Pode ser mais detalhado\n- Conte histórias e dê mais contexto\n";
+      break;
+    default:
+      adaptation += "- Ritmo normal de conversa\n- Balance detalhes com objetividade\n";
+  }
+
+  // Adaptação baseada no relacionamento
+  if (totalInteractions >= 5) {
+    adaptation += "- Cliente habitual - seja mais familiar\n- Pode fazer referências a conversas anteriores\n- Trate como um amigo conhecido\n";
+  } else if (totalInteractions >= 2) {
+    adaptation += "- Cliente que já volta - seja acolhedor\n- Mostre que se lembra dele\n- Construa confiança\n";
+  } else {
+    adaptation += "- Cliente novo - seja acolhedor mas profissional\n- Construa relacionamento gradualmente\n- Demonstre competência\n";
+  }
+
+  return adaptation;
+}
+
+function getMostActiveHour(activeHours: any): string {
+  if (!activeHours || Object.keys(activeHours).length === 0) {
+    return 'Padrão não estabelecido';
+  }
+
+  const mostActive = Object.entries(activeHours)
+    .sort(([,a], [,b]) => (b as number) - (a as number))[0];
+
+  const hour = parseInt(mostActive[0]);
+  if (hour >= 6 && hour < 12) return 'Manhã';
+  if (hour >= 12 && hour < 18) return 'Tarde';
+  if (hour >= 18 && hour < 22) return 'Noite';
+  return 'Madrugada';
+}
+
+function getTimeAgo(timestamp: string): string {
+  const now = new Date();
+  const past = new Date(timestamp);
+  const diffMs = now.getTime() - past.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) return `${diffDays}d atrás`;
+  if (diffHours > 0) return `${diffHours}h atrás`;
+  return 'agora mesmo';
+}
+
+async function performIntelligentProductSearch(message: string, context: any, supabase: any) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Análise inteligente da mensagem
+  const searchTerms = [];
+  const categoryHints = [];
+  
+  // Detectar produtos específicos mencionados
+  const specificProducts = {
+    'x83': ['x83', 'x 83'],
+    'pro6': ['pro6', 'pro 6', 'tws'],
+    't19': ['t19', 't 19', 'disney'],
+    'disney': ['disney'],
+    'transparente': ['transparente', 'led']
+  };
+
+  for (const [product, variants] of Object.entries(specificProducts)) {
+    if (variants.some(variant => lowerMessage.includes(variant))) {
+      searchTerms.push(product);
+    }
+  }
+
+  // Detectar categorias
+  const categories = {
+    'audio': ['fone', 'fones', 'auricular', 'bluetooth', 'sem fio', 'wireless'],
+    'input': ['mouse', 'rato', 'teclado', 'keyboard'],
+    'charging': ['cabo', 'carregador', 'fonte', 'adaptador']
+  };
+
+  for (const [category, keywords] of Object.entries(categories)) {
+    if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+      categoryHints.push(category);
+    }
+  }
+
+  // Construir query de busca inteligente
+  let productsQuery = supabase
+    .from('products')
+    .select('id, name, slug, price, description, image_url, category_id')
+    .eq('active', true)
+    .eq('in_stock', true);
+
+  // Priorizar produtos específicos
+  if (searchTerms.length > 0) {
+    const searchConditions = searchTerms.map(term => 
+      `name.ilike.%${term}%`
+    ).join(',');
+    productsQuery = productsQuery.or(searchConditions);
+  } else if (categoryHints.length > 0) {
+    // Buscar por categoria
+    const categoryConditions = categoryHints.flatMap(category => 
+      categories[category].map(keyword => `name.ilike.%${keyword}%`)
+    ).join(',');
+    productsQuery = productsQuery.or(categoryConditions);
+  }
+
+  // Limitar resultados baseado no contexto
+  if (context.conversationStage === 'product_focus') {
+    productsQuery = productsQuery.limit(5); // Menos produtos se focado
+  } else {
+    productsQuery = productsQuery.limit(25); // Mais opções se explorando
+  }
+
+  const { data: products } = await productsQuery;
+
+  // Construir informação dos produtos
+  let productsInfo = '';
+  if (products && products.length > 0) {
+    productsInfo = '\n\n🛍️ PRODUTOS DISPONÍVEIS:\n';
+    products.forEach((product: any, index: number) => {
+      const price = parseFloat(product.price).toLocaleString('pt-AO');
+      productsInfo += `${index + 1}. ${product.name} - ${price} Kz\n`;
+      productsInfo += `   Link: https://superloja.vip/produto/${product.slug}\n`;
+      if (product.image_url) {
+        productsInfo += `   ImageURL: ${product.image_url}\n`;
+      }
+      productsInfo += '\n';
+    });
+    
+    console.log(`📊 Produtos carregados: ${products.length}`);
+  }
+
+  return { products, productsInfo };
+}
+
+async function getFallbackResponse(message: string, supabase: any): Promise<string> {
+  const lowerMessage = message.toLowerCase();
+  
+  // Respostas humanizadas baseadas no contexto
+  const timeOfDay = new Date().getHours();
+  let greeting = '';
+  
+  if (timeOfDay < 12) greeting = 'Bom dia';
+  else if (timeOfDay < 18) greeting = 'Boa tarde';
+  else greeting = 'Boa noite';
+
+  // Buscar produtos mais populares como fallback
+  try {
+    const { data: popularProducts } = await supabase
+      .from('products')
+      .select('name, slug, price, image_url')
+      .eq('active', true)
+      .eq('in_stock', true)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (popularProducts && popularProducts.length > 0) {
+      let response = `${greeting}! 😊 Carlos aqui da SuperLoja.\n\n`;
+      
+      if (lowerMessage.includes('fone') || lowerMessage.includes('bluetooth')) {
+        response += "Vi que procura fones de ouvido. Deixe-me mostrar o que temos de melhor:\n\n";
+      } else {
+        response += "Que bom ter você aqui! Temos produtos incríveis com entrega grátis em Luanda. Dê uma olhada:\n\n";
+      }
+
+      popularProducts.forEach((product: any, index: number) => {
+        const price = parseFloat(product.price).toLocaleString('pt-AO');
+        response += `${index + 1}. *${product.name}* - ${price} Kz\n`;
+        response += `   🔗 [Ver produto](https://superloja.vip/produto/${product.slug})\n\n`;
+      });
+
+      response += "Qual destes chama mais a sua atenção? Ou tem algo específico em mente? 🤔";
+      return response;
+    }
+  } catch (error) {
+    console.error('❌ Erro buscar produtos populares:', error);
+  }
+
+  // Fallback padrão humanizado
+  const fallbackResponses = [
+    `${greeting}! Carlos aqui da SuperLoja! 😊 Como posso ajudar hoje?`,
+    `Olá! Bem-vindo à SuperLoja! Sou o Carlos e estou aqui para encontrar o produto perfeito para você.`,
+    `${greeting}! É um prazer ter você aqui na SuperLoja! Em que posso ser útil?`
+  ];
+
+  return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)] + 
+         `\n\nVisite nosso site: https://superloja.vip\nWhatsApp: 939729902`;
 }
 
 function detectPurchaseIntent(customerMessage: string, aiResponse: string): string | null {
   const lowerMessage = customerMessage.toLowerCase();
   const lowerResponse = aiResponse.toLowerCase();
   
-  // Palavras que indicam confirmação direta
+  // Sinais de confirmação direta
   const confirmationKeywords = [
     'sim podem entregar', 'sim', 'yes', 'ok', 'certo', 'correto', 'confirmo', 
     'podem entregar', 'perfeito', 'está certo', 'tudo certo', 'concordo'
   ];
   
-  // Palavras que indicam interesse forte em comprar
+  // Sinais de interesse forte
   const strongBuyKeywords = [
     'quero comprar', 'vou comprar', 'compro', 'interesse', 'preço final',
     'como faço para comprar', 'forma de pagamento', 'entrega', 'garantia',
     'posso pagar', 'aceita cartão', 'disponível', 'stock', 'quanto tempo demora'
   ];
   
-  // Palavras que indicam dados pessoais/finalização
+  // Sinais de finalização
   const finalizationKeywords = [
     'nome:', 'contacto:', 'telefone:', 'endereço:', 'confirmar compra',
-    'finalizar', 'morada', 'dados pessoais', 'meu nome é', 'meu contacto',
-    'carlos raposo', '939729902', 'kilamba j4'
+    'finalizar', 'morada', 'dados pessoais', 'meu nome é', 'meu contacto'
   ];
   
-  // Detectar confirmação direta (MÁXIMA PRIORIDADE)
   const hasDirectConfirmation = confirmationKeywords.some(keyword => 
     lowerMessage.includes(keyword)
-  ) && (lowerResponse.includes('dados') || lowerResponse.includes('finalizar') || lowerResponse.includes('compra'));
+  ) && (lowerResponse.includes('dados') || lowerResponse.includes('finalizar'));
   
-  // Detectar tentativa de finalização
   const hasFinalizationAttempt = finalizationKeywords.some(keyword => 
     lowerMessage.includes(keyword)
   );
   
-  // Detectar interesse forte
   const hasStrongBuyIntent = strongBuyKeywords.some(keyword => 
     lowerMessage.includes(keyword) || lowerResponse.includes(keyword)
   );
   
-  if (hasDirectConfirmation) {
-    return 'confirmed_purchase'; // Cliente confirmou compra diretamente
-  } else if (hasFinalizationAttempt) {
-    return 'finalization'; // Cliente tentando finalizar compra
-  } else if (hasStrongBuyIntent) {
-    return 'strong_interest'; // Cliente mostra interesse forte
-  }
+  if (hasDirectConfirmation) return 'confirmed_purchase';
+  if (hasFinalizationAttempt) return 'finalization';
+  if (hasStrongBuyIntent) return 'strong_interest';
   
-  return null; // Nenhuma intenção de compra detectada
+  return null;
 }
 
 async function notifyAdmin(customerId: string, customerMessage: string, supabase: any, intentType: string, context?: any) {
   try {
     console.log(`🔔 Notificando admin sobre ${intentType}...`);
     
-    // Buscar nome completo do usuário
-    const { data: userProfile } = await supabase
-      .from('ai_conversation_context')
-      .select('user_preferences')
-      .eq('user_id', customerId)
-      .eq('platform', 'facebook')
-      .single();
-    
-    let userName = customerId;
-    let userContact = '';
-    let userAddress = '';
-    
-    if (userProfile?.user_preferences) {
-      userName = userProfile.user_preferences.name || customerId;
-      userContact = userProfile.user_preferences.contact || '';
-      userAddress = userProfile.user_preferences.address || '';
-    }
-    
-    // Buscar admin ID do banco de dados
+    // Buscar dados do admin
     const { data: adminData } = await supabase
       .from('ai_settings')
       .select('value')
@@ -737,9 +1020,7 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
       .single();
 
     const adminId = adminData?.value || "24320548907583618";
-    console.log('🔍 Admin ID para notificação:', adminId);
     
-    // Buscar token do Facebook
     const { data: tokenData } = await supabase
       .from('ai_settings')
       .select('value')
@@ -753,72 +1034,65 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
       return;
     }
 
-    // Construir mensagem personalizada baseada no tipo de intenção
+    // Construir mensagem personalizada
     let notificationMessage = '';
-    let urgencyLevel = '';
-    
-    // Extrair informações detalhadas do contexto
     const productInfo = context?.selectedProduct || 'Produto não identificado';
-    const conversationStage = context?.conversationStage || 'indefinido';
-    const importantInfo = context?.importantInfo || '';
-    
-    if (intentType === 'confirmed_purchase') {
-      urgencyLevel = '🎉 VENDA FECHADA';
-      notificationMessage = `${urgencyLevel} - COMPRA CONFIRMADA PELO CLIENTE! 🎉
+    const customerNeeds = context?.identifiedNeeds || '';
+    const relationshipLevel = context?.relationshipLevel || 'desconhecido';
 
-👤 Cliente: ${userName}
-📱 ID: ${customerId}
-${userContact ? `📞 Contacto: ${userContact}` : ''}
-${userAddress ? `📍 Endereço: ${userAddress}` : ''}
+    switch (intentType) {
+      case 'confirmed_purchase':
+        notificationMessage = `🎉 VENDA CONFIRMADA! 🎉
+
+👤 Cliente: ${customerId}
+🔄 Relacionamento: ${relationshipLevel}
 💬 Mensagem: "${customerMessage}"
-🛍️ PRODUTO ESCOLHIDO: ${productInfo}
-📋 Fase da conversa: ${conversationStage}
-${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
+🛍️ Produto: ${productInfo}
+${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
+😊 Humor: ${context?.currentMood || 'neutro'}
 
-✅ CLIENTE CONFIRMOU A COMPRA!
-📦 Proceder com preparação da entrega
-💰 Venda finalizada com sucesso!
+✅ CLIENTE CONFIRMOU COMPRA!
+📦 Preparar entrega imediatamente
+💰 Venda fechada com sucesso!
 
 ⏰ ${new Date().toLocaleString('pt-AO')}`;
-    } else if (intentType === 'finalization') {
-      urgencyLevel = '🚨 URGENTE';
-      notificationMessage = `${urgencyLevel} - CLIENTE TENTANDO FINALIZAR COMPRA! 🚨
+        break;
+        
+      case 'finalization':
+        notificationMessage = `🚨 CLIENTE FINALIZANDO COMPRA! 🚨
 
-👤 Cliente: ${userName}
-📱 ID: ${customerId}
-${userContact ? `📞 Contacto: ${userContact}` : ''}
-${userAddress ? `📍 Endereço: ${userAddress}` : ''}
+👤 Cliente: ${customerId}
+🔄 Relacionamento: ${relationshipLevel}
 💬 Mensagem: "${customerMessage}"
-🛍️ PRODUTO DE INTERESSE: ${productInfo}
-📋 Fase da conversa: ${conversationStage}
-${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
+🛍️ Produto interesse: ${productInfo}
+${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
+😊 Humor: ${context?.currentMood || 'neutro'}
 
 🔥 AÇÃO IMEDIATA NECESSÁRIA!
-📱 Entre já em contacto com o cliente para fechar a venda!
+📱 Contactar cliente AGORA!
 
 ⏰ ${new Date().toLocaleString('pt-AO')}`;
-    } else if (intentType === 'strong_interest') {
-      urgencyLevel = '⚡ OPORTUNIDADE';
-      notificationMessage = `${urgencyLevel} - CLIENTE COM FORTE INTERESSE! ⚡
+        break;
+        
+      case 'strong_interest':
+        notificationMessage = `⚡ OPORTUNIDADE DE VENDA! ⚡
 
-👤 Cliente: ${userName}
-📱 ID: ${customerId}
-${userContact ? `📞 Contacto: ${userContact}` : ''}
-${userAddress ? `📍 Endereço: ${userAddress}` : ''}
+👤 Cliente: ${customerId}
+🔄 Relacionamento: ${relationshipLevel}
 💬 Mensagem: "${customerMessage}"
-🛍️ PRODUTO DE INTERESSE: ${productInfo}
-📋 Fase da conversa: ${conversationStage}
-${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
+🛍️ Produto interesse: ${productInfo}
+${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
+😊 Humor: ${context?.currentMood || 'neutro'}
 
-💡 Cliente demonstra interesse real em comprar
-📞 Considere entrar em contacto para ajudar na decisão
+💡 Cliente demonstra interesse real
+📞 Considere contactar para fechar venda
 
 ⏰ ${new Date().toLocaleString('pt-AO')}`;
+        break;
     }
 
     const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
     
-    // Primeiro tentar com RESPONSE (que funciona no teste)
     const payload = {
       recipient: { id: adminId },
       message: { text: notificationMessage },
@@ -832,32 +1106,12 @@ ${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Erro notificar admin:', response.status, errorText);
-      
-      // Se falhar, tentar enviar como notificação normal (sem tag)
-      const fallbackPayload = {
-        recipient: { id: adminId },
-        message: { text: notificationMessage },
-        messaging_type: 'RESPONSE'
-      };
-      
-      const fallbackResponse = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fallbackPayload),
-      });
-      
-      if (fallbackResponse.ok) {
-        console.log('✅ Admin notificado via fallback!');
-      } else {
-        console.error('❌ Falha total ao notificar admin');
-      }
+      console.error('❌ Erro notificar admin:', await response.text());
     } else {
       console.log('✅ Admin notificado com sucesso!');
     }
 
-    // Salvar notificação no banco para histórico
+    // Salvar notificação no histórico
     await supabase.from('admin_notifications').insert({
       admin_user_id: adminId,
       notification_type: intentType,
@@ -865,7 +1119,7 @@ ${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
       metadata: {
         customer_id: customerId,
         customer_message: customerMessage,
-        intent_type: intentType,
+        context: context,
         timestamp: new Date().toISOString()
       }
     });
@@ -897,15 +1151,9 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
     const images = [];
     let match;
     
-    console.log('🔍 Verificando imagens na mensagem...');
-    console.log('📝 Texto da mensagem:', messageText.substring(0, 500));
-    
     while ((match = imageRegex.exec(messageText)) !== null) {
       images.push(match[1]);
-      console.log('📸 Imagem encontrada:', match[1]);
     }
-    
-    console.log(`📊 Total de imagens encontradas: ${images.length}`);
     
     // Remover markdown de imagem do texto
     const cleanText = messageText.replace(/📸 !\[Imagem\]\([^)]+\)/g, '').trim();
@@ -925,17 +1173,14 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
       });
 
       if (!textResponse.ok) {
-        const errorText = await textResponse.text();
-        console.error('❌ Erro ao enviar texto Facebook:', textResponse.status, errorText);
+        console.error('❌ Erro ao enviar texto Facebook:', await textResponse.text());
       } else {
         console.log('✅ Texto enviado para Facebook');
       }
     }
     
     // Enviar imagens como attachments
-    console.log(`🚀 Enviando ${images.length} imagens como anexos...`);
     for (const imageUrl of images) {
-      console.log('📤 Enviando imagem:', imageUrl);
       const imagePayload = {
         recipient: { id: recipientId },
         message: {
@@ -957,14 +1202,9 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
       });
 
       if (!imageResponse.ok) {
-        const errorText = await imageResponse.text();
-        console.error('❌ Erro ao enviar imagem Facebook:', {
-          status: imageResponse.status,
-          error: errorText,
-          imageUrl: imageUrl
-        });
+        console.error('❌ Erro ao enviar imagem:', await imageResponse.text());
       } else {
-        console.log('✅ Imagem enviada com sucesso para Facebook:', imageUrl);
+        console.log('✅ Imagem enviada com sucesso');
       }
       
       // Pausa entre envios
@@ -976,18 +1216,12 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
   }
 }
 
-// Função para verificar e notificar admin quando necessário
 async function checkAndNotifyAdmin(userMessage: string, aiResponse: string, userId: string, supabase: any) {
   const triggers = [
-    'entrega fora',
-    'entrega provincia',
-    'entrega nas provincia',
-    'não sei',
-    'não tenho certeza',
-    'deixa-me contactar',
-    'equipa especializada',
-    'informações mais precisas',
-    'orçamento'
+    'entrega fora', 'entrega provincia', 'entrega nas provincia',
+    'não sei', 'não tenho certeza', 'deixa-me contactar',
+    'equipa especializada', 'informações mais precisas', 'orçamento',
+    'problema técnico', 'não funciona'
   ];
   
   const shouldNotify = triggers.some(trigger => 
@@ -996,7 +1230,7 @@ async function checkAndNotifyAdmin(userMessage: string, aiResponse: string, user
   );
   
   if (shouldNotify) {
-    console.log('🔔 Notificando admin devido a:', userMessage);
+    console.log('🔔 Notificando admin - necessita ajuda especializada');
     
     try {
       await supabase.from('admin_notifications').insert({
@@ -1005,7 +1239,7 @@ async function checkAndNotifyAdmin(userMessage: string, aiResponse: string, user
         message: `Usuário ${userId} precisa de ajuda especializada. Mensagem: "${userMessage}". Resposta IA: "${aiResponse.substring(0, 200)}..."`
       });
       
-      console.log('✅ Admin notificado com sucesso');
+      console.log('✅ Admin notificado - ajuda especializada');
     } catch (error) {
       console.error('❌ Erro ao notificar admin:', error);
     }
