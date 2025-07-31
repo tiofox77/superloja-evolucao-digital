@@ -41,7 +41,7 @@ serve(async (req) => {
       });
     }
     
-    const { customerMessage = "Teste de notificação", customerId = "24279509458374902", adminId = "carlosfox2" } = body;
+    const { customerMessage = "Teste de notificação", customerId = "24279509458374902", adminId = "24320548907583618" } = body;
     
     console.log('🔔 === TESTE DE NOTIFICAÇÃO ADMIN ===');
     console.log('Admin ID:', adminId);
