@@ -119,6 +119,35 @@ async function handleMessage(messaging: any, supabase: any) {
 
 async function processWithAI(message: string, senderId: string, supabase: any): Promise<string> {
   try {
+    // PRIMEIRA PRIORIDADE: Verificar na base de conhecimento local
+    console.log('🧠 Verificando base de conhecimento para:', message);
+    const { data: knowledgeItems } = await supabase
+      .from('ai_knowledge_base')
+      .select('*')
+      .eq('active', true)
+      .order('priority', { ascending: false });
+
+    if (knowledgeItems && knowledgeItems.length > 0) {
+      // Procurar resposta relevante na base de conhecimento
+      const lowerMessage = message.toLowerCase();
+      
+      const relevantItem = knowledgeItems.find((item: any) => 
+        // Verificar se a pergunta exata existe
+        item.question.toLowerCase() === lowerMessage ||
+        // Ou se alguma keyword combina
+        item.keywords.some((keyword: string) => 
+          lowerMessage.includes(keyword.toLowerCase())
+        ) ||
+        // Ou se contém parte da pergunta
+        lowerMessage.includes(item.question.toLowerCase().substring(0, 10))
+      );
+
+      if (relevantItem) {
+        console.log('✅ Resposta encontrada na base de conhecimento:', relevantItem.question);
+        return relevantItem.answer;
+      }
+    }
+    
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
