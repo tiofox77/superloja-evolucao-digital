@@ -164,7 +164,27 @@ const TrainingChat = () => {
       return `Entendi sua pergunta sobre "${message}". Deixe-me pesquisar informações atualizadas na internet para dar uma resposta mais precisa.`;
     }
 
-    return `Compreendi sua pergunta sobre "${message}". Baseado no meu treinamento atual, posso ajudar com informações sobre nossos produtos. Se precisar de informações mais específicas ou atualizadas, posso pesquisar na internet. Gostaria que eu faça uma pesquisa web?`;
+    // Detectar tipo de pergunta para resposta mais específica
+    const lowerMessage = message.toLowerCase();
+    
+    if (lowerMessage.includes('preço') || lowerMessage.includes('custa') || lowerMessage.includes('valor')) {
+      return `Olá! Sou assistente da Superloja Evolução Digital. Para informações atualizadas sobre preços, recomendo entrar em contacto direto com nossa loja, pois os valores variam conforme promoções e stock disponível. Posso pesquisar informações técnicas detalhadas sobre o produto que procura. Gostaria que eu faça uma pesquisa web com especificações atualizadas?`;
+    }
+    
+    if (lowerMessage.includes('disponível') || lowerMessage.includes('stock') || lowerMessage.includes('tem')) {
+      return `Olá! Sou assistente da Superloja Evolução Digital. Para confirmar disponibilidade em stock, recomendo contactar nossa loja diretamente, pois o inventário muda constantemente. Posso pesquisar informações técnicas e comparações sobre o produto que procura. Gostaria dessa pesquisa?`;
+    }
+    
+    if (lowerMessage.includes('iphone') || lowerMessage.includes('samsung') || lowerMessage.includes('tws')) {
+      return `Olá! Sou assistente da Superloja Evolução Digital. Temos diversos modelos desses produtos populares em Angola. Para informações técnicas detalhadas e comparações atualizadas, posso fazer uma pesquisa web. Isso seria útil?`;
+    }
+    
+    if (lowerMessage.includes('garantia') || lowerMessage.includes('assistência')) {
+      return `Olá! Sou assistente da Superloja Evolução Digital. Todos nossos produtos têm garantia oficial com assistência técnica local em Angola. Para detalhes específicos sobre garantia do produto que procura, posso pesquisar informações atualizadas. Gostaria dessa pesquisa?`;
+    }
+    
+    // Resposta genérica melhorada
+    return `Olá! Sou assistente da Superloja Evolução Digital, a principal loja de tecnologia em Angola. Compreendi sua pergunta sobre "${message}". Posso ajudar com informações detalhadas e atualizadas através de pesquisa web. Gostaria que eu pesquise informações específicas sobre este assunto?`;
   };
   // Enviar mensagem para a IA
   const sendTrainingMessage = async (message: string, forceWebSearch: boolean = false) => {
