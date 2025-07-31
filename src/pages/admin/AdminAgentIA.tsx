@@ -27,8 +27,6 @@ import {
   Target
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { TrainingChat } from '@/components/admin/TrainingChat';
-import { LearningSystem } from '@/components/admin/LearningSystem';
 
 // Tipos para as interfaces
 interface Metrics {
@@ -549,23 +547,35 @@ para verificar se os serviços estão rodando`);
       </div>
 
       {/* Tabs principais */}
-      <Tabs defaultValue="conversations" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="realtime" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="realtime" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Tempo Real
+          </TabsTrigger>
           <TabsTrigger value="conversations" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
-            Conversas
+            Conversas por Usuário
+          </TabsTrigger>
+          <TabsTrigger value="knowledge" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Base de Conhecimento
+          </TabsTrigger>
+          <TabsTrigger value="learning" className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" />
+            Aprendizado IA
           </TabsTrigger>
           <TabsTrigger value="training" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             Treinamento
           </TabsTrigger>
-          <TabsTrigger value="learning" className="flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Aprendizado IA
+          <TabsTrigger value="configurations" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Configurações
           </TabsTrigger>
-          <TabsTrigger value="realtime" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Tempo Real
+          <TabsTrigger value="tests" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Centro de Testes
           </TabsTrigger>
         </TabsList>
 
@@ -888,7 +898,100 @@ para verificar se os serviços estão rodando`);
 
         {/* Aprendizado IA */}
         <TabsContent value="learning">
-          <LearningSystem />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="h-5 w-5" />
+                🎓 Aprendizado da IA
+              </CardTitle>
+              <CardDescription>
+                Insights e padrões aprendidos pela IA através das interações
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Cards de resumo */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{learningInsights.length}</div>
+                      <div className="text-sm text-muted-foreground">Insights Coletados</div>
+                    </div>
+                  </Card>
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {learningInsights.filter(i => i.confidence_score > 0.8).length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Alta Confiança</div>
+                    </div>
+                  </Card>
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {learningInsights.reduce((sum, i) => sum + i.usage_count, 0)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Usos Totais</div>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Insights de Aprendizado */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">📊 Insights de Aprendizado</h3>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {learningInsights.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Lightbulb className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>A IA ainda está coletando dados para gerar insights.</p>
+                      </div>
+                    ) : (
+                      learningInsights.map((insight) => (
+                        <div key={insight.id} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <Badge variant="outline">{insight.insight_type}</Badge>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>Confiança: {(insight.confidence_score * 100).toFixed(0)}%</span>
+                              <span>Usado: {insight.usage_count}x</span>
+                              <span>Eficácia: {(insight.effectiveness_score * 100).toFixed(0)}%</span>
+                            </div>
+                          </div>
+                          <p className="text-sm">{insight.content}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Como funciona o aprendizado */}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold mb-4">🔬 Como Funciona o Aprendizado</h3>
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-medium mb-2 text-green-600">✅ Já Implementado</h4>
+                        <ul className="text-sm space-y-1">
+                          <li>• Análise de padrões de conversação</li>
+                          <li>• Identificação de temas frequentes</li>
+                          <li>• Medição de eficácia das respostas</li>
+                          <li>• Aprendizado com feedback implícito</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2 text-blue-600">🚧 Próximas Otimizações</h4>
+                        <ul className="text-sm space-y-1">
+                          <li>• Personalização por usuário</li>
+                          <li>• Predição de intenções</li>
+                          <li>• Auto-melhoria de respostas</li>
+                          <li>• Detecção de sentimentos</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Configurações */}
@@ -1220,7 +1323,216 @@ para verificar se os serviços estão rodando`);
 
         {/* Área de Treinamento do Agente */}
         <TabsContent value="training">
-          <TrainingChat />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                🎯 Treinamento do Agente IA
+              </CardTitle>
+              <CardDescription>
+                Aprimore as respostas do agente através de exemplos e correções
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                
+                {/* Padrões de Confirmação */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    ✅ Padrões de Confirmação de Compra
+                  </h3>
+                  <div className="bg-green-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium text-green-800">Palavras de Confirmação</Label>
+                        <div className="text-sm text-green-700 mt-1">
+                          <Badge variant="secondary" className="mr-1 mb-1">sim</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">sim podem entregar</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">certo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">correto</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">confirmo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">perfeito</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">está certo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">tudo certo</Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-green-800">Contexto Necessário</Label>
+                        <div className="text-sm text-green-700 mt-1">
+                          • Cliente já forneceu dados pessoais<br/>
+                          • Produto específico foi mencionado<br/>
+                          • Bot perguntou confirmação<br/>
+                          • Cliente responde afirmativamente
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dados Pessoais Detectados */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    👤 Detecção de Dados Pessoais
+                  </h3>
+                  <div className="bg-blue-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Nome</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Nome: [nome]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Meu nome é [nome]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">[nome completo]</code>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Contacto</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Contacto: [número]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Telefone: [número]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">[9 dígitos]</code>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Endereço</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Endereço: [local]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Kilamba [detalhes]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Luanda, [área]</code>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fases da Conversa */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    🗣️ Fases da Conversa
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="border-yellow-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-yellow-800">Navegação</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-yellow-700">
+                          • Cliente explorando produtos<br/>
+                          • Fazendo perguntas gerais<br/>
+                          • Sem produto específico escolhido
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-blue-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-blue-800">Discussão de Produto</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-blue-700">
+                          • Cliente interessado em produto específico<br/>
+                          • Perguntando detalhes, preço, especificações<br/>
+                          • Comparando opções
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-orange-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-orange-800">Intenção de Compra</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-orange-700">
+                          • Cliente quer comprar<br/>
+                          • Perguntando sobre entrega, pagamento<br/>
+                          • Começando a fornecer dados
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-green-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-green-800">Compra Confirmada</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-green-700">
+                          • Dados pessoais fornecidos<br/>
+                          • Cliente confirmou compra<br/>
+                          • Pronto para entrega!
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Sistema de Aprendizado */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    🧠 Sistema de Aprendizado Automático
+                  </h3>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium text-purple-800">O que o Agente Aprende</Label>
+                        <ul className="text-sm text-purple-700 mt-2 space-y-1">
+                          <li>• Padrões de confirmação de compra</li>
+                          <li>• Produtos mais procurados</li>
+                          <li>• Variações de linguagem do cliente</li>
+                          <li>• Momentos críticos de venda</li>
+                          <li>• Respostas que funcionam melhor</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-purple-800">Como Melhora</Label>
+                        <ul className="text-sm text-purple-700 mt-2 space-y-1">
+                          <li>• Analisa histórico de conversas</li>
+                          <li>• Identifica sucessos e falhas</li>
+                          <li>• Ajusta estratégias automaticamente</li>
+                          <li>• Aprende novos padrões de linguagem</li>
+                          <li>• Otimiza timing de notificações</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monitoramento em Tempo Real */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    📊 Monitoramento de Performance
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {learningInsights.filter(i => i.insight_type === 'confirmation_pattern').length}
+                        </div>
+                        <div className="text-sm text-gray-600">Padrões de Confirmação</div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-green-600">
+                          {Math.round(learningInsights.reduce((acc, i) => acc + i.effectiveness_score, 0) / Math.max(learningInsights.length, 1) * 100)}%
+                        </div>
+                        <div className="text-sm text-gray-600">Taxa de Eficácia</div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {learningInsights.length}
+                        </div>
+                        <div className="text-sm text-gray-600">Insights Ativos</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Centro de Testes */}
