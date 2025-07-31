@@ -292,17 +292,29 @@ const AdminAgentIA = () => {
 
   const loadBotSettings = async () => {
     try {
-      const { data } = await supabase
+      // Carregar configuração do bot
+      const { data: botData } = await supabase
         .from('ai_settings')
         .select('key, value')
         .eq('key', 'bot_enabled')
-        .single();
+        .maybeSingle();
       
-      if (data) {
-        setBotEnabled(data.value === 'true');
+      if (botData) {
+        setBotEnabled(botData.value === 'true');
+      }
+
+      // Carregar configuração da base de conhecimento
+      const { data: knowledgeData } = await supabase
+        .from('ai_settings')
+        .select('key, value')
+        .eq('key', 'knowledge_base_enabled')
+        .maybeSingle();
+      
+      if (knowledgeData) {
+        setKnowledgeBaseEnabled(knowledgeData.value === 'true');
       }
     } catch (error) {
-      console.error('Erro ao carregar configurações do bot:', error);
+      console.error('Erro ao carregar configurações:', error);
     }
   };
 
@@ -427,6 +439,8 @@ para verificar se os serviços estão rodando`);
           key: 'knowledge_base_enabled', 
           value: enabled.toString(),
           description: 'Base de conhecimento habilitada/desabilitada'
+        }, { 
+          onConflict: 'key' 
         });
       
       if (error) throw error;

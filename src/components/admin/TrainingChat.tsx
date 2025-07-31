@@ -117,6 +117,18 @@ const TrainingChat = () => {
     try {
       const keywords = newExample.keywords.split(',').map(k => k.trim()).filter(k => k);
       
+      // Verificar se já existe uma pergunta similar
+      const { data: existingExample } = await supabase
+        .from('ai_knowledge_base')
+        .select('id')
+        .eq('question', newExample.question.trim())
+        .maybeSingle();
+
+      if (existingExample) {
+        toast.error('Já existe um exemplo com esta pergunta na base de conhecimento');
+        return;
+      }
+      
       const { error } = await supabase
         .from('ai_knowledge_base')
         .insert({

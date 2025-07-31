@@ -246,9 +246,29 @@ const LearningSystem = () => {
     // Salvar insights no banco
     for (const insight of insights) {
       try {
-        await supabase
+        // Verificar se já existe um insight similar
+        const { data: existingInsight } = await supabase
           .from('ai_learning_insights')
-          .insert(insight);
+          .select('id')
+          .eq('insight_type', insight.insight_type)
+          .eq('content', insight.content)
+          .maybeSingle();
+
+        if (!existingInsight) {
+          await supabase
+            .from('ai_learning_insights')
+            .insert(insight);
+        } else {
+          // Se já existe, atualizar os contadores
+          await supabase
+            .from('ai_learning_insights')
+            .update({
+              usage_count: insight.usage_count,
+              effectiveness_score: insight.effectiveness_score,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingInsight.id);
+        }
       } catch (error) {
         console.error('Erro ao salvar insight:', error);
       }
