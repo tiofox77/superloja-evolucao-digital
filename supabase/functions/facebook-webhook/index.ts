@@ -334,6 +334,12 @@ INSTRUÇÕES PARA PRODUTOS ESPECÍFICOS:
 - Se cliente pede "x83" e está na lista → mostre esse produto específico  
 - Se cliente não entender ou for vago → instrua: "Para ajudar melhor, escolha pelo número (1, 2, 3...) ou nome completo da lista que enviei"
 
+MEMÓRIA DE PRODUTO ESCOLHIDO:
+- PRODUTO DE INTERESSE ATUAL: ${context.selectedProduct || 'Nenhum'}
+- Se cliente quer finalizar compra, LEMBRE-SE do produto que ele escolheu anteriormente
+- NUNCA confunda o produto na hora de finalizar - sempre use o produto correto do contexto
+- Se cliente fornece dados pessoais, confirme o produto específico que ele escolheu
+
 DETECÇÃO DE FOTOS:
 Usuário pediu fotos: ${wantsPhotos}
 
@@ -507,20 +513,38 @@ function analyzeConversationContext(conversations: any[], currentMessage: string
   const allMessages = conversations.map(c => c.message).join(' ').toLowerCase();
   const currentLower = currentMessage.toLowerCase();
 
-  // Detectar produto de interesse baseado no histórico
-  const productKeywords = {
+  // Detectar produto específico mencionado (prioridade para produtos específicos)
+  const specificProductKeywords = {
+    'x83': 'Fones de ouvido X83',
+    'pro6': 'Fones de ouvido Pro6',
     't19': 'Fones de ouvido Bluetooth sem fio Disney T19',
     'disney': 'Fones de ouvido Bluetooth sem fio Disney T19',
-    'bluetooth': 'Fones de ouvido relacionados',
-    'fone': 'Fones de ouvido em geral',
-    'auricular': 'Fones de ouvido',
-    'tws': 'Fones sem fio TWS'
+    'transparente': 'Fones de ouvido sem fio TWS transparentes'
   };
-
-  for (const [keyword, product] of Object.entries(productKeywords)) {
+  
+  // Buscar por produtos específicos primeiro (mais prioritário)
+  for (const [keyword, product] of Object.entries(specificProductKeywords)) {
     if (allMessages.includes(keyword) || currentLower.includes(keyword)) {
       context.selectedProduct = product;
+      console.log(`🎯 Produto específico identificado: ${product} (palavra-chave: ${keyword})`);
       break;
+    }
+  }
+  
+  // Se não encontrou produto específico, buscar por categoria geral
+  if (!context.selectedProduct) {
+    const generalKeywords = {
+      'bluetooth': 'Fones de ouvido relacionados',
+      'fone': 'Fones de ouvido em geral',
+      'auricular': 'Fones de ouvido',
+      'tws': 'Fones sem fio TWS'
+    };
+    
+    for (const [keyword, product] of Object.entries(generalKeywords)) {
+      if (allMessages.includes(keyword) || currentLower.includes(keyword)) {
+        context.selectedProduct = product;
+        break;
+      }
     }
   }
 
