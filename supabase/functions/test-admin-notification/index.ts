@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,18 +48,48 @@ serve(async (req) => {
     console.log('Cliente:', customerId);
     console.log('Mensagem:', customerMessage);
     
-    // Verificar token do Facebook
-    const pageAccessToken = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+    // Criar cliente Supabase para buscar token do banco
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    
+    console.log('🔍 Buscando token do Facebook no banco de dados...');
+    
+    // Buscar token do Facebook no banco
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('ai_settings')
+      .select('value')
+      .eq('key', 'facebook_page_token')
+      .single();
+    
+    console.log('📋 Resultado da busca do token:', { tokenData, tokenError });
+    
+    // Fallback para variável de ambiente se não encontrar no banco
+    let pageAccessToken = tokenData?.value || Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
     console.log('Token disponível:', pageAccessToken ? 'SIM' : 'NÃO');
     
     if (!pageAccessToken) {
       return new Response(JSON.stringify({
         success: false,
-        error: 'FACEBOOK_PAGE_ACCESS_TOKEN não encontrado nas variáveis de ambiente',
+        error: 'Token do Facebook não encontrado',
+        diagnosis: 'Token não configurado nem no banco nem nas variáveis de ambiente',
         instructions: [
+          '🔧 SOLUÇÃO 1 - Configurar no Banco (RECOMENDADO):',
+          '1. Vá para Admin → Agente IA → Configurações',
+          '2. Na seção "Integração Facebook"',
+          '3. Cole seu token da página Facebook',
+          '4. Clique em "Salvar Configurações"',
+          '',
+          '🔧 SOLUÇÃO 2 - Variáveis de Ambiente:',
           '1. Acesse: https://supabase.com/dashboard/project/fijbvihinhuedkvkxwir/settings/functions',
-          '2. Adicione a secret: FACEBOOK_PAGE_ACCESS_TOKEN',
-          '3. Valor: Token da sua página Facebook com permissão pages_messaging'
+          '2. Adicione: FACEBOOK_PAGE_ACCESS_TOKEN',
+          '3. Valor: Seu token da página Facebook'
+        ],
+        nextSteps: [
+          'Configure o token usando uma das soluções acima',
+          'Execute o teste novamente',
+          'Verifique se o token tem permissão "pages_messaging"'
         ]
       }), {
         status: 400,
