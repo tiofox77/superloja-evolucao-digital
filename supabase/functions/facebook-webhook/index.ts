@@ -420,8 +420,19 @@ IMPORTANTE:
       const purchaseIntentDetected = detectPurchaseIntent(message, aiResponse);
       if (purchaseIntentDetected) {
         console.log('🛒 Intenção de compra detectada - notificando admin');
-        // Notificar admin em background (sem aguardar)
-        notifyAdmin(senderId, message, supabase, purchaseIntentDetected).catch(error => 
+        // Buscar contexto da conversa para incluir detalhes do produto
+        const { data: recentConversations } = await supabase
+          .from('ai_conversations')
+          .select('message, type, timestamp')
+          .eq('platform', 'facebook')
+          .eq('user_id', senderId)
+          .order('timestamp', { ascending: false })
+          .limit(10);
+        
+        const context = analyzeConversationContext(recentConversations || [], message);
+        
+        // Notificar admin em background (sem aguardar) com contexto completo
+        notifyAdmin(senderId, message, supabase, purchaseIntentDetected, context).catch(error => 
           console.error('❌ Erro ao notificar admin:', error)
         );
       }
@@ -665,7 +676,7 @@ function detectPurchaseIntent(customerMessage: string, aiResponse: string): stri
   return null; // Nenhuma intenção de compra detectada
 }
 
-async function notifyAdmin(customerId: string, customerMessage: string, supabase: any, intentType: string) {
+async function notifyAdmin(customerId: string, customerMessage: string, supabase: any, intentType: string, context?: any) {
   try {
     console.log(`🔔 Notificando admin sobre ${intentType}...`);
     
@@ -698,12 +709,20 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
     let urgencyLevel = '';
     
     
+    // Extrair informações detalhadas do contexto
+    const productInfo = context?.selectedProduct || 'Produto não identificado';
+    const conversationStage = context?.conversationStage || 'indefinido';
+    const importantInfo = context?.importantInfo || '';
+    
     if (intentType === 'confirmed_purchase') {
       urgencyLevel = '🎉 VENDA FECHADA';
       notificationMessage = `${urgencyLevel} - COMPRA CONFIRMADA PELO CLIENTE! 🎉
 
 👤 Cliente: ${customerId}
 💬 Mensagem: "${customerMessage}"
+🛍️ PRODUTO ESCOLHIDO: ${productInfo}
+📋 Fase da conversa: ${conversationStage}
+${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
 
 ✅ CLIENTE CONFIRMOU A COMPRA!
 📦 Proceder com preparação da entrega
@@ -716,6 +735,9 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
 
 👤 Cliente: ${customerId}
 💬 Mensagem: "${customerMessage}"
+🛍️ PRODUTO DE INTERESSE: ${productInfo}
+📋 Fase da conversa: ${conversationStage}
+${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
 
 🔥 AÇÃO IMEDIATA NECESSÁRIA!
 📱 Entre já em contacto com o cliente para fechar a venda!
@@ -727,6 +749,9 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
 
 👤 Cliente: ${customerId}
 💬 Mensagem: "${customerMessage}"
+🛍️ PRODUTO DE INTERESSE: ${productInfo}
+📋 Fase da conversa: ${conversationStage}
+${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
 
 💡 Cliente demonstra interesse real em comprar
 📞 Considere entrar em contacto para ajudar na decisão
