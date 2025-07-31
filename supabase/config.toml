@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.ai-search-web]
 verify_jwt = false
+
+[functions.ai-auto-learning]
+verify_jwt = false

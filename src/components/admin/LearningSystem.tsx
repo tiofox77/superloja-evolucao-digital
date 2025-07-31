@@ -75,46 +75,75 @@ const LearningSystem = () => {
     }
   };
 
-  // Analisar conversas e gerar insights
+  // Analisar conversas e gerar insights automáticos
   const analyzeConversations = async () => {
     setIsAnalyzing(true);
     
     try {
-      // Buscar conversas recentes
-      const { data: conversations } = await supabase
-        .from('ai_conversations')
-        .select('*')
-        .gte('timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      console.log('🧠 Iniciando análise automática...');
+      
+      const { data, error } = await supabase.functions.invoke('ai-auto-learning');
 
-      if (conversations) {
-        // Analisar padrões
-        const topicAnalysis = analyzeTopics(conversations);
-        const timeAnalysis = analyzeTimings(conversations);
-        const successAnalysis = analyzeSuccess(conversations);
+      if (error) {
+        console.error('❌ Erro na edge function:', error);
+        throw error;
+      }
 
-        // Atualizar métricas
+      if (data?.success) {
+        // Atualizar métricas com dados reais
         setMetrics({
-          totalConversations: conversations.length,
-          successfulInteractions: successAnalysis.successful,
-          commonTopics: topicAnalysis.topics,
-          peakHours: timeAnalysis.peakHours,
-          improvementAreas: successAnalysis.improvementAreas
+          totalConversations: data.conversations_analyzed || 0,
+          successfulInteractions: Math.round((data.conversations_analyzed || 0) * (data.success_rates?.responseRate || 0.7)),
+          commonTopics: (data.popular_topics || []).slice(0, 5).map((topic: any) => topic.topic),
+          peakHours: [data.user_insights?.peakHour ? `${data.user_insights.peakHour}:00` : '14:00'],
+          improvementAreas: data.success_rates?.recommendations || []
         });
 
-        // Gerar novos insights
-        await generateInsights(conversations);
+        // Recarregar insights
+        await loadLearningInsights();
         
         setLastAnalysis(new Date());
-        toast.success('Análise de aprendizado concluída!');
+        toast.success(`✅ Análise concluída! ${data.insights_generated} insights gerados`);
+        
+        console.log('📊 Resultados da análise:', {
+          insights: data.insights_generated,
+          conversations: data.conversations_analyzed,
+          patterns: data.confirmation_patterns,
+          topics: data.popular_topics
+        });
+      } else {
+        throw new Error(data?.error || 'Erro na análise automática');
       }
     } catch (error) {
-      console.error('Erro na análise:', error);
-      toast.error('Erro ao analisar conversas');
+      console.error('❌ Erro na análise:', error);
+      toast.error('Erro ao executar análise automática');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
+  // Auto-executar análise a cada 30 minutos
+  useEffect(() => {
+    // Executar na primeira carga
+    const timer = setTimeout(() => {
+      analyzeConversations();
+    }, 2000);
+
+    // Executar periodicamente
+    const interval = setInterval(() => {
+      analyzeConversations();
+    }, 30 * 60 * 1000); // 30 minutos
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Executar análise manual
+  const runManualAnalysis = () => {
+    analyzeConversations();
+  };
   // Analisar tópicos mais comuns
   const analyzeTopics = (conversations: any[]) => {
     const topicCount: { [key: string]: number } = {};
@@ -297,12 +326,12 @@ const LearningSystem = () => {
         </div>
         
         <Button 
-          onClick={analyzeConversations}
+          onClick={runManualAnalysis}
           disabled={isAnalyzing}
           className="flex items-center gap-2"
         >
           <RefreshCw className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-          {isAnalyzing ? 'Analisando...' : 'Analisar Agora'}
+          {isAnalyzing ? 'Processando...' : 'Executar Análise'}
         </Button>
       </div>
 
@@ -469,21 +498,21 @@ const LearningSystem = () => {
             <div>
               <h4 className="font-medium mb-2 text-green-600">✅ Sistema Ativo</h4>
               <ul className="text-sm space-y-1">
-                <li>• Análise automática de conversas</li>
-                <li>• Identificação de padrões de sucesso</li>
-                <li>• Medição de eficácia de respostas</li>
-                <li>• Geração de insights em tempo real</li>
-                <li>• Otimização baseada em dados</li>
+                <li>• <strong>Coleta dados de todas as conversas</strong></li>
+                <li>• <strong>Analisa padrões de confirmação</strong></li>
+                <li>• <strong>Identifica tópicos populares</strong></li>
+                <li>• <strong>Calcula taxas de sucesso</strong></li>
+                <li>• <strong>Ajusta estratégias automaticamente</strong></li>
               </ul>
             </div>
             <div>
               <h4 className="font-medium mb-2 text-blue-600">🔄 Processo Automático</h4>
               <ul className="text-sm space-y-1">
-                <li>• Coleta dados de todas as conversas</li>
-                <li>• Analisa padrões de confirmação</li>
-                <li>• Identifica tópicos populares</li>
-                <li>• Calcula taxas de sucesso</li>
-                <li>• Ajusta estratégias automaticamente</li>
+                <li>• Executa análise a cada 30 minutos</li>
+                <li>• Processa últimas 24 horas de dados</li>
+                <li>• Gera insights automaticamente</li>
+                <li>• Atualiza métricas em tempo real</li>
+                <li>• Otimiza respostas baseado em padrões</li>
               </ul>
             </div>
           </div>
