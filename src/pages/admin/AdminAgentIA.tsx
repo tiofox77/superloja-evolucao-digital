@@ -124,7 +124,29 @@ const AdminAgentIA = () => {
       setLastUpdate(new Date());
     }, 5000);
 
-    return () => clearInterval(interval);
+    // Configurar realtime para ai_conversations  
+    const channel = supabase
+      .channel('ai-conversations-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ai_conversations'
+        },
+        (payload) => {
+          console.log('🔥 Nova mensagem recebida em tempo real:', payload);
+          // Recarregar mensagens imediatamente
+          loadRealtimeMessages();
+          setLastUpdate(new Date());
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Funções de carregamento de dados
