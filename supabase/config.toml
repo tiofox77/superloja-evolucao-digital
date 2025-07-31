@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.test-admin-notification]
 verify_jwt = false
+
+[functions.ai-search-web]
+verify_jwt = false

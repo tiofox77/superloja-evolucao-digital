@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,14 @@ import {
   MessageSquare,
   Brain,
   Target,
-  Lightbulb
+  Lightbulb,
+  Search,
+  Globe,
+  Loader2,
+  CheckCircle,
+  Copy,
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +41,10 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  isSearchResult?: boolean;
+  relatedQuestions?: string[];
+  searchQuery?: string;
+  confidence?: number;
 }
 
 const TrainingChat = () => {
@@ -47,7 +58,9 @@ const TrainingChat = () => {
     category: 'geral'
   });
   const [isTraining, setIsTraining] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'examples'>('chat');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   // Carregar exemplos de treinamento
   const loadTrainingExamples = async () => {
@@ -72,8 +85,89 @@ const TrainingChat = () => {
     }
   };
 
+  useEffect(() => {
+    loadTrainingExamples();
+  }, []);
+
+  // Buscar informações na internet
+  const searchWeb = async (query: string, context: string = '') => {
+    setIsSearching(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-search-web', {
+        body: {
+          query,
+          context,
+          language: 'pt'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        return {
+          content: data.result,
+          relatedQuestions: data.related_questions || [],
+          searchQuery: query,
+          confidence: 0.8
+        };
+      } else {
+        throw new Error(data?.error || 'Erro na pesquisa');
+      }
+    } catch (error) {
+      console.error('Erro na pesquisa web:', error);
+      toast.error('Erro ao pesquisar na internet. Tentando resposta local...');
+      return null;
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Verificar se deve pesquisar na internet
+  const shouldSearchWeb = (message: string): boolean => {
+    const searchTriggers = [
+      'não sei', 'não tenho informação', 'não encontrei', 
+      'não conheço', 'buscar', 'pesquisar', 'procurar',
+      'tws pro6', 'airpods', 'iphone', 'smartphone', 'preço'
+    ];
+    
+    return searchTriggers.some(trigger => 
+      message.toLowerCase().includes(trigger.toLowerCase())
+    );
+  };
+
+  // Gerar resposta local inteligente
+  const generateLocalResponse = async (message: string, context: ChatMessage[]): Promise<string> => {
+    // Buscar na base de conhecimento
+    const { data: knowledgeItems } = await supabase
+      .from('ai_knowledge_base')
+      .select('*')
+      .eq('active', true);
+
+    if (knowledgeItems) {
+      // Procurar resposta relevante
+      const relevantItem = knowledgeItems.find(item => 
+        item.keywords.some((keyword: string) => 
+          message.toLowerCase().includes(keyword.toLowerCase())
+        ) || message.toLowerCase().includes(item.question.toLowerCase().substring(0, 10))
+      );
+
+      if (relevantItem) {
+        return relevantItem.answer;
+      }
+    }
+
+    // Resposta padrão mais inteligente
+    const contextSummary = context.slice(-3).map(msg => msg.content).join(' ');
+    
+    if (shouldSearchWeb(message)) {
+      return `Entendi sua pergunta sobre "${message}". Deixe-me pesquisar informações atualizadas na internet para dar uma resposta mais precisa.`;
+    }
+
+    return `Compreendi sua pergunta sobre "${message}". Baseado no meu treinamento atual, posso ajudar com informações sobre nossos produtos. Se precisar de informações mais específicas ou atualizadas, posso pesquisar na internet. Gostaria que eu faça uma pesquisa web?`;
+  };
   // Enviar mensagem para a IA
-  const sendTrainingMessage = async (message: string) => {
+  const sendTrainingMessage = async (message: string, forceWebSearch: boolean = false) => {
     if (!message.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -88,15 +182,50 @@ const TrainingChat = () => {
     setIsTraining(true);
 
     try {
-      // Simular resposta da IA (aqui você pode integrar com sua API da IA)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      let botResponse: ChatMessage;
       
-      const botResponse: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `Entendi sua pergunta sobre "${message}". Baseado no meu treinamento atual, posso fornecer informações sobre nossos produtos e ajudar com vendas. Você gostaria de adicionar este exemplo ao meu banco de conhecimento?`,
-        timestamp: new Date().toISOString()
-      };
+      // Determinar se deve pesquisar na web
+      const needsWebSearch = forceWebSearch || shouldSearchWeb(message);
+      
+      if (needsWebSearch) {
+        // Tentar pesquisar na web primeiro
+        const contextString = chatMessages.slice(-5).map(msg => 
+          `${msg.role}: ${msg.content}`
+        ).join('\n');
+        
+        const webResult = await searchWeb(message, contextString);
+        
+        if (webResult) {
+          botResponse = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: webResult.content,
+            timestamp: new Date().toISOString(),
+            isSearchResult: true,
+            relatedQuestions: webResult.relatedQuestions,
+            searchQuery: webResult.searchQuery,
+            confidence: webResult.confidence
+          };
+        } else {
+          // Fallback para resposta local
+          const localResponse = await generateLocalResponse(message, chatMessages);
+          botResponse = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: localResponse,
+            timestamp: new Date().toISOString()
+          };
+        }
+      } else {
+        // Resposta local
+        const localResponse = await generateLocalResponse(message, chatMessages);
+        botResponse = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: localResponse,
+          timestamp: new Date().toISOString()
+        };
+      }
 
       setChatMessages(prev => [...prev, botResponse]);
     } catch (error) {
@@ -107,7 +236,28 @@ const TrainingChat = () => {
     }
   };
 
-  // Adicionar exemplo de treinamento
+  // Copiar mensagem para clipboard
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Copiado para a área de transferência!');
+    } catch (error) {
+      console.error('Erro ao copiar:', error);
+      toast.error('Erro ao copiar texto');
+    }
+  };
+
+  // Adicionar resposta como exemplo de treinamento
+  const addResponseAsExample = (userMsg: string, aiResponse: string) => {
+    setNewExample({
+      question: userMsg,
+      answer: aiResponse,
+      keywords: '',
+      category: 'geral'
+    });
+    setActiveTab('examples');
+    toast.info('Resposta carregada para adição como exemplo de treinamento');
+  };
   const addTrainingExample = async () => {
     if (!newExample.question.trim() || !newExample.answer.trim()) {
       toast.error('Pergunta e resposta são obrigatórias');
@@ -185,21 +335,73 @@ const TrainingChat = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" />
-              Chat Interativo de Treinamento
+              Chat Interativo de Treinamento com Pesquisa Web
             </CardTitle>
             <CardDescription>
-              Converse com a IA para testar e treinar suas respostas
+              Converse com a IA para testar e treinar suas respostas. A IA pode pesquisar na internet automaticamente quando necessário.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Opções avançadas */}
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Opções Avançadas
+                </Button>
+                
+                <div className="flex gap-2">
+                  <Badge variant={isSearching ? "default" : "secondary"}>
+                    {isSearching ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Pesquisando...
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="h-3 w-3 mr-1" />
+                        Pesquisa Web Ativa
+                      </>
+                    )}
+                  </Badge>
+                </div>
+              </div>
+
+              {showAdvancedOptions && (
+                <Card className="p-4 bg-muted/30">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <Label className="font-medium">Triggers de Pesquisa Web:</Label>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {['tws pro6', 'preços', 'não sei', 'pesquisar'].map(trigger => (
+                          <Badge key={trigger} variant="outline" className="text-xs">{trigger}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="font-medium">Funcionalidades:</Label>
+                      <ul className="mt-1 text-xs space-y-1">
+                        <li>• Pesquisa automática na web</li>
+                        <li>• Base de conhecimento local</li>
+                        <li>• Sugestões relacionadas</li>
+                        <li>• Adição rápida de exemplos</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+              )}
               {/* Área do chat */}
               <ScrollArea className="h-96 border rounded-lg p-4">
                 <div className="space-y-4">
                   {chatMessages.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Bot className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>Inicie uma conversa para treinar a IA</p>
+                      <p className="mb-2">Inicie uma conversa para treinar a IA</p>
+                      <p className="text-xs">A IA pode pesquisar na internet automaticamente quando necessário</p>
                     </div>
                   ) : (
                     chatMessages.map((msg) => (
@@ -208,36 +410,114 @@ const TrainingChat = () => {
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[80%] p-3 rounded-lg ${
+                          className={`max-w-[85%] p-4 rounded-lg border transition-all ${
                             msg.role === 'user'
                               ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted'
+                              : msg.isSearchResult 
+                                ? 'bg-gradient-to-r from-blue-50 to-green-50 border-blue-200'
+                                : 'bg-muted'
                           }`}
                         >
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-2">
                             {msg.role === 'user' ? (
                               <User className="h-4 w-4" />
                             ) : (
-                              <Bot className="h-4 w-4" />
+                              <div className="flex items-center gap-1">
+                                <Bot className="h-4 w-4" />
+                                {msg.isSearchResult && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <Globe className="h-3 w-3 mr-1" />
+                                    Web
+                                  </Badge>
+                                )}
+                              </div>
                             )}
                             <span className="text-xs opacity-70">
                               {msg.role === 'user' ? 'Você' : 'IA'}
                             </span>
+                            <span className="text-xs opacity-50">
+                              {new Date(msg.timestamp).toLocaleTimeString()}
+                            </span>
+                            
+                            {msg.role === 'assistant' && (
+                              <div className="ml-auto flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => copyToClipboard(msg.content)}
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => {
+                                    const userMsg = chatMessages.find(m => 
+                                      m.role === 'user' && 
+                                      chatMessages.indexOf(m) === chatMessages.indexOf(msg) - 1
+                                    );
+                                    if (userMsg) {
+                                      addResponseAsExample(userMsg.content, msg.content);
+                                    }
+                                  }}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                          <p className="text-sm">{msg.content}</p>
+                          
+                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          
+                          {msg.isSearchResult && msg.relatedQuestions && msg.relatedQuestions.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-blue-200">
+                              <Label className="text-xs font-medium">Perguntas relacionadas:</Label>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {msg.relatedQuestions.slice(0, 3).map((question, idx) => (
+                                  <Button
+                                    key={idx}
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs h-6"
+                                    onClick={() => sendTrainingMessage(question, true)}
+                                  >
+                                    {question.length > 30 ? question.substring(0, 30) + '...' : question}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {msg.confidence && (
+                            <div className="mt-2 pt-2 border-t">
+                              <div className="flex items-center gap-2 text-xs opacity-70">
+                                <CheckCircle className="h-3 w-3" />
+                                Confiança: {Math.round(msg.confidence * 100)}%
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))
                   )}
                   
-                  {isTraining && (
+                  {(isTraining || isSearching) && (
                     <div className="flex justify-start">
-                      <div className="bg-muted p-3 rounded-lg">
+                      <div className="bg-muted p-3 rounded-lg border">
                         <div className="flex items-center gap-2">
                           <Bot className="h-4 w-4" />
-                          <div className="animate-pulse text-sm">
-                            IA está pensando...
-                          </div>
+                          {isSearching ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <div className="text-sm">Pesquisando na internet...</div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="animate-pulse text-sm">IA está pensando...</div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -246,24 +526,45 @@ const TrainingChat = () => {
               </ScrollArea>
 
               {/* Input de mensagem */}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Digite sua pergunta para treinar a IA..."
-                  value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !isTraining) {
-                      sendTrainingMessage(currentMessage);
-                    }
-                  }}
-                  disabled={isTraining}
-                />
-                <Button
-                  onClick={() => sendTrainingMessage(currentMessage)}
-                  disabled={!currentMessage.trim() || isTraining}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Digite sua pergunta para treinar a IA... (ex: o que sabes sobre tws pro6?)"
+                    value={currentMessage}
+                    onChange={(e) => setCurrentMessage(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !isTraining && !isSearching) {
+                        sendTrainingMessage(currentMessage);
+                      }
+                    }}
+                    disabled={isTraining || isSearching}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => sendTrainingMessage(currentMessage)}
+                    disabled={!currentMessage.trim() || isTraining || isSearching}
+                    className="min-w-[100px]"
+                  >
+                    {isSearching ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => sendTrainingMessage(currentMessage, true)}
+                    disabled={!currentMessage.trim() || isTraining || isSearching}
+                    title="Forçar pesquisa na web"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Globe className="h-3 w-3" />
+                  <span>A IA pesquisará automaticamente na internet quando necessário</span>
+                </div>
               </div>
             </div>
           </CardContent>
