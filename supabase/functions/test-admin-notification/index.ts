@@ -43,6 +43,14 @@ serve(async (req) => {
     
     const { customerMessage = "Teste de notificação", customerId = "24279509458374902" } = body;
     
+    // Criar cliente Supabase PRIMEIRO
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    
+    console.log('🔍 Buscando admin ID do banco de dados...');
+    
     // Buscar adminId do banco de dados
     const { data: adminData, error: adminError } = await supabase
       .from('ai_settings')
@@ -52,16 +60,13 @@ serve(async (req) => {
     
     const adminId = adminData?.value || "24320548907583618";
     
+    console.log('📋 Admin data from database:', adminData);
+    console.log('🔍 Final admin ID being used:', adminId);
+    
     console.log('🔔 === TESTE DE NOTIFICAÇÃO ADMIN ===');
     console.log('Admin ID:', adminId);
     console.log('Cliente:', customerId);
     console.log('Mensagem:', customerMessage);
-    
-    // Criar cliente Supabase para buscar token do banco
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
     
     console.log('🔍 Buscando token do Facebook no banco de dados...');
     
