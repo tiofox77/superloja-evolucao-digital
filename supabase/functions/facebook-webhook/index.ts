@@ -680,6 +680,24 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
   try {
     console.log(`🔔 Notificando admin sobre ${intentType}...`);
     
+    // Buscar nome completo do usuário
+    const { data: userProfile } = await supabase
+      .from('ai_conversation_context')
+      .select('user_preferences')
+      .eq('user_id', customerId)
+      .eq('platform', 'facebook')
+      .single();
+    
+    let userName = customerId;
+    let userContact = '';
+    let userAddress = '';
+    
+    if (userProfile?.user_preferences) {
+      userName = userProfile.user_preferences.name || customerId;
+      userContact = userProfile.user_preferences.contact || '';
+      userAddress = userProfile.user_preferences.address || '';
+    }
+    
     // Buscar admin ID do banco de dados
     const { data: adminData } = await supabase
       .from('ai_settings')
@@ -708,7 +726,6 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
     let notificationMessage = '';
     let urgencyLevel = '';
     
-    
     // Extrair informações detalhadas do contexto
     const productInfo = context?.selectedProduct || 'Produto não identificado';
     const conversationStage = context?.conversationStage || 'indefinido';
@@ -718,7 +735,10 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
       urgencyLevel = '🎉 VENDA FECHADA';
       notificationMessage = `${urgencyLevel} - COMPRA CONFIRMADA PELO CLIENTE! 🎉
 
-👤 Cliente: ${customerId}
+👤 Cliente: ${userName}
+📱 ID: ${customerId}
+${userContact ? `📞 Contacto: ${userContact}` : ''}
+${userAddress ? `📍 Endereço: ${userAddress}` : ''}
 💬 Mensagem: "${customerMessage}"
 🛍️ PRODUTO ESCOLHIDO: ${productInfo}
 📋 Fase da conversa: ${conversationStage}
@@ -733,7 +753,10 @@ ${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
       urgencyLevel = '🚨 URGENTE';
       notificationMessage = `${urgencyLevel} - CLIENTE TENTANDO FINALIZAR COMPRA! 🚨
 
-👤 Cliente: ${customerId}
+👤 Cliente: ${userName}
+📱 ID: ${customerId}
+${userContact ? `📞 Contacto: ${userContact}` : ''}
+${userAddress ? `📍 Endereço: ${userAddress}` : ''}
 💬 Mensagem: "${customerMessage}"
 🛍️ PRODUTO DE INTERESSE: ${productInfo}
 📋 Fase da conversa: ${conversationStage}
@@ -747,7 +770,10 @@ ${importantInfo ? `ℹ️ Info adicional: ${importantInfo}` : ''}
       urgencyLevel = '⚡ OPORTUNIDADE';
       notificationMessage = `${urgencyLevel} - CLIENTE COM FORTE INTERESSE! ⚡
 
-👤 Cliente: ${customerId}
+👤 Cliente: ${userName}
+📱 ID: ${customerId}
+${userContact ? `📞 Contacto: ${userContact}` : ''}
+${userAddress ? `📍 Endereço: ${userAddress}` : ''}
 💬 Mensagem: "${customerMessage}"
 🛍️ PRODUTO DE INTERESSE: ${productInfo}
 📋 Fase da conversa: ${conversationStage}

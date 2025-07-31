@@ -48,10 +48,16 @@ interface RealtimeMessage {
 
 interface Conversation {
   user_id: string;
+  userName?: string;
+  userContact?: string;
+  userAddress?: string;
   platform: string;
   lastMessage: string;
   timestamp: string;
   messageCount: number;
+  conversationStage?: string;
+  selectedProduct?: string;
+  isLead?: boolean;
 }
 
 interface KnowledgeItem {
@@ -172,31 +178,48 @@ const AdminAgentIA = () => {
 
   const loadConversations = async () => {
     try {
-      const { data } = await supabase
+      // Buscar conversas com informações completas
+      const { data: contextData } = await supabase
+        .from('ai_conversation_context')
+        .select('*')
+        .order('last_interaction', { ascending: false });
+      
+      const { data: conversationData } = await supabase
         .from('ai_conversations')
         .select('*')
         .order('timestamp', { ascending: false });
       
-      if (data) {
-        // Agrupar por usuário e plataforma
-        const grouped = data.reduce((acc: Record<string, any>, msg) => {
-          const key = `${msg.user_id}-${msg.platform}`;
-          if (!acc[key]) {
-            acc[key] = {
-              user_id: msg.user_id,
-              platform: msg.platform,
-              messages: [],
-              lastMessage: msg.message,
-              timestamp: msg.timestamp,
-              messageCount: 0
-            };
-          }
-          acc[key].messages.push(msg);
-          acc[key].messageCount = acc[key].messages.length;
-          return acc;
-        }, {});
+      if (contextData && conversationData) {
+        // Mesclar dados de contexto com conversas
+        const enrichedConversations = contextData.map(context => {
+          const userMessages = conversationData.filter(msg => 
+            msg.user_id === context.user_id && msg.platform === context.platform
+          );
+          
+          const lastMessage = userMessages[0]?.message || 'Sem mensagens';
+          const userPrefs = context.user_preferences as any;
+          const userName = userPrefs?.name || context.user_id;
+          const userContact = userPrefs?.contact || '';
+          const userAddress = userPrefs?.address || '';
+          
+          return {
+            user_id: context.user_id,
+            userName,
+            userContact,
+            userAddress,
+            platform: context.platform,
+            lastMessage,
+            timestamp: context.last_interaction,
+            messageCount: context.message_count || 0,
+            conversationStage: (context.context_data as any)?.conversationStage || 'indefinido',
+            selectedProduct: (context.context_data as any)?.selectedProduct || '',
+            isLead: (context.context_data as any)?.conversationStage === 'confirmed_purchase' || 
+                   (context.context_data as any)?.conversationStage === 'finalization' ||
+                   (context.context_data as any)?.conversationStage === 'strong_interest'
+          };
+        });
         
-        setConversations(Object.values(grouped));
+        setConversations(enrichedConversations);
       }
     } catch (error) {
       console.error('Erro ao carregar conversas:', error);
@@ -621,44 +644,59 @@ para verificar se os serviços estão rodando`);
                     <p>Nenhuma conversa encontrada.</p>
                   </div>
                 ) : (
-                  Object.entries(
-                    conversations.reduce((groups: Record<string, Conversation[]>, conv) => {
-                      const key = `${conv.user_id}-${conv.platform}`;
-                      if (!groups[key]) groups[key] = [];
-                      groups[key].push(conv);
-                      return groups;
-                    }, {})
-                  ).map(([key, convs]) => {
-                    const conv = convs[0];
-                    return (
-                      <div key={key} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                              {conv.user_id.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{conv.user_id}</h4>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {conv.platform}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {conv.messageCount} mensagens
-                                </span>
-                              </div>
-                            </div>
+                  conversations.map((conv, index) => (
+                    <div key={`${conv.user_id}-${conv.platform}-${index}`} 
+                         className={`border rounded-lg p-4 ${conv.isLead ? 'border-green-500 bg-green-50' : ''}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                            conv.isLead ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 
+                            'bg-gradient-to-br from-blue-500 to-purple-600'
+                          }`}>
+                            {conv.userName ? conv.userName.slice(0, 2).toUpperCase() : conv.user_id.slice(0, 2).toUpperCase()}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(conv.timestamp).toLocaleString()}
+                          <div>
+                            <h4 className="font-medium">
+                              {conv.userName || conv.user_id}
+                              {conv.isLead && <span className="ml-2 text-green-600">🔥 LEAD</span>}
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {conv.platform}
+                              </Badge>
+                              <Badge variant={conv.isLead ? 'default' : 'secondary'} className="text-xs">
+                                {conv.conversationStage || 'indefinido'}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {conv.messageCount} mensagens
+                              </span>
+                            </div>
+                            {conv.userContact && (
+                              <div className="text-xs text-green-600 font-medium">
+                                📞 {conv.userContact}
+                              </div>
+                            )}
+                            {conv.userAddress && (
+                              <div className="text-xs text-blue-600">
+                                📍 {conv.userAddress}
+                              </div>
+                            )}
+                            {conv.selectedProduct && (
+                              <div className="text-xs text-orange-600 font-medium">
+                                🛍️ {conv.selectedProduct}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="text-sm bg-gray-50 p-2 rounded">
-                          <span className="font-medium">Última mensagem:</span> {conv.lastMessage}
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(conv.timestamp).toLocaleString('pt-BR')}
                         </div>
                       </div>
-                    );
-                  })
+                      <div className="text-sm bg-gray-50 p-2 rounded">
+                        <span className="font-medium">Última mensagem:</span> {conv.lastMessage}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </CardContent>
