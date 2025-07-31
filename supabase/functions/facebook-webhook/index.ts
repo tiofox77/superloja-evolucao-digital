@@ -140,13 +140,57 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     const context = analyzeConversationContext(recentConversations || [], message);
     console.log('🧠 Contexto analisado:', context);
 
-    // Buscar produtos disponíveis
-    const { data: products } = await supabase
+    // BUSCA INTELIGENTE DE PRODUTOS BASEADA NA MENSAGEM DO USUÁRIO
+    console.log('🧠 Analisando mensagem para busca inteligente:', message);
+    
+    // Detectar categoria/tipo de produto que o usuário está perguntando
+    const productKeywords = {
+      'fones': ['fone', 'fones', 'headphone', 'earphone', 'ouvido'],
+      'mouse': ['mouse', 'rato'],
+      'teclado': ['teclado', 'keyboard'],
+      'cabo': ['cabo', 'carregador'],
+      'carregador': ['carregador', 'fonte'],
+      'todos': ['todos', 'tudo', 'mais', 'outros', 'resto']
+    };
+    
+    let searchQuery = '';
+    let categoryFound = '';
+    
+    // Detectar categoria específica
+    for (const [category, keywords] of Object.entries(productKeywords)) {
+      if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
+        categoryFound = category;
+        if (category !== 'todos') {
+          searchQuery = keywords[0]; // Usar primeira palavra-chave para busca
+        }
+        break;
+      }
+    }
+    
+    console.log('🎯 Categoria detectada:', categoryFound);
+    console.log('🔍 Query de busca:', searchQuery);
+    
+    // Buscar produtos de forma mais específica
+    let productsQuery = supabase
       .from('products')
-      .select('id, name, slug, price, description, image_url')
+      .select('id, name, slug, price, description, image_url, category_id')
       .eq('active', true)
-      .eq('in_stock', true)
-      .limit(25);
+      .eq('in_stock', true);
+    
+    // Se foi detectado uma categoria específica, filtrar por ela
+    if (searchQuery && categoryFound !== 'todos') {
+      // Usar ilike para busca flexível no nome e descrição
+      productsQuery = productsQuery.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+    }
+    
+    // Buscar TODOS os produtos se usuário perguntou sobre "todos" ou categoria específica
+    if (categoryFound === 'todos' || searchQuery) {
+      productsQuery = productsQuery.limit(50); // Aumentar limite para busca mais completa
+    } else {
+      productsQuery = productsQuery.limit(25);
+    }
+    
+    const { data: products } = await productsQuery;
 
     // Construir informações dos produtos (incluindo URLs das imagens quando necessário)
     let productsInfo = '';
@@ -227,9 +271,17 @@ Mensagem do cliente: "${message}"
 
 ANÁLISE OBRIGATÓRIA ANTES DE RESPONDER:
 1. O que o cliente REALMENTE quer? (analise palavras-chave, intenção)
-2. Existe algum produto que corresponde ao que ele perguntou?
-3. Se não existe exatamente, qual seria a melhor alternativa?
-4. Como posso ser mais útil e humano na resposta?
+2. BUSCA NA BASE DE DADOS: Categoria detectada - "${categoryFound}" | Query - "${searchQuery}" | Produtos encontrados: ${products?.length || 0}
+3. Se cliente pergunta "são todos?", "tem mais?", "mais algum?" - CONSULTE A LISTA COMPLETA ACIMA e responda baseado nos dados REAIS
+4. Se não existe exatamente o que perguntou, qual seria a melhor alternativa da lista acima?
+5. Como posso ser mais útil e humano na resposta baseado nos produtos REAIS disponíveis?
+
+IMPORTANTE - QUANDO CLIENTE PERGUNTA SE HÁ MAIS PRODUTOS:
+- Analise TODA a lista de produtos acima
+- Se existem ${products?.length || 0} produtos na categoria "${categoryFound}"
+- Seja específico: "Sim, esses são TODOS os ${categoryFound} que temos" ou "Encontrei mais X produtos..."
+- NUNCA invente produtos que não estão na lista acima
+- Se a busca retornou poucos produtos, seja honesto: "Esses são os que temos disponíveis no momento"
 
 DETECÇÃO DE FOTOS:
 Usuário pediu fotos: ${wantsPhotos}
@@ -645,7 +697,7 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
         console.error('❌ Falha total ao notificar admin');
       }
     } else {
-      console.log('✅ Admin carlosfox2 notificado com sucesso!');
+      console.log('✅ Admin notificado com sucesso!');
     }
 
     // Salvar notificação no banco para histórico
