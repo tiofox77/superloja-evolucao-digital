@@ -593,6 +593,10 @@ para verificar se os serviços estão rodando`);
             <Zap className="h-4 w-4" />
             Centro de Testes
           </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Admin Notifications
+          </TabsTrigger>
         </TabsList>
 
         {/* Tempo Real */}
