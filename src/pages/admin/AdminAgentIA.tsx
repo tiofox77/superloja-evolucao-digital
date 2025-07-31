@@ -275,6 +275,55 @@ const AdminAgentIA = () => {
     }
   };
 
+  const testAdminNotification = async () => {
+    try {
+      toast.info('🧪 Iniciando teste de notificação...');
+      
+      const { data, error } = await supabase.functions.invoke('test-admin-notification', {
+        body: {
+          customerMessage: 'sim podem entregar - carlos raposo, 939729902, kilamba j4',
+          customerId: '24279509458374902',
+          adminId: 'carlosfox2'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast.success(`✅ ${data.diagnosis}`);
+        console.log('📊 Resultado do teste:', data);
+        
+        // Mostrar instruções de sucesso
+        alert(`🎉 TESTE SUCESSO!
+
+${data.diagnosis}
+
+📋 Próximos passos:
+${data.nextSteps.map((step: string) => `• ${step}`).join('\n')}
+
+Método que funcionou: ${data.successfulMethod}`);
+      } else {
+        toast.error(`❌ ${data.diagnosis}`);
+        console.error('📊 Resultado do teste:', data);
+        
+        // Mostrar instruções de erro
+        alert(`⚠️ TESTE FALHOU!
+
+${data.diagnosis}
+
+📋 Instruções para corrigir:
+${data.instructions.map((instruction: string) => `• ${instruction}`).join('\n')}
+
+📋 Próximos passos:
+${data.nextSteps.map((step: string) => `• ${step}`).join('\n')}`);
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro no teste de notificação:', error);
+      toast.error('Erro ao executar teste de notificação');
+    }
+  };
+
   const handleKnowledgeBaseToggle = async (enabled: boolean) => {
     setKnowledgeBaseEnabled(enabled);
     
@@ -408,7 +457,7 @@ const AdminAgentIA = () => {
 
       {/* Tabs principais */}
       <Tabs defaultValue="realtime" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="realtime" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Tempo Real
@@ -424,6 +473,10 @@ const AdminAgentIA = () => {
           <TabsTrigger value="learning" className="flex items-center gap-2">
             <Lightbulb className="h-4 w-4" />
             Aprendizado IA
+          </TabsTrigger>
+          <TabsTrigger value="training" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            Treinamento
           </TabsTrigger>
           <TabsTrigger value="configurations" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -1321,6 +1374,17 @@ const AdminAgentIA = () => {
                     <div className="text-center">
                       <Activity className="h-6 w-6 mx-auto mb-1" />
                       <div className="text-sm font-medium">Debug Mensagens</div>
+                    </div>
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="h-16 border-red-500 text-red-600 hover:bg-red-50"
+                    onClick={testAdminNotification}
+                  >
+                    <div className="text-center">
+                      <User className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Testar Notificação Admin</div>
                     </div>
                   </Button>
                 </div>

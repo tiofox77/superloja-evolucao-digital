@@ -1,188 +1,239 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { customerMessage = "Teste de notificação", customerId = "24279509458374902", adminId = "carlosfox2" } = await req.json();
+    
+    console.log('🔔 === TESTE DE NOTIFICAÇÃO ADMIN ===');
+    console.log('Admin ID:', adminId);
+    console.log('Cliente:', customerId);
+    console.log('Mensagem:', customerMessage);
+    
+    // Verificar token do Facebook
+    const pageAccessToken = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+    console.log('Token disponível:', pageAccessToken ? 'SIM' : 'NÃO');
+    
+    if (!pageAccessToken) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'FACEBOOK_PAGE_ACCESS_TOKEN não encontrado nas variáveis de ambiente',
+        instructions: [
+          '1. Acesse: https://supabase.com/dashboard/project/fijbvihinhuedkvkxwir/settings/functions',
+          '2. Adicione a secret: FACEBOOK_PAGE_ACCESS_TOKEN',
+          '3. Valor: Token da sua página Facebook com permissão pages_messaging'
+        ]
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    console.log('🧪 TESTE NOTIFICAÇÃO ADMIN INICIADO');
+    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
+    
+    const testMessage = `🧪 TESTE DE NOTIFICAÇÃO! 🧪
 
-    // Simular dados de teste
-    const testUserId = 'test_user_12345';
-    const testMessage = 'comprei os fones bluetooth';
-    const testProducts = [
-      { name: 'Fones Bluetooth', price: 7500 },
-      { name: 'Mouse Sem Fio', price: 5000 }
+👤 Cliente: ${customerId}
+💬 Mensagem: "${customerMessage}"
+
+🔔 Se você recebeu esta mensagem, o sistema de notificações está funcionando!
+
+⏰ ${new Date().toLocaleString('pt-AO')}
+
+📋 Próximos passos:
+1. ✅ Sistema funcionando
+2. 🤖 Bot irá notificar automaticamente sobre vendas
+3. 📱 Fique atento às mensagens urgentes`;
+    
+    // Diferentes métodos de envio para testar
+    const methods = [
+      {
+        name: 'RESPONSE (Recomendado)',
+        payload: {
+          recipient: { id: adminId },
+          message: { text: testMessage },
+          messaging_type: 'RESPONSE'
+        }
+      },
+      {
+        name: 'UPDATE',
+        payload: {
+          recipient: { id: adminId },
+          message: { text: testMessage },
+          messaging_type: 'UPDATE'
+        }
+      },
+      {
+        name: 'MESSAGE_TAG',
+        payload: {
+          recipient: { id: adminId },
+          message: { text: testMessage },
+          messaging_type: 'MESSAGE_TAG',
+          tag: 'BUSINESS_PRODUCTIVITY'
+        }
+      }
     ];
 
-    // 1. Verificar configurações
-    console.log('📋 1. VERIFICANDO CONFIGURAÇÕES...');
-    const { data: settings, error: settingsError } = await supabase
-      .from('ai_settings')
-      .select('key, value')
-      .in('key', ['admin_facebook_id', 'facebook_page_token']);
+    const results = [];
+    let successfulMethod = null;
 
-    console.log('📋 Configurações encontradas:', settings);
-    
-    if (settingsError) {
-      console.error('❌ Erro ao buscar configurações:', settingsError);
-      throw new Error(`Erro configurações: ${settingsError.message}`);
-    }
+    for (const method of methods) {
+      console.log(`📤 Testando método: ${method.name}`);
+      
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(method.payload),
+        });
 
-    const adminId = settings?.find(s => s.key === 'admin_facebook_id')?.value;
-    const pageToken = settings?.find(s => s.key === 'facebook_page_token')?.value;
-
-    console.log(`👤 Admin ID: ${adminId || 'NÃO ENCONTRADO'}`);
-    console.log(`🔑 Page Token: ${pageToken ? 'ENCONTRADO' : 'NÃO ENCONTRADO'}`);
-
-    if (!adminId) {
-      throw new Error('Admin Facebook ID não configurado');
-    }
-
-    if (!pageToken) {
-      throw new Error('Facebook Page Token não encontrado');
-    }
-
-    // 2. Salvar notificação no banco
-    console.log('💾 2. SALVANDO NOTIFICAÇÃO NO BANCO...');
-    const { data: notificationData, error: notificationError } = await supabase
-      .from('admin_notifications')
-      .insert({
-        admin_user_id: adminId,
-        notification_type: 'purchase_confirmation_test',
-        message: `🧪 TESTE: Cliente ${testUserId} confirmou compra: "${testMessage}"`,
-        metadata: {
-          user_id: testUserId,
-          original_message: testMessage,
-          test: true,
-          timestamp: new Date().toISOString()
+        const responseText = await response.text();
+        let responseJson;
+        
+        try {
+          responseJson = JSON.parse(responseText);
+        } catch {
+          responseJson = { raw: responseText };
         }
-      });
+        
+        const result = {
+          method: method.name,
+          status: response.status,
+          success: response.ok,
+          response: responseJson,
+          error: response.ok ? null : responseJson.error || responseText
+        };
+        
+        results.push(result);
 
-    if (notificationError) {
-      console.error('❌ Erro ao salvar notificação:', notificationError);
-      throw new Error(`Erro banco: ${notificationError.message}`);
+        if (response.ok) {
+          console.log(`✅ Sucesso com método: ${method.name}`);
+          successfulMethod = method.name;
+          break; // Se funcionar, para de tentar
+        } else {
+          console.log(`❌ Falha com método: ${method.name} - Status: ${response.status}`);
+          console.log('Erro:', responseJson.error || responseText);
+        }
+      } catch (error) {
+        console.error(`❌ Erro com método ${method.name}:`, error);
+        results.push({
+          method: method.name,
+          status: 0,
+          success: false,
+          response: null,
+          error: error.message
+        });
+      }
+      
+      // Pausa entre tentativas
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    console.log('✅ Notificação salva no banco:', notificationData);
+    // Preparar instruções baseadas nos resultados
+    let instructions = [];
+    let diagnosis = '';
 
-    // 3. Testar envio para Facebook
-    console.log('📱 3. TESTANDO ENVIO FACEBOOK...');
-    const facebookResult = await testFacebookSend(adminId, testUserId, testMessage, testProducts, pageToken);
+    if (successfulMethod) {
+      diagnosis = `✅ Sistema funcionando! Método ${successfulMethod} teve sucesso.`;
+      instructions = [
+        '🎉 Parabéns! O sistema de notificações está funcionando corretamente.',
+        '🤖 O bot irá notificar automaticamente quando clientes confirmarem compras.',
+        '📱 Certifique-se de que o Facebook Messenger está aberto para receber notificações.',
+        '⚙️ Configure o webhook do Facebook se ainda não foi feito.'
+      ];
+    } else {
+      diagnosis = '❌ Nenhum método funcionou. Verificar configurações.';
+      
+      // Diagnóstico detalhado
+      const hasPermissionError = results.some(r => 
+        r.error && (
+          r.error.message?.includes('permission') ||
+          r.error.message?.includes('access') ||
+          r.error.code === 10
+        )
+      );
+      
+      const hasInvalidUser = results.some(r => 
+        r.error && (
+          r.error.message?.includes('Invalid user ID') ||
+          r.error.code === 100
+        )
+      );
 
-    // 4. Resultado final
-    const result = {
-      success: true,
-      adminId: adminId,
-      hasPageToken: !!pageToken,
-      notificationSaved: !notificationError,
-      facebookSent: facebookResult.success,
-      facebookError: facebookResult.error,
-      timestamp: new Date().toISOString()
-    };
+      if (hasPermissionError) {
+        instructions = [
+          '🔑 PROBLEMA: Token sem permissões adequadas',
+          '📋 Soluções:',
+          '1. Gere um novo token da página no Facebook Developers',
+          '2. Certifique-se de incluir a permissão "pages_messaging"',
+          '3. O token deve ser da PÁGINA, não do usuário',
+          '4. Atualize a secret FACEBOOK_PAGE_ACCESS_TOKEN no Supabase'
+        ];
+      } else if (hasInvalidUser) {
+        instructions = [
+          '👤 PROBLEMA: ID do admin não válido',
+          '📋 Soluções:',
+          '1. Verifique se "carlosfox2" é o ID correto do Facebook',
+          '2. O ID deve ser o ID único do Facebook, não o nome de usuário',
+          '3. Teste primeiro enviando mensagem do usuário para a página',
+          '4. Use o ID que aparece nas conversas recebidas'
+        ];
+      } else {
+        instructions = [
+          '🔧 PROBLEMA: Configuração geral',
+          '📋 Verificar:',
+          '1. Token da página Facebook está correto?',
+          '2. Página está em modo "Ativo" ou "Desenvolvedor"?',
+          '3. Webhook está configurado corretamente?',
+          '4. ID do admin está correto?'
+        ];
+      }
+    }
 
-    console.log('🎯 RESULTADO FINAL:', result);
-
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({
+      success: !!successfulMethod,
+      diagnosis,
+      successfulMethod,
+      adminId,
+      testMessage: testMessage.substring(0, 200) + '...',
+      attempts: results,
+      instructions,
+      timestamp: new Date().toISOString(),
+      nextSteps: successfulMethod ? [
+        'Sistema funcionando! 🎉',
+        'Bot notificará automaticamente sobre vendas',
+        'Monitore a aba "Tempo Real" para ver atividade'
+      ] : [
+        'Siga as instruções acima para corrigir o problema',
+        'Execute o teste novamente após as correções',
+        'Entre em contacto com suporte se problema persistir'
+      ]
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('❌ ERRO NO TESTE:', error);
+    console.error('❌ Erro no teste de notificação:', error);
     return new Response(JSON.stringify({ 
-      success: false, 
+      success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      instructions: [
+        'Erro interno no sistema de teste',
+        'Verifique as configurações do Supabase',
+        'Certifique-se de que a edge function está funcionando'
+      ]
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
-
-async function testFacebookSend(adminId: string, customerId: string, customerMessage: string, products: any[], pageToken: string) {
-  try {
-    console.log(`📤 Enviando para Facebook - Admin: ${adminId}`);
-
-    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageToken}`;
-    
-    const testMessage = `🧪 TESTE DE NOTIFICAÇÃO!\n\n👤 Cliente teste: ${customerId}\n💬 Disse: "${customerMessage}"\n\n📦 Produtos:\n${products.map((p: any) => `• ${p.name} - ${p.price} Kz`).join('\n')}\n\n🕐 ${new Date().toLocaleString('pt-AO')}\n\n✅ Se você recebeu esta mensagem, a notificação está funcionando!`;
-    
-    console.log('📝 Mensagem de teste:', testMessage.substring(0, 100) + '...');
-
-    // Tentar com MESSAGE_TAG primeiro
-    const payload1 = {
-      recipient: { id: adminId },
-      message: { text: testMessage },
-      messaging_type: 'MESSAGE_TAG',
-      tag: 'BUSINESS_PRODUCTIVITY'
-    };
-
-    console.log('📦 Tentativa 1: MESSAGE_TAG + BUSINESS_PRODUCTIVITY');
-    let response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload1),
-    });
-
-    console.log('📡 Resposta 1:', response.status, response.statusText);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log('✅ Sucesso com MESSAGE_TAG!', data);
-      return { success: true, method: 'MESSAGE_TAG' };
-    }
-
-    const error1 = await response.text();
-    console.log('❌ Falhou com MESSAGE_TAG:', error1);
-
-    // Tentar com RESPONSE
-    console.log('📦 Tentativa 2: RESPONSE');
-    const payload2 = {
-      recipient: { id: adminId },
-      message: { text: testMessage },
-      messaging_type: 'RESPONSE'
-    };
-
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload2),
-    });
-
-    console.log('📡 Resposta 2:', response.status, response.statusText);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log('✅ Sucesso com RESPONSE!', data);
-      return { success: true, method: 'RESPONSE' };
-    }
-
-    const error2 = await response.text();
-    console.log('❌ Falhou com RESPONSE:', error2);
-
-    return { 
-      success: false, 
-      error: `MESSAGE_TAG: ${error1}, RESPONSE: ${error2}` 
-    };
-
-  } catch (error) {
-    console.error('❌ Erro no teste Facebook:', error);
-    return { 
-      success: false, 
-      error: error.message 
-    };
-  }
-}
