@@ -279,6 +279,8 @@ const AdminAgentIA = () => {
     try {
       toast.info('🧪 Iniciando teste de notificação...');
       
+      console.log('📤 Enviando requisição para test-admin-notification...');
+      
       const { data, error } = await supabase.functions.invoke('test-admin-notification', {
         body: {
           customerMessage: 'sim podem entregar - carlos raposo, 939729902, kilamba j4',
@@ -287,9 +289,31 @@ const AdminAgentIA = () => {
         }
       });
 
-      if (error) throw error;
+      console.log('📥 Resposta recebida:', { data, error });
 
-      if (data.success) {
+      if (error) {
+        console.error('❌ Erro da edge function:', error);
+        toast.error(`Erro na função: ${error.message}`);
+        
+        // Mostrar erro detalhado
+        alert(`❌ ERRO NA EDGE FUNCTION!
+
+Erro: ${error.message}
+
+📋 Possíveis causas:
+• Edge function não está funcionando
+• Problema de configuração no Supabase
+• Token Facebook não configurado
+• Erro de sintaxe na função
+
+🔧 Soluções:
+1. Verifique os logs da edge function
+2. Configure FACEBOOK_PAGE_ACCESS_TOKEN nas secrets do Supabase
+3. Teste novamente`);
+        return;
+      }
+
+      if (data?.success) {
         toast.success(`✅ ${data.diagnosis}`);
         console.log('📊 Resultado do teste:', data);
         
@@ -303,24 +327,37 @@ ${data.nextSteps.map((step: string) => `• ${step}`).join('\n')}
 
 Método que funcionou: ${data.successfulMethod}`);
       } else {
-        toast.error(`❌ ${data.diagnosis}`);
+        toast.error(`❌ ${data?.diagnosis || 'Teste falhou'}`);
         console.error('📊 Resultado do teste:', data);
         
         // Mostrar instruções de erro
         alert(`⚠️ TESTE FALHOU!
 
-${data.diagnosis}
+${data?.diagnosis || 'Erro desconhecido'}
 
 📋 Instruções para corrigir:
-${data.instructions.map((instruction: string) => `• ${instruction}`).join('\n')}
+${data?.instructions?.map((instruction: string) => `• ${instruction}`).join('\n') || '• Verifique as configurações'}
 
 📋 Próximos passos:
-${data.nextSteps.map((step: string) => `• ${step}`).join('\n')}`);
+${data?.nextSteps?.map((step: string) => `• ${step}`).join('\n') || '• Execute o teste novamente'}`);
       }
       
     } catch (error) {
       console.error('❌ Erro no teste de notificação:', error);
       toast.error('Erro ao executar teste de notificação');
+      
+      // Debug detalhado
+      alert(`❌ ERRO CRÍTICO!
+
+Erro: ${error.message}
+
+📋 Debug:
+• Verifique se a edge function existe
+• Verifique se o Supabase está funcionando  
+• Verifique a configuração do projeto
+
+🔧 Execute: npm run supabase status
+para verificar se os serviços estão rodando`);
     }
   };
 

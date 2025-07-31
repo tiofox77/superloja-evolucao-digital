@@ -6,13 +6,41 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('🚀 Função test-admin-notification iniciada');
+  console.log('Method:', req.method);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('📋 Handling CORS preflight');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { customerMessage = "Teste de notificação", customerId = "24279509458374902", adminId = "carlosfox2" } = await req.json();
+    console.log('📥 Tentando ler body da requisição...');
+    
+    let body = {};
+    try {
+      const bodyText = await req.text();
+      console.log('📝 Body raw:', bodyText);
+      
+      if (bodyText) {
+        body = JSON.parse(bodyText);
+        console.log('📋 Body parsed:', body);
+      }
+    } catch (parseError) {
+      console.error('❌ Erro ao fazer parse do body:', parseError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Erro ao fazer parse do JSON: ' + parseError.message,
+        receivedBody: bodyText || 'empty'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    const { customerMessage = "Teste de notificação", customerId = "24279509458374902", adminId = "carlosfox2" } = body;
     
     console.log('🔔 === TESTE DE NOTIFICAÇÃO ADMIN ===');
     console.log('Admin ID:', adminId);
