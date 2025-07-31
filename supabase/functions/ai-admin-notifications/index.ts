@@ -41,7 +41,7 @@ serve(async (req) => {
 
     // Criar notificação no banco
     const { data: notification, error: notificationError } = await supabase
-      .from('admin_escalations')
+      .from('admin_notifications')
       .insert({
         user_id,
         conversation_id,

@@ -29,7 +29,6 @@ import {
 import { toast } from 'sonner';
 import TrainingChat from '@/components/admin/TrainingChat';
 import LearningSystem from '@/components/admin/LearningSystem';
-import AdminNotifications from '@/components/admin/AdminNotifications';
 
 // Tipos para as interfaces
 interface Metrics {
@@ -1443,11 +1442,6 @@ para verificar se os serviços estão rodando`);
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Admin Notifications */}
-        <TabsContent value="notifications">
-          <AdminNotifications />
         </TabsContent>
       </Tabs>
     </div>

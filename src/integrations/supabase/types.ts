@@ -14,54 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      admin_escalations: {
-        Row: {
-          assigned_to: string | null
-          context: Json | null
-          conversation_id: string | null
-          created_at: string
-          id: string
-          message: string
-          platform: string | null
-          priority: string | null
-          reason: string
-          resolved_at: string | null
-          status: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          assigned_to?: string | null
-          context?: Json | null
-          conversation_id?: string | null
-          created_at?: string
-          id?: string
-          message: string
-          platform?: string | null
-          priority?: string | null
-          reason: string
-          resolved_at?: string | null
-          status?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          assigned_to?: string | null
-          context?: Json | null
-          conversation_id?: string | null
-          created_at?: string
-          id?: string
-          message?: string
-          platform?: string | null
-          priority?: string | null
-          reason?: string
-          resolved_at?: string | null
-          status?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       admin_notifications: {
         Row: {
           admin_user_id: string

@@ -18,24 +18,25 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-interface AdminEscalation {
+interface AdminNotification {
   id: string;
-  user_id: string;
-  conversation_id?: string | null;
+  user_id?: string;
+  notification_type: string;
+  recipient: string;
+  subject?: string;
   message: string;
-  reason: string;
-  platform: string;
-  priority: string;
   status: string;
-  assigned_to?: string | null;
-  context: any;
-  resolved_at?: string | null;
+  provider?: string;
+  provider_response?: any;
+  error_message?: string;
+  metadata?: any;
+  sent_at?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 const AdminNotifications = () => {
-  const [notifications, setNotifications] = useState<AdminEscalation[]>([]);
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'resolved'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'urgent'>('all');
@@ -45,7 +46,7 @@ const AdminNotifications = () => {
     setLoading(true);
     try {
       let query = supabase
-        .from('admin_escalations')
+        .from('admin_notifications')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -77,10 +78,10 @@ const AdminNotifications = () => {
   }, [filter, priorityFilter]);
 
   // Atualizar status da notificação
-  const updateNotificationStatus = async (id: string, status: AdminEscalation['status']) => {
+  const updateNotificationStatus = async (id: string, status: AdminNotification['status']) => {
     try {
       const { error } = await supabase
-        .from('admin_escalations')
+        .from('admin_notifications')
         .update({ 
           status,
           resolved_at: status === 'resolved' ? new Date().toISOString() : null

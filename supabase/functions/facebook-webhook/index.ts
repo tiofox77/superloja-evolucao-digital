@@ -119,35 +119,6 @@ async function handleMessage(messaging: any, supabase: any) {
 
 async function processWithAI(message: string, senderId: string, supabase: any): Promise<string> {
   try {
-    // PRIMEIRA PRIORIDADE: Verificar na base de conhecimento local
-    console.log('🧠 Verificando base de conhecimento para:', message);
-    const { data: knowledgeItems } = await supabase
-      .from('ai_knowledge_base')
-      .select('*')
-      .eq('active', true)
-      .order('priority', { ascending: false });
-
-    if (knowledgeItems && knowledgeItems.length > 0) {
-      // Procurar resposta relevante na base de conhecimento
-      const lowerMessage = message.toLowerCase();
-      
-      const relevantItem = knowledgeItems.find((item: any) => 
-        // Verificar se a pergunta exata existe
-        item.question.toLowerCase() === lowerMessage ||
-        // Ou se alguma keyword combina
-        item.keywords.some((keyword: string) => 
-          lowerMessage.includes(keyword.toLowerCase())
-        ) ||
-        // Ou se contém parte da pergunta
-        lowerMessage.includes(item.question.toLowerCase().substring(0, 10))
-      );
-
-      if (relevantItem) {
-        console.log('✅ Resposta encontrada na base de conhecimento:', relevantItem.question);
-        return relevantItem.answer;
-      }
-    }
-    
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
@@ -302,33 +273,19 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
 
     const systemPrompt = `Você é Carlos, um vendedor angolano experiente da SuperLoja (https://superloja.vip).
 
-INFORMAÇÕES OBRIGATÓRIAS DA LOJA (USE SEMPRE):
-- WhatsApp: 939729902 (Link direto: https://wa.me/244939729902)
-- Endereço: Kilamba J13, Luanda
-- Entrega em Luanda: GRÁTIS
-- Entrega outras províncias: Sob orçamento (contactar 939729902)
-- Recolha urgente: Disponível no Kilamba J13
-
-RESPOSTAS ESPECÍFICAS OBRIGATÓRIAS:
-- Se perguntarem "qual vosso whatsapp?" → "Nosso WhatsApp é 939729902. Link direto: https://wa.me/244939729902. Estamos localizados no Kilamba J13, Luanda."
-- Se perguntarem sobre entrega Luanda → "Entrega GRÁTIS em Luanda! Nossa loja fica no Kilamba J13."
-- Se perguntarem sobre entrega províncias → "Para entrega fora de Luanda (outras províncias), fazemos orçamento personalizado. Contacte 939729902."
-
-PERSONALIDADE HUMANA: 
+PERSONALIDADE: 
 - Fala como um angolano real, informal mas respeitoso
-- Use expressões como "meu caro", "eh pá", "não é assim?", "pá!"
+- Use expressões como "meu caro", "eh pá", "não é assim?"
 - Seja caloroso, paciente e entusiasmado com os produtos
 - Conte histórias sobre os produtos se apropriado
 - Mostre interesse genuíno nas necessidades do cliente
-- NUNCA diga "não temos WhatsApp" - SEMPRE mencione o 939729902
 
 INTELIGÊNCIA CRÍTICA - ANTES DE RESPONDER:
 1. ANALISE A MENSAGEM: O que o cliente REALMENTE está perguntando?
-2. VERIFIQUE AS INFORMAÇÕES OBRIGATÓRIAS: Se é sobre WhatsApp, entrega, etc.
-3. IDENTIFIQUE O PRODUTO: Ele quer algo específico ou está explorando?
-4. CONTEXTO: Olhe o histórico - já falaram de algo antes?
-5. ESTRATÉGIA: Qual a melhor forma de ajudar este cliente específico?
-6. HUMANIDADE: Como um vendedor angolano real responderia?
+2. IDENTIFIQUE O PRODUTO: Ele quer algo específico ou está explorando?
+3. CONTEXTO: Olhe o histórico - já falaram de algo antes?
+4. ESTRATÉGIA: Qual a melhor forma de ajudar este cliente específico?
+5. HUMANIDADE: Como um vendedor real responderia?
 
 REGRAS DE INTELIGÊNCIA:
 - Se cliente pergunta produto específico que NÃO EXISTE, seja honesto: "Eh pá, não temos esse modelo específico, mas tenho aqui..."
@@ -336,7 +293,6 @@ REGRAS DE INTELIGÊNCIA:
 - Se cliente parece confuso, esclareça: "Deixe-me ajudar a encontrar o que precisa..."
 - NUNCA dê listas genéricas se cliente perguntou algo específico
 - SEMPRE tente entender a NECESSIDADE por trás da pergunta
-- Use sempre as informações OBRIGATÓRIAS da loja acima
 
 ${conversationHistory}
 
@@ -436,7 +392,7 @@ IMPORTANTE:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
