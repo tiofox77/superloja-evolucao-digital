@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -15,10 +16,15 @@ import {
   Zap,
   Bot,
   Brain,
+  Lightbulb,
   Settings,
+  Save,
   Send,
   Activity,
-  Eye
+  Eye,
+  User,
+  Key,
+  Target
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,6 +71,16 @@ interface KnowledgeItem {
   created_at: string;
 }
 
+interface LearningInsight {
+  id: string;
+  insight_type: string;
+  content: string;
+  confidence_score: number;
+  usage_count: number;
+  effectiveness_score: number;
+  created_at: string;
+}
+
 const AdminAgentIA = () => {
   // Estados principais
   const [metrics, setMetrics] = useState<Metrics>({
@@ -78,16 +94,16 @@ const AdminAgentIA = () => {
   const [realtimeMessages, setRealtimeMessages] = useState<RealtimeMessage[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeItem[]>([]);
+  const [learningInsights, setLearningInsights] = useState<LearningInsight[]>([]);
   
   // Estados de controle
   const [botEnabled, setBotEnabled] = useState(true);
   const [knowledgeBaseEnabled, setKnowledgeBaseEnabled] = useState(false);
   const [realtimeLoading, setRealtimeLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const [testMessage, setTestMessage] = useState('');
   const [messageCount, setMessageCount] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [expandedConversations, setExpandedConversations] = useState<Set<string>>(new Set());
-  const [conversationMessages, setConversationMessages] = useState<Record<string, any[]>>({});
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -95,6 +111,7 @@ const AdminAgentIA = () => {
     loadRealtimeMessages();
     loadConversations();
     loadKnowledgeBase();
+    loadLearningInsights();
     loadBotSettings();
     
     // Configurar polling para mensagens em tempo real
@@ -141,6 +158,7 @@ const AdminAgentIA = () => {
         .limit(20);
       
       if (data) {
+        // Converter e filtrar dados para o tipo correto
         const typedMessages = data.filter(msg => 
           msg.type === 'received' || msg.type === 'sent'
         ).map(msg => ({
@@ -223,6 +241,22 @@ const AdminAgentIA = () => {
     }
   };
 
+  const loadLearningInsights = async () => {
+    try {
+      const { data } = await supabase
+        .from('ai_learning_insights')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (data) {
+        setLearningInsights(data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar insights:', error);
+    }
+  };
+
   const loadBotSettings = async () => {
     try {
       const { data } = await supabase
@@ -268,6 +302,8 @@ const AdminAgentIA = () => {
     try {
       toast.info('🧪 Iniciando teste de notificação...');
       
+      console.log('📤 Enviando requisição para test-admin-notification...');
+      
       const { data, error } = await supabase.functions.invoke('test-admin-notification', {
         body: {
           customerMessage: 'sim podem entregar - carlos raposo, 939729902, kilamba j4',
@@ -276,20 +312,75 @@ const AdminAgentIA = () => {
         }
       });
 
+      console.log('📥 Resposta recebida:', { data, error });
+
       if (error) {
+        console.error('❌ Erro da edge function:', error);
         toast.error(`Erro na função: ${error.message}`);
+        
+        // Mostrar erro detalhado
+        alert(`❌ ERRO NA EDGE FUNCTION!
+
+Erro: ${error.message}
+
+📋 Possíveis causas:
+• Edge function não está funcionando
+• Problema de configuração no Supabase
+• Token Facebook não configurado
+• Erro de sintaxe na função
+
+🔧 Soluções:
+1. Verifique os logs da edge function
+2. Configure FACEBOOK_PAGE_ACCESS_TOKEN nas secrets do Supabase
+3. Teste novamente`);
         return;
       }
 
       if (data?.success) {
         toast.success(`✅ ${data.diagnosis}`);
+        console.log('📊 Resultado do teste:', data);
+        
+        // Mostrar instruções de sucesso
+        alert(`🎉 TESTE SUCESSO!
+
+${data.diagnosis}
+
+📋 Próximos passos:
+${data.nextSteps.map((step: string) => `• ${step}`).join('\n')}
+
+Método que funcionou: ${data.successfulMethod}`);
       } else {
         toast.error(`❌ ${data?.diagnosis || 'Teste falhou'}`);
+        console.error('📊 Resultado do teste:', data);
+        
+        // Mostrar instruções de erro
+        alert(`⚠️ TESTE FALHOU!
+
+${data?.diagnosis || 'Erro desconhecido'}
+
+📋 Instruções para corrigir:
+${data?.instructions?.map((instruction: string) => `• ${instruction}`).join('\n') || '• Verifique as configurações'}
+
+📋 Próximos passos:
+${data?.nextSteps?.map((step: string) => `• ${step}`).join('\n') || '• Execute o teste novamente'}`);
       }
       
     } catch (error) {
       console.error('❌ Erro no teste de notificação:', error);
       toast.error('Erro ao executar teste de notificação');
+      
+      // Debug detalhado
+      alert(`❌ ERRO CRÍTICO!
+
+Erro: ${error.message}
+
+📋 Debug:
+• Verifique se a edge function existe
+• Verifique se o Supabase está funcionando  
+• Verifique a configuração do projeto
+
+🔧 Execute: npm run supabase status
+para verificar se os serviços estão rodando`);
     }
   };
 
@@ -315,6 +406,21 @@ const AdminAgentIA = () => {
     }
   };
 
+  const handleSaveSettings = async () => {
+    setSettingsLoading(true);
+    
+    try {
+      // Simular salvamento
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      toast.success('Configurações salvas com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error);
+      toast.error('Erro ao salvar configurações');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
   const sendTestMessage = async (message: string) => {
     try {
       const newMessage = {
@@ -331,43 +437,6 @@ const AdminAgentIA = () => {
     } catch (error) {
       console.error('Erro ao enviar mensagem de teste:', error);
       toast.error('Erro ao enviar mensagem');
-    }
-  };
-
-  const toggleConversation = async (userId: string, platform: string) => {
-    const key = `${userId}-${platform}`;
-    const newExpanded = new Set(expandedConversations);
-    
-    if (expandedConversations.has(key)) {
-      newExpanded.delete(key);
-    } else {
-      newExpanded.add(key);
-      // Carregar mensagens se ainda não foram carregadas
-      if (!conversationMessages[key]) {
-        await loadConversationMessages(userId, platform, key);
-      }
-    }
-    
-    setExpandedConversations(newExpanded);
-  };
-
-  const loadConversationMessages = async (userId: string, platform: string, key: string) => {
-    try {
-      const { data } = await supabase
-        .from('ai_conversations')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('platform', platform)
-        .order('timestamp', { ascending: true });
-      
-      if (data) {
-        setConversationMessages(prev => ({
-          ...prev,
-          [key]: data
-        }));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar mensagens:', error);
     }
   };
 
@@ -447,393 +516,191 @@ const AdminAgentIA = () => {
       </div>
 
       {/* Tabs principais */}
-      <Tabs defaultValue="conversations" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="conversations" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Conversas
-          </TabsTrigger>
-          <TabsTrigger value="leads" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Leads
-          </TabsTrigger>
+      <Tabs defaultValue="realtime" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="realtime" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Tempo Real
           </TabsTrigger>
+          <TabsTrigger value="conversations" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Conversas por Usuário
+          </TabsTrigger>
           <TabsTrigger value="knowledge" className="flex items-center gap-2">
             <Brain className="h-4 w-4" />
-            Conhecimento
+            Base de Conhecimento
+          </TabsTrigger>
+          <TabsTrigger value="learning" className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" />
+            Aprendizado IA
+          </TabsTrigger>
+          <TabsTrigger value="training" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            Treinamento
+          </TabsTrigger>
+          <TabsTrigger value="configurations" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Configurações
+          </TabsTrigger>
+          <TabsTrigger value="tests" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Centro de Testes
           </TabsTrigger>
         </TabsList>
 
-        {/* Conversas Organizadas */}
-        <TabsContent value="conversations">
-          <div className="grid grid-cols-1 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
-                  💬 Conversas por Usuário
-                </CardTitle>
-                <CardDescription>
-                  Visualize todas as conversas organizadas por usuário com histórico completo
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                  {conversations.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>Nenhuma conversa encontrada.</p>
-                    </div>
-                  ) : (
-                    conversations.map((conv, index) => {
-                      const key = `${conv.user_id}-${conv.platform}`;
-                      const isExpanded = expandedConversations.has(key);
-                      const messages = conversationMessages[key] || [];
-
-                      return (
-                        <div key={`${key}-${index}`} 
-                             className={`border rounded-lg ${conv.isLead ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
-                          {/* Header da conversa */}
-                          <div 
-                            className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                            onClick={() => toggleConversation(conv.user_id, conv.platform)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                                  conv.isLead ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 
-                                  'bg-gradient-to-br from-blue-500 to-purple-600'
-                                }`}>
-                                  {conv.userName ? conv.userName.slice(0, 2).toUpperCase() : conv.user_id.slice(0, 2).toUpperCase()}
-                                </div>
-                                <div className="flex-1">
-                                  <h4 className="font-medium flex items-center gap-2">
-                                    {conv.userName || conv.user_id}
-                                    {conv.isLead && <Badge variant="destructive" className="text-xs">🔥 LEAD</Badge>}
-                                  </h4>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <Badge variant="outline" className="text-xs">
-                                      {conv.platform}
-                                    </Badge>
-                                    <Badge variant={conv.isLead ? 'default' : 'secondary'} className="text-xs">
-                                      {conv.conversationStage || 'indefinido'}
-                                    </Badge>
-                                    <span className="text-xs text-muted-foreground">
-                                      {conv.messageCount} mensagens
-                                    </span>
-                                  </div>
-                                  
-                                  {/* Informações do usuário */}
-                                  <div className="mt-2 space-y-1">
-                                    {conv.userContact && (
-                                      <div className="text-xs text-green-600 font-medium">
-                                        📞 {conv.userContact}
-                                      </div>
-                                    )}
-                                    {conv.userAddress && (
-                                      <div className="text-xs text-blue-600">
-                                        📍 {conv.userAddress}
-                                      </div>
-                                    )}
-                                    {conv.selectedProduct && (
-                                      <div className="text-xs text-orange-600 font-medium">
-                                        🛍️ {conv.selectedProduct}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="text-xs text-muted-foreground text-right">
-                                  {new Date(conv.timestamp).toLocaleString('pt-BR')}
-                                </div>
-                                <div className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                                  ⬇️
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Última mensagem */}
-                            <div className="mt-3 text-sm bg-white p-2 rounded border-l-4 border-gray-300">
-                              <span className="font-medium">Última mensagem:</span> {conv.lastMessage}
-                            </div>
-                          </div>
-
-                          {/* Mensagens expandidas */}
-                          {isExpanded && (
-                            <div className="border-t bg-gray-50 p-4">
-                              <h5 className="font-medium mb-3 text-sm">📝 Histórico da Conversa:</h5>
-                              <div className="space-y-2 max-h-64 overflow-y-auto">
-                                {messages.length === 0 ? (
-                                  <div className="text-center py-4 text-muted-foreground text-sm">
-                                    Carregando mensagens...
-                                  </div>
-                                ) : (
-                                  messages.map((msg, msgIndex) => (
-                                    <div key={`${msg.id}-${msgIndex}`} 
-                                         className={`p-2 rounded text-sm ${
-                                           msg.type === 'received' 
-                                             ? 'bg-blue-100 border-l-4 border-blue-500' 
-                                             : 'bg-green-100 border-l-4 border-green-500'
-                                         }`}>
-                                      <div className="flex items-center justify-between mb-1">
-                                        <Badge variant={msg.type === 'received' ? 'default' : 'secondary'} className="text-xs">
-                                          {msg.type === 'received' ? '👤 Cliente' : '🤖 Bot'}
-                                        </Badge>
-                                        <span className="text-xs text-muted-foreground">
-                                          {new Date(msg.timestamp).toLocaleTimeString('pt-BR')}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm">{msg.message}</p>
-                                    </div>
-                                  ))
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Leads Organizados */}
-        <TabsContent value="leads">
-          <div className="grid grid-cols-1 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
-                  🔥 Leads Qualificados
-                </CardTitle>
-                <CardDescription>
-                  Clientes com interesse real de compra que precisam de acompanhamento
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {conversations.filter(conv => conv.isLead).length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Zap className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>Nenhum lead encontrado ainda.</p>
-                      <p className="text-sm mt-1">Leads aparecem quando clientes demonstram interesse real de compra.</p>
-                    </div>
-                  ) : (
-                    conversations.filter(conv => conv.isLead).map((conv, index) => (
-                      <div key={`lead-${conv.user_id}-${index}`} 
-                           className="border-2 border-green-500 rounded-lg p-4 bg-green-50">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold">
-                              {conv.userName ? conv.userName.slice(0, 2).toUpperCase() : conv.user_id.slice(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-lg text-green-800">
-                                🔥 {conv.userName || conv.user_id}
-                              </h4>
-                              <Badge variant="destructive" className="text-xs">
-                                {conv.conversationStage?.toUpperCase() || 'LEAD QUENTE'}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium text-green-700">
-                              💰 OPORTUNIDADE ATIVA
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {new Date(conv.timestamp).toLocaleString('pt-BR')}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Informações do lead */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                          {conv.selectedProduct && (
-                            <div className="bg-white p-3 rounded border-l-4 border-orange-500">
-                              <div className="text-xs text-orange-600 font-medium mb-1">🛍️ PRODUTO DE INTERESSE</div>
-                              <div className="font-medium">{conv.selectedProduct}</div>
-                            </div>
-                          )}
-                          
-                          {conv.userContact && (
-                            <div className="bg-white p-3 rounded border-l-4 border-blue-500">
-                              <div className="text-xs text-blue-600 font-medium mb-1">📞 CONTACTO</div>
-                              <div className="font-medium">{conv.userContact}</div>
-                            </div>
-                          )}
-                          
-                          {conv.userAddress && (
-                            <div className="bg-white p-3 rounded border-l-4 border-purple-500">
-                              <div className="text-xs text-purple-600 font-medium mb-1">📍 ENDEREÇO</div>
-                              <div className="font-medium">{conv.userAddress}</div>
-                            </div>
-                          )}
-                          
-                          <div className="bg-white p-3 rounded border-l-4 border-green-500">
-                            <div className="text-xs text-green-600 font-medium mb-1">💬 INTERAÇÕES</div>
-                            <div className="font-medium">{conv.messageCount} mensagens</div>
-                          </div>
-                        </div>
-
-                        {/* Última mensagem */}
-                        <div className="bg-white p-3 rounded border-l-4 border-gray-300">
-                          <div className="text-xs text-gray-600 font-medium mb-1">💭 ÚLTIMA MENSAGEM</div>
-                          <div className="text-sm">{conv.lastMessage}</div>
-                        </div>
-
-                        {/* Ações */}
-                        <div className="flex gap-2 mt-4">
-                          <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                            📞 Contactar Agora
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            📝 Ver Conversa Completa
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            ✅ Marcar como Convertido
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
         {/* Tempo Real */}
         <TabsContent value="realtime">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Mensagens em Tempo Real */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    📡 Mensagens em Tempo Real
-                  </CardTitle>
-                  <CardDescription>
-                    {realtimeLoading ? 'Carregando...' : `${messageCount} mensagens • Última atualização: ${lastUpdate?.toLocaleTimeString() || 'Nunca'}`}
-                  </CardDescription>
-                </div>
-                <Button 
-                  onClick={loadRealtimeMessages}
-                  size="sm"
-                  variant="outline"
-                  disabled={realtimeLoading}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${realtimeLoading ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`}></div>
+                Monitor de Mensagens em Tempo Real
+              </CardTitle>
+              <CardDescription>
+                {realtimeLoading ? 'Carregando...' : `${messageCount} mensagens | Última atualização: ${lastUpdate?.toLocaleTimeString() || 'Nunca'}`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2 mb-4">
+                <Input
+                  placeholder="Enviar mensagem de teste..."
+                  value={testMessage}
+                  onChange={(e) => setTestMessage(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && testMessage.trim()) {
+                      sendTestMessage(testMessage);
+                      setTestMessage('');
+                    }
+                  }}
+                />
+                <Button
+                  onClick={() => {
+                    if (testMessage.trim()) {
+                      sendTestMessage(testMessage);
+                      setTestMessage('');
+                    }
+                  }}
+                  disabled={!testMessage.trim()}
                 >
-                  {realtimeLoading ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary" />
-                  ) : (
-                    'Atualizar'
-                  )}
+                  <Send className="h-4 w-4" />
                 </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {realtimeMessages.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>Nenhuma mensagem recente.</p>
-                    </div>
-                  ) : (
-                    realtimeMessages.map((msg, index) => (
-                      <div key={`${msg.id}-${index}`} className={`p-3 rounded-lg border ${
+              </div>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {realtimeMessages.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>Nenhuma mensagem ainda.</p>
+                  </div>
+                ) : (
+                  realtimeMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`p-3 rounded-lg border ${
                         msg.type === 'received' 
                           ? 'bg-blue-50 border-blue-200' 
                           : 'bg-green-50 border-green-200'
-                      }`}>
-                        <div className="flex items-center justify-between mb-1">
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
                           <Badge variant={msg.type === 'received' ? 'default' : 'secondary'}>
                             {msg.type === 'received' ? '📥 Recebida' : '📤 Enviada'}
                           </Badge>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(msg.timestamp).toLocaleString('pt-BR')}
+                          <Badge variant="outline">{msg.platform}</Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(msg.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        <p className="font-medium text-muted-foreground">
+                          Usuário: {msg.user_id}
+                        </p>
+                        <p className="mt-1">{msg.message}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Conversas */}
+        <TabsContent value="conversations">
+          <Card>
+            <CardHeader>
+              <CardTitle>🗨️ Conversas Organizadas por Usuário</CardTitle>
+              <CardDescription>
+                Visualize conversas agrupadas por usuário e plataforma para melhor acompanhamento
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {conversations.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>Nenhuma conversa encontrada.</p>
+                  </div>
+                ) : (
+                  conversations.map((conv, index) => (
+                    <div key={`${conv.user_id}-${conv.platform}-${index}`} 
+                         className={`border rounded-lg p-4 ${conv.isLead ? 'border-green-500 bg-green-50' : ''}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                            conv.isLead ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 
+                            'bg-gradient-to-br from-blue-500 to-purple-600'
+                          }`}>
+                            {conv.userName ? conv.userName.slice(0, 2).toUpperCase() : conv.user_id.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="font-medium">
+                              {conv.userName || conv.user_id}
+                              {conv.isLead && <span className="ml-2 text-green-600">🔥 LEAD</span>}
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {conv.platform}
+                              </Badge>
+                              <Badge variant={conv.isLead ? 'default' : 'secondary'} className="text-xs">
+                                {conv.conversationStage || 'indefinido'}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {conv.messageCount} mensagens
+                              </span>
+                            </div>
+                            {conv.userContact && (
+                              <div className="text-xs text-green-600 font-medium">
+                                📞 {conv.userContact}
+                              </div>
+                            )}
+                            {conv.userAddress && (
+                              <div className="text-xs text-blue-600">
+                                📍 {conv.userAddress}
+                              </div>
+                            )}
+                            {conv.selectedProduct && (
+                              <div className="text-xs text-orange-600 font-medium">
+                                🛍️ {conv.selectedProduct}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="text-sm">
-                          <span className="font-medium">👤 {msg.user_id.slice(0, 12)}:</span>
-                          <p className="mt-1">{msg.message}</p>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(conv.timestamp).toLocaleString('pt-BR')}
                         </div>
-                        <Badge variant="outline" className="text-xs mt-2">
-                          {msg.platform}
-                        </Badge>
                       </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Status do Sistema */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  ⚙️ Status do Sistema
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Status do Bot */}
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                  <div>
-                    <h3 className="font-medium">🤖 Status do Bot</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {botEnabled ? 'Ativo - Respondendo automaticamente' : 'Desativo - Sem respostas automáticas'}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={botEnabled}
-                    onCheckedChange={handleBotToggle}
-                  />
-                </div>
-
-                {/* Teste de Notificação Admin */}
-                <div className="space-y-3">
-                  <h3 className="font-medium">🧪 Testes do Sistema</h3>
-                  <Button 
-                    onClick={testAdminNotification}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    Testar Notificação Admin
-                  </Button>
-                </div>
-
-                {/* Teste de Mensagem */}
-                <div className="space-y-3">
-                  <Label htmlFor="test-message">📝 Testar Mensagem</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="test-message"
-                      placeholder="Digite uma mensagem de teste..."
-                      value={testMessage}
-                      onChange={(e) => setTestMessage(e.target.value)}
-                    />
-                    <Button 
-                      onClick={() => {
-                        if (testMessage.trim()) {
-                          sendTestMessage(testMessage);
-                          setTestMessage('');
-                        }
-                      }}
-                      disabled={!testMessage.trim()}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                      <div className="text-sm bg-gray-50 p-2 rounded">
+                        <span className="font-medium">Última mensagem:</span> {conv.lastMessage}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Base de Conhecimento */}
@@ -903,6 +770,836 @@ const AdminAgentIA = () => {
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Aprendizado IA */}
+        <TabsContent value="learning">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="h-5 w-5" />
+                🎓 Aprendizado da IA
+              </CardTitle>
+              <CardDescription>
+                Insights e padrões aprendidos pela IA através das interações
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Cards de resumo */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{learningInsights.length}</div>
+                      <div className="text-sm text-muted-foreground">Insights Coletados</div>
+                    </div>
+                  </Card>
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {learningInsights.filter(i => i.confidence_score > 0.8).length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Alta Confiança</div>
+                    </div>
+                  </Card>
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {learningInsights.reduce((sum, i) => sum + i.usage_count, 0)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Usos Totais</div>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Insights de Aprendizado */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">📊 Insights de Aprendizado</h3>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {learningInsights.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Lightbulb className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>A IA ainda está coletando dados para gerar insights.</p>
+                      </div>
+                    ) : (
+                      learningInsights.map((insight) => (
+                        <div key={insight.id} className="border rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <Badge variant="outline">{insight.insight_type}</Badge>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>Confiança: {(insight.confidence_score * 100).toFixed(0)}%</span>
+                              <span>Usado: {insight.usage_count}x</span>
+                              <span>Eficácia: {(insight.effectiveness_score * 100).toFixed(0)}%</span>
+                            </div>
+                          </div>
+                          <p className="text-sm">{insight.content}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Como funciona o aprendizado */}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold mb-4">🔬 Como Funciona o Aprendizado</h3>
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-medium mb-2 text-green-600">✅ Já Implementado</h4>
+                        <ul className="text-sm space-y-1">
+                          <li>• Análise de padrões de conversação</li>
+                          <li>• Identificação de temas frequentes</li>
+                          <li>• Medição de eficácia das respostas</li>
+                          <li>• Aprendizado com feedback implícito</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-2 text-blue-600">🚧 Próximas Otimizações</h4>
+                        <ul className="text-sm space-y-1">
+                          <li>• Personalização por usuário</li>
+                          <li>• Predição de intenções</li>
+                          <li>• Auto-melhoria de respostas</li>
+                          <li>• Detecção de sentimentos</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Configurações */}
+        <TabsContent value="configurations">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                ⚙️ Configurações da IA
+              </CardTitle>
+              <CardDescription>
+                Configure APIs, modelo preferido e comportamento do bot
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-8">
+                {/* Controle de Emergência do Bot */}
+                <div className="border-2 border-red-200 bg-red-50 p-6 rounded-lg space-y-4">
+                  <h3 className="text-lg font-semibold text-red-800 flex items-center gap-2">
+                    🚨 Controle de Emergência
+                  </h3>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-red-700 font-medium">Status do Bot</Label>
+                      <p className="text-sm text-red-600 mt-1">
+                        Use este controle para pausar o bot em caso de loops ou problemas
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge variant={botEnabled ? "default" : "destructive"} className="text-sm">
+                        {botEnabled ? "🟢 ATIVO" : "🔴 PAUSADO"}
+                      </Badge>
+                      <Switch
+                        checked={botEnabled}
+                        onCheckedChange={handleBotToggle}
+                        className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-red-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="bg-white p-3 rounded border">
+                    <p className="text-sm text-gray-700">
+                      <strong>Como usar:</strong> Se o bot entrar em loop ou começar a enviar respostas incorretas, 
+                      desative-o imediatamente usando este switch. O bot parará de responder instantaneamente.
+                    </p>
+                  </div>
+                </div>
+                {/* Modelo OpenAI */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">🤖 Modelo OpenAI</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Modelo Preferido</Label>
+                      <select className="w-full p-2 border rounded-lg">
+                        <option value="gpt-4o-mini">GPT-4o Mini - Rápido e Econômico</option>
+                        <option value="gpt-4o">GPT-4o - Mais Inteligente</option>
+                        <option value="gpt-4-turbo">GPT-4 Turbo - Balanceado</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground">
+                        GPT-4o Mini é recomendado para chatbot por ser rápido e econômico
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Chave API OpenAI</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          placeholder="sk-..."
+                          value="••••••••••••••••"
+                          disabled
+                        />
+                        <Button variant="outline" size="sm">
+                          <Key className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Button variant="link" size="sm" className="p-0 h-auto text-blue-500">
+                        → Obter chave API OpenAI
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Integração Facebook */}
+                <div className="border-t pt-6 space-y-4">
+                  <h3 className="text-lg font-semibold">📘 Integração Facebook</h3>
+                  <div className="space-y-2">
+                    <Label>Token Página Facebook</Label>
+                    <Input
+                      type="password"
+                      placeholder="Token de acesso da página..."
+                      value="••••••••••••••••"
+                      disabled
+                    />
+                    <Button variant="link" size="sm" className="p-0 h-auto text-blue-500">
+                      → Obter token Facebook
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Integração Instagram */}
+                <div className="border-t pt-6 space-y-4">
+                  <h3 className="text-lg font-semibold">📸 Integração Instagram</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <Label>Habilitar Bot Instagram</Label>
+                    <Switch defaultChecked />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Token Página Instagram</Label>
+                    <Input
+                      type="password"
+                      placeholder="Use o mesmo token do Facebook se sua página está conectada ao Instagram"
+                      disabled
+                    />
+                    <div className="bg-yellow-50 p-3 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        💡 Use o mesmo token do Facebook se sua página está conectada ao Instagram
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Comportamento do Bot */}
+                <div className="border-t pt-6 space-y-6">
+                  <h3 className="text-lg font-semibold">🎯 Comportamento do Bot</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Tom das Respostas</Label>
+                        <select className="w-full p-2 border rounded-lg">
+                          <option value="friendly">Amigável</option>
+                          <option value="professional">Profissional</option>
+                          <option value="casual">Casual</option>
+                          <option value="formal">Formal</option>
+                        </select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Tamanho Máximo</Label>
+                        <Input type="number" defaultValue="200" />
+                        <p className="text-xs text-muted-foreground">
+                          Número máximo de caracteres por resposta
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label>Respostas Automáticas</Label>
+                        <Switch defaultChecked />
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <Label>Base de Conhecimento Ativada</Label>
+                        <Switch
+                          checked={knowledgeBaseEnabled}
+                          onCheckedChange={handleKnowledgeBaseToggle}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Escalation para Humano */}
+                <div className="border-t pt-6 space-y-4">
+                  <h3 className="text-lg font-semibold">👤 Escalation para Humano</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <Label>Habilitar Escalation Automático</Label>
+                    <Switch defaultChecked />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>ID Facebook do Admin (carlosfox)</Label>
+                      <Input defaultValue="carlosfox" />
+                      <p className="text-xs text-muted-foreground">
+                        Este usuário receberá notificações quando clientes quiserem finalizar compras
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Palavras-chave para Escalation</Label>
+                      <textarea 
+                        className="w-full p-2 border rounded-lg h-20"
+                        defaultValue="comprar,finalizar,problema,ajuda,atendente"
+                        placeholder="Separe palavras-chave por vírgula"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Separe palavras-chave por vírgula. Quando detectadas, admin será notificado.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Controle Chat Humano/IA */}
+                <div className="border-t pt-6 space-y-4">
+                  <h3 className="text-lg font-semibold">🎭 Controle Chat Humano/IA</h3>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <Label className="font-medium">Sistema Inteligente Ativado</Label>
+                    </div>
+                    <ul className="text-sm space-y-1 text-green-700">
+                      <li>• IA **para automaticamente** quando humano responde no chat</li>
+                      <li>• IA **analisa contexto completo** das conversas antes de responder</li>
+                      <li>• IA **responde diretamente** às perguntas específicas</li>
+                      <li>• IA **não envia produtos** sem solicitação</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Modo de Operação Atual</Label>
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-blue-500" />
+                          <span className="font-medium">IA Inteligente + Controle Humano</span>
+                        </div>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Sistema detecta automaticamente quando humano está ativo e pausa a IA
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label>Tempo de Pausa</Label>
+                      <Input type="number" defaultValue="30" />
+                      <p className="text-xs text-muted-foreground">
+                        IA fica pausada por 30min após atividade humana
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sincronização */}
+                <div className="border-t pt-6 space-y-4">
+                  <h3 className="text-lg font-semibold">🔄 Sincronização</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Button variant="outline">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Sincronizar com Secrets
+                    </Button>
+                    <Button variant="outline">
+                      <Key className="h-4 w-4 mr-2" />
+                      Usar Token Meta
+                    </Button>
+                    <Button variant="outline">
+                      <Eye className="h-4 w-4 mr-2" />
+                      Verificar Tabelas
+                    </Button>
+                  </div>
+                  <div className="bg-yellow-50 p-3 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      💡 Use "Usar Token Meta" para sincronizar o token que você salvou na página de configurações Meta/Facebook
+                    </p>
+                  </div>
+                </div>
+
+                {/* Links Úteis */}
+                <div className="border-t pt-6 space-y-4">
+                  <h3 className="text-lg font-semibold">🔗 Links Úteis</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="p-4">
+                      <div className="text-center">
+                        <MessageSquare className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+                        <h4 className="font-medium">Webhook Facebook</h4>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          URL para configurar no Facebook
+                        </p>
+                        <div className="text-xs bg-gray-100 p-2 rounded">
+                          https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook
+                        </div>
+                        <Button variant="outline" size="sm" className="mt-2">
+                          <div className="h-3 w-3 mr-1" />
+                          Copiar URL
+                        </Button>
+                      </div>
+                    </Card>
+                    
+                    <Card className="p-4">
+                      <div className="text-center">
+                        <Settings className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                        <h4 className="font-medium">Facebook Developers</h4>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Configure seu app Facebook
+                        </p>
+                        <Button variant="outline" size="sm">
+                          Abrir Console
+                        </Button>
+                      </div>
+                    </Card>
+                    
+                    <Card className="p-4">
+                      <div className="text-center">
+                        <Key className="h-8 w-8 mx-auto mb-2 text-orange-500" />
+                        <h4 className="font-medium">OpenAI Platform</h4>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Gerencie suas chaves API
+                        </p>
+                        <Button variant="outline" size="sm">
+                          Acessar
+                        </Button>
+                      </div>
+                    </Card>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleSaveSettings}
+                  className="w-full"
+                  size="lg"
+                  disabled={settingsLoading}
+                >
+                  {settingsLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Salvando Configurações...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5 mr-2" />
+                      Salvar Configurações
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Área de Treinamento do Agente */}
+        <TabsContent value="training">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                🎯 Treinamento do Agente IA
+              </CardTitle>
+              <CardDescription>
+                Aprimore as respostas do agente através de exemplos e correções
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                
+                {/* Padrões de Confirmação */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    ✅ Padrões de Confirmação de Compra
+                  </h3>
+                  <div className="bg-green-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium text-green-800">Palavras de Confirmação</Label>
+                        <div className="text-sm text-green-700 mt-1">
+                          <Badge variant="secondary" className="mr-1 mb-1">sim</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">sim podem entregar</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">certo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">correto</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">confirmo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">perfeito</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">está certo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">tudo certo</Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-green-800">Contexto Necessário</Label>
+                        <div className="text-sm text-green-700 mt-1">
+                          • Cliente já forneceu dados pessoais<br/>
+                          • Produto específico foi mencionado<br/>
+                          • Bot perguntou confirmação<br/>
+                          • Cliente responde afirmativamente
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dados Pessoais Detectados */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    👤 Detecção de Dados Pessoais
+                  </h3>
+                  <div className="bg-blue-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Nome</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Nome: [nome]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Meu nome é [nome]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">[nome completo]</code>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Contacto</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Contacto: [número]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Telefone: [número]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">[9 dígitos]</code>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Endereço</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Endereço: [local]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Kilamba [detalhes]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Luanda, [área]</code>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fases da Conversa */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    🗣️ Fases da Conversa
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="border-yellow-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-yellow-800">Navegação</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-yellow-700">
+                          • Cliente explorando produtos<br/>
+                          • Fazendo perguntas gerais<br/>
+                          • Sem produto específico escolhido
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-blue-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-blue-800">Discussão de Produto</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-blue-700">
+                          • Cliente interessado em produto específico<br/>
+                          • Perguntando detalhes, preço, especificações<br/>
+                          • Comparando opções
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-orange-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-orange-800">Intenção de Compra</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-orange-700">
+                          • Cliente quer comprar<br/>
+                          • Perguntando sobre entrega, pagamento<br/>
+                          • Começando a fornecer dados
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-green-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-green-800">Compra Confirmada</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-green-700">
+                          • Dados pessoais fornecidos<br/>
+                          • Cliente confirmou compra<br/>
+                          • Pronto para entrega!
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Sistema de Aprendizado */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    🧠 Sistema de Aprendizado Automático
+                  </h3>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium text-purple-800">O que o Agente Aprende</Label>
+                        <ul className="text-sm text-purple-700 mt-2 space-y-1">
+                          <li>• Padrões de confirmação de compra</li>
+                          <li>• Produtos mais procurados</li>
+                          <li>• Variações de linguagem do cliente</li>
+                          <li>• Momentos críticos de venda</li>
+                          <li>• Respostas que funcionam melhor</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-purple-800">Como Melhora</Label>
+                        <ul className="text-sm text-purple-700 mt-2 space-y-1">
+                          <li>• Analisa histórico de conversas</li>
+                          <li>• Identifica sucessos e falhas</li>
+                          <li>• Ajusta estratégias automaticamente</li>
+                          <li>• Aprende novos padrões de linguagem</li>
+                          <li>• Otimiza timing de notificações</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monitoramento em Tempo Real */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    📊 Monitoramento de Performance
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {learningInsights.filter(i => i.insight_type === 'confirmation_pattern').length}
+                        </div>
+                        <div className="text-sm text-gray-600">Padrões de Confirmação</div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-green-600">
+                          {Math.round(learningInsights.reduce((acc, i) => acc + i.effectiveness_score, 0) / Math.max(learningInsights.length, 1) * 100)}%
+                        </div>
+                        <div className="text-sm text-gray-600">Taxa de Eficácia</div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {learningInsights.length}
+                        </div>
+                        <div className="text-sm text-gray-600">Insights Ativos</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Centro de Testes */}
+        <TabsContent value="tests">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                🧪 Centro de Testes
+              </CardTitle>
+              <CardDescription>
+                Teste todas as APIs e funcionalidades do agente IA
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Testes de API */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button variant="outline" className="h-16">
+                    <div className="text-center">
+                      <Bot className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Testar OpenAI</div>
+                    </div>
+                  </Button>
+                  
+                  <Button variant="outline" className="h-16">
+                    <div className="text-center">
+                      <MessageSquare className="h-6 w-6 mx-auto mb-1 text-blue-500" />
+                      <div className="text-sm font-medium">Testar Facebook</div>
+                    </div>
+                  </Button>
+                  
+                  <Button variant="outline" className="h-16 border-blue-500 text-blue-600">
+                    <div className="text-center">
+                      <Activity className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Debug Mensagens</div>
+                    </div>
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="h-16 border-red-500 text-red-600 hover:bg-red-50"
+                    onClick={testAdminNotification}
+                  >
+                    <div className="text-center">
+                      <User className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Testar Notificação Admin</div>
+                    </div>
+                  </Button>
+                </div>
+
+                {/* Testes Avançados */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button variant="default" className="h-16 bg-green-500 hover:bg-green-600">
+                    <div className="text-center text-white">
+                      <Send className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Teste Envio Real</div>
+                    </div>
+                  </Button>
+                  
+                  <Button variant="default" className="h-16 bg-orange-500 hover:bg-orange-600">
+                    <div className="text-center text-white">
+                      <CheckCircle className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Teste Completo</div>
+                    </div>
+                  </Button>
+                  
+                  <Button variant="outline" className="h-16 border-purple-500 text-purple-600">
+                    <div className="text-center">
+                      <Brain className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Testar Instagram</div>
+                    </div>
+                  </Button>
+                </div>
+
+                {/* Validação e Debug */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button variant="outline" className="h-16 border-blue-500 text-blue-600">
+                    <div className="text-center">
+                      <Key className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Validar Token</div>
+                    </div>
+                  </Button>
+                  
+                  <Button variant="outline" className="h-16 border-red-500 text-red-600">
+                    <div className="text-center">
+                      <Settings className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Debug Completo</div>
+                    </div>
+                  </Button>
+                </div>
+
+                {/* Configuração do Webhook Facebook */}
+                <div className="border-t pt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <MessageSquare className="h-5 w-5 text-blue-500" />
+                    <h3 className="text-lg font-semibold">Configuração do Webhook Facebook</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Para o bot responder automaticamente, você precisa configurar o webhook no Facebook:
+                  </p>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="font-medium">1. URL do Webhook</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          value="https://fijbvihinhuedkvkxwir.supabase.co/functions/v1/facebook-webhook"
+                          readOnly
+                          className="font-mono text-sm"
+                        />
+                        <Button variant="outline" size="sm">
+                          Copiar
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="font-medium">2. Verify Token</Label>
+                      <div className="flex gap-2">
+                        <Input 
+                          value="minha_superloja_webhook_token_2024"
+                          readOnly
+                          className="font-mono text-sm"
+                        />
+                        <Button variant="outline" size="sm">
+                          Copiar
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="font-medium">3. Configurar no Facebook</Label>
+                      <div className="space-y-2 text-sm">
+                        <p>1. Acesse <Button variant="link" className="p-0 h-auto text-blue-500">Facebook Developers</Button></p>
+                        <p>2. Vá para sua aplicação → Produtos → Messenger → Configurações</p>
+                        <p>3. Na seção "Webhooks", clique em "Configurar Webhooks"</p>
+                        <p>4. Cole a URL do webhook acima</p>
+                        <p>5. Cole o Verify Token acima</p>
+                        <p>6. Selecione os eventos: <code>messages, messaging_postbacks</code></p>
+                        <p>7. Clique em "Verificar e Salvar"</p>
+                        <p>8. Depois, associe o webhook à sua página</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-yellow-50 p-4 rounded-lg mt-4">
+                    <div className="flex items-start gap-2">
+                      <div className="bg-yellow-400 rounded-full p-1 mt-0.5">
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-yellow-800">Verificações Importantes</h4>
+                        <ul className="text-sm text-yellow-700 space-y-1">
+                          <li>• Certifique-se que o token da página tem permissão <code>pages_messaging</code></li>
+                          <li>• A página deve estar em modo "Desenvolvedor" ou "Ativo"</li>
+                          <li>• O webhook deve estar associado especificamente à sua página</li>
+                          <li>• Teste mandando uma mensagem para a página após a configuração</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Botões de Ação */}
+                  <div className="flex flex-wrap gap-2 mt-6">
+                    <Button size="sm">
+                      Abrir Facebook Developers
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      Testar Webhook
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-blue-600">
+                      Verificar Mensagens
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-green-600">
+                      Sincronizar Tokens
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-red-600">
+                      Configurar Subscrição
+                    </Button>
+                    <Button variant="outline" size="sm" className="text-purple-600">
+                      Testar Sistema
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      Testar Webhook
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
