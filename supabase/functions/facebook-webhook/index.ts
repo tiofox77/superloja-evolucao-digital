@@ -126,6 +126,20 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
       return getFallbackResponse(message, supabase);
     }
 
+    // Buscar histórico de conversas recentes do usuário para contexto
+    console.log('🔍 Buscando histórico de conversas...');
+    const { data: recentConversations } = await supabase
+      .from('ai_conversations')
+      .select('message, type, timestamp')
+      .eq('platform', 'facebook')
+      .eq('user_id', senderId)
+      .order('timestamp', { ascending: false })
+      .limit(10); // Últimas 10 mensagens
+
+    // Analisar contexto da conversa
+    const context = analyzeConversationContext(recentConversations || [], message);
+    console.log('🧠 Contexto analisado:', context);
+
     // Buscar produtos disponíveis
     const { data: products } = await supabase
       .from('products')
@@ -163,6 +177,17 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     console.log('🎯 Usuário quer fotos:', wantsPhotos);
     console.log('==================');
 
+    // Construir histórico de conversa para contexto
+    let conversationHistory = '';
+    if (recentConversations && recentConversations.length > 0) {
+      conversationHistory = '\n\n📋 HISTÓRICO RECENTE DA CONVERSA:\n';
+      recentConversations.reverse().forEach((conv: any, index: number) => {
+        const role = conv.type === 'received' ? 'Cliente' : 'Carlos';
+        conversationHistory += `${index + 1}. ${role}: "${conv.message}"\n`;
+      });
+      conversationHistory += '\n';
+    }
+
     const systemPrompt = `Você é Carlos, um vendedor angolano experiente da SuperLoja (https://superloja.vip).
 
 PERSONALIDADE: 
@@ -178,6 +203,15 @@ COMPORTAMENTO HUMANO:
 - Se o cliente quer finalizar compra, guie-o passo a passo de forma amigável
 - Use emojis moderadamente para expressar emoções
 - Varie suas respostas, não seja repetitivo
+
+${conversationHistory}
+
+CONTEXTO ANALISADO:
+${context.summary}
+
+PRODUTO DE INTERESSE: ${context.selectedProduct || 'Nenhum produto específico identificado'}
+FASE DA CONVERSA: ${context.conversationStage}
+PRECISA LEMBRAR: ${context.importantInfo || 'Nada específico'}
 
 ${productsInfo}
 
@@ -218,7 +252,11 @@ REGRAS ABSOLUTAS:
 - Mostre a lista COMPLETA de fones - todos os produtos
 ${wantsPhotos ? '- INCLUA 📸 ![Imagem](URL) para cada produto' : '- NÃO inclua ![Imagem](URL) a menos que cliente peça fotos'}
 
-IMPORTANTE: Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('fone')).length || 9} fones. Mostre TODOS eles quando perguntarem sobre fones!`;
+IMPORTANTE: 
+- SEMPRE lembre do contexto da conversa anterior
+- Se o cliente já escolheu um produto, mantenha o foco nesse produto
+- Se está na fase de finalização, continue o processo onde parou
+- Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('fone')).length || 9} fones. Mostre TODOS eles quando perguntarem sobre fones!`;
 
     console.log('🤖 Enviando para OpenAI com instruções para mostrar TODOS os fones...');
 
@@ -327,6 +365,93 @@ async function getFallbackResponse(message: string, supabase: any): Promise<stri
   return `Olá! Bem-vindo à SuperLoja! 😊 Temos produtos incríveis com entrega grátis. O que procura? 
 
 Visite nosso site: https://superloja.vip`;
+}
+
+function analyzeConversationContext(conversations: any[], currentMessage: string) {
+  console.log('🔍 Analisando contexto de', conversations.length, 'conversas...');
+  
+  const context = {
+    summary: '',
+    selectedProduct: null,
+    conversationStage: 'initial',
+    importantInfo: null
+  };
+
+  // Se não há histórico, retornar contexto inicial
+  if (!conversations || conversations.length === 0) {
+    context.summary = 'Primeira conversa com o cliente';
+    context.conversationStage = 'initial';
+    return context;
+  }
+
+  // Analisar mensagens para extrair contexto
+  const allMessages = conversations.map(c => c.message).join(' ').toLowerCase();
+  const currentLower = currentMessage.toLowerCase();
+
+  // Detectar produto de interesse baseado no histórico
+  const productKeywords = {
+    't19': 'Fones de ouvido Bluetooth sem fio Disney T19',
+    'disney': 'Fones de ouvido Bluetooth sem fio Disney T19',
+    'bluetooth': 'Fones de ouvido relacionados',
+    'fone': 'Fones de ouvido em geral',
+    'auricular': 'Fones de ouvido',
+    'tws': 'Fones sem fio TWS'
+  };
+
+  for (const [keyword, product] of Object.entries(productKeywords)) {
+    if (allMessages.includes(keyword) || currentLower.includes(keyword)) {
+      context.selectedProduct = product;
+      break;
+    }
+  }
+
+  // Detectar fase da conversa
+  const purchaseIndicators = ['quero comprar', 'interesse', 'finalizar', 'nome:', 'contacto:', 'confirmar'];
+  const hasPurchaseIntent = purchaseIndicators.some(indicator => 
+    allMessages.includes(indicator) || currentLower.includes(indicator)
+  );
+
+  if (hasPurchaseIntent) {
+    context.conversationStage = 'purchase_intent';
+  } else if (context.selectedProduct) {
+    context.conversationStage = 'product_discussion';
+  } else {
+    context.conversationStage = 'browsing';
+  }
+
+  // Detectar informações importantes para lembrar
+  const importantPatterns = [
+    { pattern: /nome.*?([a-zA-Z\s]+)/i, type: 'nome' },
+    { pattern: /contacto.*?(\d+)/i, type: 'contacto' },
+    { pattern: /telefone.*?(\d+)/i, type: 'telefone' }
+  ];
+
+  for (const conv of conversations) {
+    for (const pattern of importantPatterns) {
+      const match = conv.message.match(pattern.pattern);
+      if (match) {
+        context.importantInfo = `${pattern.type}: ${match[1]}`;
+        break;
+      }
+    }
+  }
+
+  // Construir resumo baseado no contexto
+  if (context.conversationStage === 'purchase_intent') {
+    context.summary = `Cliente demonstrou interesse em comprar ${context.selectedProduct || 'um produto'}. Fase de finalização de compra.`;
+  } else if (context.conversationStage === 'product_discussion') {
+    context.summary = `Cliente está interessado em ${context.selectedProduct}. Discutindo detalhes do produto.`;
+  } else {
+    context.summary = 'Cliente navegando e explorando produtos disponíveis.';
+  }
+
+  console.log('🧠 Contexto extraído:', {
+    produto: context.selectedProduct,
+    fase: context.conversationStage,
+    info: context.importantInfo
+  });
+
+  return context;
 }
 
 function detectPurchaseIntent(customerMessage: string, aiResponse: string): string | null {
