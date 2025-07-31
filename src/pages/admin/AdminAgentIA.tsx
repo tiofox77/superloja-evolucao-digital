@@ -23,7 +23,8 @@ import {
   Activity,
   Eye,
   User,
-  Key
+  Key,
+  Target
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -1067,6 +1068,220 @@ const AdminAgentIA = () => {
                     </>
                   )}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Área de Treinamento do Agente */}
+        <TabsContent value="training">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                🎯 Treinamento do Agente IA
+              </CardTitle>
+              <CardDescription>
+                Aprimore as respostas do agente através de exemplos e correções
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                
+                {/* Padrões de Confirmação */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    ✅ Padrões de Confirmação de Compra
+                  </h3>
+                  <div className="bg-green-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium text-green-800">Palavras de Confirmação</Label>
+                        <div className="text-sm text-green-700 mt-1">
+                          <Badge variant="secondary" className="mr-1 mb-1">sim</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">sim podem entregar</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">certo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">correto</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">confirmo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">perfeito</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">está certo</Badge>
+                          <Badge variant="secondary" className="mr-1 mb-1">tudo certo</Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-green-800">Contexto Necessário</Label>
+                        <div className="text-sm text-green-700 mt-1">
+                          • Cliente já forneceu dados pessoais<br/>
+                          • Produto específico foi mencionado<br/>
+                          • Bot perguntou confirmação<br/>
+                          • Cliente responde afirmativamente
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dados Pessoais Detectados */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    👤 Detecção de Dados Pessoais
+                  </h3>
+                  <div className="bg-blue-50 p-4 rounded-lg space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Nome</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Nome: [nome]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Meu nome é [nome]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">[nome completo]</code>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Contacto</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Contacto: [número]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Telefone: [número]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">[9 dígitos]</code>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-blue-800">Padrões de Endereço</Label>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <code className="bg-blue-100 px-2 py-1 rounded">Endereço: [local]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Kilamba [detalhes]</code><br/>
+                          <code className="bg-blue-100 px-2 py-1 rounded">Luanda, [área]</code>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fases da Conversa */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    🗣️ Fases da Conversa
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="border-yellow-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-yellow-800">Navegação</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-yellow-700">
+                          • Cliente explorando produtos<br/>
+                          • Fazendo perguntas gerais<br/>
+                          • Sem produto específico escolhido
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-blue-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-blue-800">Discussão de Produto</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-blue-700">
+                          • Cliente interessado em produto específico<br/>
+                          • Perguntando detalhes, preço, especificações<br/>
+                          • Comparando opções
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-orange-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-orange-800">Intenção de Compra</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-orange-700">
+                          • Cliente quer comprar<br/>
+                          • Perguntando sobre entrega, pagamento<br/>
+                          • Começando a fornecer dados
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="border-green-200">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm text-green-800">Compra Confirmada</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="text-sm text-green-700">
+                          • Dados pessoais fornecidos<br/>
+                          • Cliente confirmou compra<br/>
+                          • Pronto para entrega!
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                {/* Sistema de Aprendizado */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    🧠 Sistema de Aprendizado Automático
+                  </h3>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium text-purple-800">O que o Agente Aprende</Label>
+                        <ul className="text-sm text-purple-700 mt-2 space-y-1">
+                          <li>• Padrões de confirmação de compra</li>
+                          <li>• Produtos mais procurados</li>
+                          <li>• Variações de linguagem do cliente</li>
+                          <li>• Momentos críticos de venda</li>
+                          <li>• Respostas que funcionam melhor</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <Label className="font-medium text-purple-800">Como Melhora</Label>
+                        <ul className="text-sm text-purple-700 mt-2 space-y-1">
+                          <li>• Analisa histórico de conversas</li>
+                          <li>• Identifica sucessos e falhas</li>
+                          <li>• Ajusta estratégias automaticamente</li>
+                          <li>• Aprende novos padrões de linguagem</li>
+                          <li>• Otimiza timing de notificações</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monitoramento em Tempo Real */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    📊 Monitoramento de Performance
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {learningInsights.filter(i => i.insight_type === 'confirmation_pattern').length}
+                        </div>
+                        <div className="text-sm text-gray-600">Padrões de Confirmação</div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-green-600">
+                          {Math.round(learningInsights.reduce((acc, i) => acc + i.effectiveness_score, 0) / Math.max(learningInsights.length, 1) * 100)}%
+                        </div>
+                        <div className="text-sm text-gray-600">Taxa de Eficácia</div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="text-center">
+                      <CardContent className="pt-6">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {learningInsights.length}
+                        </div>
+                        <div className="text-sm text-gray-600">Insights Ativos</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
               </div>
             </CardContent>
           </Card>

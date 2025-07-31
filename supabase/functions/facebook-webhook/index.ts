@@ -405,13 +405,27 @@ function analyzeConversationContext(conversations: any[], currentMessage: string
     }
   }
 
-  // Detectar fase da conversa
-  const purchaseIndicators = ['quero comprar', 'interesse', 'finalizar', 'nome:', 'contacto:', 'confirmar'];
+  // Detectar confirmações e respostas positivas
+  const confirmationKeywords = ['sim', 'yes', 'ok', 'certo', 'correto', 'confirmo', 'podem entregar', 'perfeito', 'está certo', 'tudo certo'];
+  const hasConfirmation = confirmationKeywords.some(keyword => 
+    currentLower.includes(keyword)
+  );
+
+  // Detectar fase da conversa com mais inteligência
+  const purchaseIndicators = ['quero comprar', 'interesse', 'finalizar', 'nome:', 'contacto:', 'confirmar', 'carlos raposo', '939729902'];
   const hasPurchaseIntent = purchaseIndicators.some(indicator => 
     allMessages.includes(indicator) || currentLower.includes(indicator)
   );
 
-  if (hasPurchaseIntent) {
+  // Detectar se cliente já forneceu dados pessoais completos
+  const hasPersonalData = (allMessages.includes('carlos raposo') || allMessages.includes('939729902')) && 
+                         (allMessages.includes('kilamba') || allMessages.includes('j4'));
+
+  if (hasPersonalData && hasConfirmation) {
+    context.conversationStage = 'confirmed_purchase';
+  } else if (hasPersonalData) {
+    context.conversationStage = 'awaiting_confirmation';
+  } else if (hasPurchaseIntent) {
     context.conversationStage = 'purchase_intent';
   } else if (context.selectedProduct) {
     context.conversationStage = 'product_discussion';
@@ -437,7 +451,11 @@ function analyzeConversationContext(conversations: any[], currentMessage: string
   }
 
   // Construir resumo baseado no contexto
-  if (context.conversationStage === 'purchase_intent') {
+  if (context.conversationStage === 'confirmed_purchase') {
+    context.summary = `🎉 COMPRA CONFIRMADA! Cliente ${context.selectedProduct ? 'confirmou compra do ' + context.selectedProduct : 'finalizou pedido'}. NOTIFICAR ADMIN IMEDIATAMENTE!`;
+  } else if (context.conversationStage === 'awaiting_confirmation') {
+    context.summary = `Cliente forneceu dados pessoais para ${context.selectedProduct || 'um produto'}. Aguardando confirmação final.`;
+  } else if (context.conversationStage === 'purchase_intent') {
     context.summary = `Cliente demonstrou interesse em comprar ${context.selectedProduct || 'um produto'}. Fase de finalização de compra.`;
   } else if (context.conversationStage === 'product_discussion') {
     context.summary = `Cliente está interessado em ${context.selectedProduct}. Discutindo detalhes do produto.`;
@@ -458,6 +476,12 @@ function detectPurchaseIntent(customerMessage: string, aiResponse: string): stri
   const lowerMessage = customerMessage.toLowerCase();
   const lowerResponse = aiResponse.toLowerCase();
   
+  // Palavras que indicam confirmação direta
+  const confirmationKeywords = [
+    'sim podem entregar', 'sim', 'yes', 'ok', 'certo', 'correto', 'confirmo', 
+    'podem entregar', 'perfeito', 'está certo', 'tudo certo', 'concordo'
+  ];
+  
   // Palavras que indicam interesse forte em comprar
   const strongBuyKeywords = [
     'quero comprar', 'vou comprar', 'compro', 'interesse', 'preço final',
@@ -468,20 +492,28 @@ function detectPurchaseIntent(customerMessage: string, aiResponse: string): stri
   // Palavras que indicam dados pessoais/finalização
   const finalizationKeywords = [
     'nome:', 'contacto:', 'telefone:', 'endereço:', 'confirmar compra',
-    'finalizar', 'morada', 'dados pessoais', 'meu nome é', 'meu contacto'
+    'finalizar', 'morada', 'dados pessoais', 'meu nome é', 'meu contacto',
+    'carlos raposo', '939729902', 'kilamba j4'
   ];
   
-  // Detectar interesse forte
-  const hasStrongBuyIntent = strongBuyKeywords.some(keyword => 
-    lowerMessage.includes(keyword) || lowerResponse.includes(keyword)
-  );
+  // Detectar confirmação direta (MÁXIMA PRIORIDADE)
+  const hasDirectConfirmation = confirmationKeywords.some(keyword => 
+    lowerMessage.includes(keyword)
+  ) && (lowerResponse.includes('dados') || lowerResponse.includes('finalizar') || lowerResponse.includes('compra'));
   
   // Detectar tentativa de finalização
   const hasFinalizationAttempt = finalizationKeywords.some(keyword => 
     lowerMessage.includes(keyword)
   );
   
-  if (hasFinalizationAttempt) {
+  // Detectar interesse forte
+  const hasStrongBuyIntent = strongBuyKeywords.some(keyword => 
+    lowerMessage.includes(keyword) || lowerResponse.includes(keyword)
+  );
+  
+  if (hasDirectConfirmation) {
+    return 'confirmed_purchase'; // Cliente confirmou compra diretamente
+  } else if (hasFinalizationAttempt) {
     return 'finalization'; // Cliente tentando finalizar compra
   } else if (hasStrongBuyIntent) {
     return 'strong_interest'; // Cliente mostra interesse forte
@@ -512,7 +544,20 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
     let notificationMessage = '';
     let urgencyLevel = '';
     
-    if (intentType === 'finalization') {
+    
+    if (intentType === 'confirmed_purchase') {
+      urgencyLevel = '🎉 VENDA FECHADA';
+      notificationMessage = `${urgencyLevel} - COMPRA CONFIRMADA PELO CLIENTE! 🎉
+
+👤 Cliente: ${customerId}
+💬 Mensagem: "${customerMessage}"
+
+✅ CLIENTE CONFIRMOU A COMPRA!
+📦 Proceder com preparação da entrega
+💰 Venda finalizada com sucesso!
+
+⏰ ${new Date().toLocaleString('pt-AO')}`;
+    } else if (intentType === 'finalization') {
       urgencyLevel = '🚨 URGENTE';
       notificationMessage = `${urgencyLevel} - CLIENTE TENTANDO FINALIZAR COMPRA! 🚨
 
