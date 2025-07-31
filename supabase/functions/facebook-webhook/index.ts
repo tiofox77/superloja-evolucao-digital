@@ -26,19 +26,30 @@ serve(async (req) => {
   }
 
   if (req.method === 'GET') {
-    // Webhook verification
+    // Webhook verification para Facebook e Instagram
     const url = new URL(req.url);
     const mode = url.searchParams.get('hub.mode');
     const token = url.searchParams.get('hub.verify_token');
     const challenge = url.searchParams.get('hub.challenge');
 
-    const VERIFY_TOKEN = Deno.env.get('FACEBOOK_VERIFY_TOKEN');
+    console.log('=== WEBHOOK VERIFICATION ===');
+    console.log('Mode:', mode);
+    console.log('Token recebido:', token);
+    console.log('Challenge:', challenge);
 
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-      console.log('✅ Webhook verified');
+    // Aceitar tokens do Facebook e Instagram
+    const FACEBOOK_TOKEN = Deno.env.get('FACEBOOK_VERIFY_TOKEN') || 'superloja_webhook_2024';
+    const INSTAGRAM_TOKEN = 'minha_superloja_instagram_webhook_token_2024';
+    
+    console.log('Tokens esperados:', { facebook: FACEBOOK_TOKEN, instagram: INSTAGRAM_TOKEN });
+
+    if (mode === 'subscribe' && (token === FACEBOOK_TOKEN || token === INSTAGRAM_TOKEN)) {
+      console.log('✅ VERIFICAÇÃO APROVADA - Retornando challenge');
       return new Response(challenge, { status: 200 });
     } else {
-      console.log('❌ Verification failed');
+      console.log('❌ VERIFICAÇÃO REJEITADA');
+      console.log('Mode válido?', mode === 'subscribe');
+      console.log('Token válido?', token === FACEBOOK_TOKEN || token === INSTAGRAM_TOKEN);
       return new Response('Forbidden', { status: 403 });
     }
   }
@@ -48,7 +59,11 @@ serve(async (req) => {
       const body = await req.json();
       console.log('📨 Webhook received:', JSON.stringify(body, null, 2));
 
+      // Detectar se é Facebook ou Instagram
       if (body.object === 'page') {
+        const platform = detectPlatform(body);
+        console.log(`📱 Plataforma detectada: ${platform}`);
+        
         for (const entry of body.entry) {
           if (entry.messaging) {
             for (const messaging of entry.messaging) {
@@ -59,7 +74,7 @@ serve(async (req) => {
               }
               
               if (messaging.message && messaging.message.text) {
-                await handleMessage(messaging, supabase);
+                await handleMessage(messaging, supabase, platform);
               }
             }
           }
@@ -222,7 +237,38 @@ async function optimizeResponsePatterns(insights: any, supabase: any) {
   });
 }
 
-async function handleMessage(messaging: any, supabase: any) {
+// Função para detectar plataforma
+function detectPlatform(body: any): 'facebook' | 'instagram' {
+  // Instagram geralmente tem diferentes IDs de página ou estruturas
+  // Para agora, vamos detectar baseado no token usado na verificação
+  // Ou outros indicadores específicos do Instagram vs Facebook
+  
+  // Verificar se tem indicadores específicos do Instagram
+  if (body.entry && body.entry[0]) {
+    const entry = body.entry[0];
+    
+    // Instagram tem diferentes estruturas de messaging
+    // Por exemplo, Instagram pode ter 'standby' array ou outros campos
+    if (entry.standby || entry.changes) {
+      return 'instagram';
+    }
+    
+    // Verificar ID da página (Instagram vs Facebook têm IDs diferentes)
+    const pageId = entry.id;
+    
+    // IDs específicos conhecidos (ajuste conforme necessário)
+    const instagramPageIds = ['your_instagram_page_id']; // Adicione IDs específicos
+    
+    if (instagramPageIds.includes(pageId)) {
+      return 'instagram';
+    }
+  }
+  
+  // Por padrão, assumir Facebook
+  return 'facebook';
+}
+
+async function handleMessage(messaging: any, supabase: any, platform: 'facebook' | 'instagram' = 'facebook') {
   const senderId = messaging.sender.id;
   const messageText = messaging.message.text;
   
@@ -243,7 +289,7 @@ async function handleMessage(messaging: any, supabase: any) {
     
     // Salvar mensagem recebida
     await supabase.from('ai_conversations').insert({
-      platform: 'facebook',
+      platform: platform,
       user_id: senderId,
       message: messageText,
       type: 'received',
@@ -261,7 +307,7 @@ async function handleMessage(messaging: any, supabase: any) {
     
     // Salvar resposta enviada
     await supabase.from('ai_conversations').insert({
-      platform: 'facebook',
+      platform: platform,
       user_id: senderId,
       message: aiResponse,
       type: 'sent',
