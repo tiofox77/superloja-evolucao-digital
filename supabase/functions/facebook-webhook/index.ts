@@ -143,7 +143,21 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     // BUSCA INTELIGENTE DE PRODUTOS BASEADA NA MENSAGEM DO USUÁRIO
     console.log('🧠 Analisando mensagem para busca inteligente:', message);
     
-    // Detectar categoria/tipo de produto que o usuário está perguntando
+    // PRIMEIRO: Verificar se usuário está referenciando produto específico da conversa anterior
+    const lowerMessage = message.toLowerCase();
+    let specificProductRequested = null;
+    
+    // Buscar por modelos específicos mencionados (X83, Pro6, T19, etc.)
+    const productPatterns = [
+      { pattern: /x83|x 83/, searchTerms: ['x83'] },
+      { pattern: /pro6|pro 6/, searchTerms: ['pro6', 'tws'] },
+      { pattern: /t19|t 19/, searchTerms: ['t19', 'disney'] },
+      { pattern: /disney/, searchTerms: ['disney'] },
+      { pattern: /transparente/, searchTerms: ['transparente', 'led'] },
+      { pattern: /numero\s*(\d+)|item\s*(\d+)|opção\s*(\d+)|opcao\s*(\d+)/, isNumber: true }
+    ];
+    
+    // Detectar categoria/tipo de produto
     const productKeywords = {
       'fones': ['fone', 'fones', 'headphone', 'earphone', 'ouvido'],
       'mouse': ['mouse', 'rato'],
@@ -155,13 +169,30 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     
     let searchQuery = '';
     let categoryFound = '';
+    let specificProductSearchTerms = [];
     
-    // Detectar categoria específica
+    // Detectar produto específico primeiro
+    for (const { pattern, searchTerms, isNumber } of productPatterns) {
+      const match = lowerMessage.match(pattern);
+      if (match) {
+        if (isNumber) {
+          const number = match[1] || match[2] || match[3] || match[4];
+          console.log('🔢 Usuário mencionou número:', number);
+          specificProductRequested = number;
+        } else if (searchTerms) {
+          specificProductSearchTerms = searchTerms;
+          console.log('🎯 Produto específico detectado:', searchTerms);
+        }
+        break;
+      }
+    }
+    
+    // Detectar categoria geral
     for (const [category, keywords] of Object.entries(productKeywords)) {
-      if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
+      if (keywords.some(keyword => lowerMessage.includes(keyword))) {
         categoryFound = category;
         if (category !== 'todos') {
-          searchQuery = keywords[0]; // Usar primeira palavra-chave para busca
+          searchQuery = keywords[0];
         }
         break;
       }
@@ -169,6 +200,7 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     
     console.log('🎯 Categoria detectada:', categoryFound);
     console.log('🔍 Query de busca:', searchQuery);
+    console.log('🎯 Produto específico:', specificProductSearchTerms);
     
     // Buscar produtos de forma mais específica
     let productsQuery = supabase
@@ -177,15 +209,22 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
       .eq('active', true)
       .eq('in_stock', true);
     
+    // Se produto específico foi mencionado, buscar por ele
+    if (specificProductSearchTerms.length > 0) {
+      const searchConditions = specificProductSearchTerms.map(term => 
+        `name.ilike.%${term}%`
+      ).join(',');
+      productsQuery = productsQuery.or(searchConditions);
+      console.log('🔍 Buscando produto específico com condições:', searchConditions);
+    }
     // Se foi detectado uma categoria específica, filtrar por ela
-    if (searchQuery && categoryFound !== 'todos') {
-      // Usar ilike para busca flexível no nome e descrição
+    else if (searchQuery && categoryFound !== 'todos') {
       productsQuery = productsQuery.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
     }
     
     // Buscar TODOS os produtos se usuário perguntou sobre "todos" ou categoria específica
-    if (categoryFound === 'todos' || searchQuery) {
-      productsQuery = productsQuery.limit(50); // Aumentar limite para busca mais completa
+    if (categoryFound === 'todos' || searchQuery || specificProductSearchTerms.length > 0) {
+      productsQuery = productsQuery.limit(50);
     } else {
       productsQuery = productsQuery.limit(25);
     }
@@ -270,11 +309,18 @@ INSTRUÇÕES ESPECÍFICAS PARA ESTA MENSAGEM:
 Mensagem do cliente: "${message}"
 
 ANÁLISE OBRIGATÓRIA ANTES DE RESPONDER:
-1. O que o cliente REALMENTE quer? (analise palavras-chave, intenção)
+1. O que o cliente REALMENTE quer? (analise palavras-chave, intenção, contexto da conversa)
 2. BUSCA NA BASE DE DADOS: Categoria detectada - "${categoryFound}" | Query - "${searchQuery}" | Produtos encontrados: ${products?.length || 0}
-3. Se cliente pergunta "são todos?", "tem mais?", "mais algum?" - CONSULTE A LISTA COMPLETA ACIMA e responda baseado nos dados REAIS
-4. Se não existe exatamente o que perguntou, qual seria a melhor alternativa da lista acima?
-5. Como posso ser mais útil e humano na resposta baseado nos produtos REAIS disponíveis?
+3. RECONHECIMENTO DE PRODUTO ESPECÍFICO: Se cliente menciona "pro6", "x83", "t19", etc., verifique se EXISTE na lista acima
+4. Se cliente pergunta "são todos?", "tem mais?", "mais algum?" - CONSULTE A LISTA COMPLETA ACIMA e responda baseado nos dados REAIS
+5. Se não existe exatamente o que perguntou, qual seria a melhor alternativa da lista acima?
+6. Como posso ser mais útil e humano na resposta baseado nos produtos REAIS disponíveis?
+
+REGRA CRÍTICA - RECONHECIMENTO DE PRODUTOS:
+- SE cliente menciona um produto específico (ex: "pro6", "x83", "disney"), PRIMEIRO procure na lista acima
+- SE o produto EXISTE na lista, forneça informações sobre ELE especificamente
+- SE o produto NÃO EXISTE na lista, seja honesto: "Esse modelo específico não temos, mas tenho aqui..."
+- NUNCA diga que não tem algo se está listado acima!
 
 IMPORTANTE - QUANDO CLIENTE PERGUNTA SE HÁ MAIS PRODUTOS:
 - Analise TODA a lista de produtos acima
@@ -282,6 +328,11 @@ IMPORTANTE - QUANDO CLIENTE PERGUNTA SE HÁ MAIS PRODUTOS:
 - Seja específico: "Sim, esses são TODOS os ${categoryFound} que temos" ou "Encontrei mais X produtos..."
 - NUNCA invente produtos que não estão na lista acima
 - Se a busca retornou poucos produtos, seja honesto: "Esses são os que temos disponíveis no momento"
+
+INSTRUÇÕES PARA PRODUTOS ESPECÍFICOS:
+- Se cliente pede "pro6 tws" e está na lista → mostre esse produto específico
+- Se cliente pede "x83" e está na lista → mostre esse produto específico  
+- Se cliente não entender ou for vago → instrua: "Para ajudar melhor, escolha pelo número (1, 2, 3...) ou nome completo da lista que enviei"
 
 DETECÇÃO DE FOTOS:
 Usuário pediu fotos: ${wantsPhotos}
