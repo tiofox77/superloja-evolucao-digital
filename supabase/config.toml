@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.ai-auto-learning]
 verify_jwt = false
+
+[functions.ai-admin-notifications]
+verify_jwt = false
