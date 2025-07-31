@@ -260,6 +260,8 @@ const AdminAgentIA = () => {
           key: 'bot_enabled', 
           value: enabled.toString(),
           description: 'Bot habilitado/desabilitado'
+        }, { 
+          onConflict: 'key' 
         });
       
       if (error) throw error;
