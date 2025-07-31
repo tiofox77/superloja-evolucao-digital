@@ -20,19 +20,12 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface AdminNotification {
   id: string;
-  user_id?: string;
+  admin_user_id: string;
   notification_type: string;
-  recipient: string;
-  subject?: string;
   message: string;
-  status: string;
-  provider?: string;
-  provider_response?: any;
-  error_message?: string;
   metadata?: any;
-  sent_at?: string;
+  is_sent?: boolean;
   created_at: string;
-  updated_at?: string;
 }
 
 const AdminNotifications = () => {
@@ -50,13 +43,7 @@ const AdminNotifications = () => {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (filter !== 'all') {
-        query = query.eq('status', filter);
-      }
-
-      if (priorityFilter !== 'all') {
-        query = query.eq('priority', priorityFilter);
-      }
+      // Filtros não aplicáveis para esta tabela simplificada
 
       const { data, error } = await query;
 
@@ -77,24 +64,21 @@ const AdminNotifications = () => {
     loadNotifications();
   }, [filter, priorityFilter]);
 
-  // Atualizar status da notificação
-  const updateNotificationStatus = async (id: string, status: AdminNotification['status']) => {
+  // Marcar como lida
+  const markAsRead = async (id: string) => {
     try {
       const { error } = await supabase
         .from('admin_notifications')
-        .update({ 
-          status,
-          resolved_at: status === 'resolved' ? new Date().toISOString() : null
-        })
+        .update({ is_sent: true })
         .eq('id', id);
 
       if (error) throw error;
 
-      toast.success(`Notificação marcada como ${status}`);
+      toast.success('Notificação marcada como lida');
       loadNotifications();
     } catch (error) {
       console.error('Erro ao atualizar notificação:', error);
-      toast.error('Erro ao atualizar status');
+      toast.error('Erro ao atualizar notificação');
     }
   };
 
@@ -207,114 +191,58 @@ const AdminNotifications = () => {
                     <div className="space-y-3">
                       {/* Header da notificação */}
                       <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium text-sm">
-                            Usuário: {notification.user_id}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {notification.platform}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={getPriorityColor(notification.priority)}>
-                            {notification.priority.toUpperCase()}
-                          </Badge>
-                          <Badge variant={getStatusColor(notification.status)}>
-                            {notification.status === 'pending' && 'Pendente'}
-                            {notification.status === 'in_progress' && 'Em Progresso'}
-                            {notification.status === 'resolved' && 'Resolvido'}
-                            {notification.status === 'dismissed' && 'Dispensado'}
-                          </Badge>
-                        </div>
+                       <div className="flex items-center gap-2">
+                           <User className="h-4 w-4 text-muted-foreground" />
+                           <span className="font-medium text-sm">
+                             Admin: {notification.admin_user_id}
+                           </span>
+                           <Badge variant="outline" className="text-xs">
+                             {notification.notification_type}
+                           </Badge>
+                         </div>
+                         <div className="flex items-center gap-2">
+                           <Badge variant={notification.is_sent ? 'secondary' : 'destructive'}>
+                             {notification.is_sent ? 'Lida' : 'Nova'}
+                           </Badge>
+                         </div>
                       </div>
 
-                      {/* Razão da escalação */}
-                      <div className="bg-yellow-50 p-3 rounded-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                          <span className="font-medium text-sm text-yellow-800">
-                            Motivo da Escalação: {notification.reason}
-                          </span>
-                        </div>
-                      </div>
+                       {/* Mensagem da notificação */}
+                       <div className="bg-muted/50 p-3 rounded-lg">
+                         <div className="flex items-center gap-2 mb-2">
+                           <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                           <span className="font-medium text-sm">Notificação:</span>
+                         </div>
+                         <p className="text-sm">{notification.message}</p>
+                       </div>
 
-                      {/* Mensagem do usuário */}
-                      <div className="bg-muted/50 p-3 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium text-sm">Mensagem do Usuário:</span>
-                        </div>
-                        <p className="text-sm">{notification.message}</p>
-                      </div>
+                       {/* Metadata adicional */}
+                       {notification.metadata && Object.keys(notification.metadata).length > 0 && (
+                         <div className="text-xs text-muted-foreground">
+                           <strong>Dados:</strong> {JSON.stringify(notification.metadata, null, 2)}
+                         </div>
+                       )}
 
-                      {/* Contexto adicional */}
-                      {notification.context && Object.keys(notification.context).length > 0 && (
-                        <div className="text-xs text-muted-foreground">
-                          <strong>Contexto:</strong> {JSON.stringify(notification.context, null, 2)}
-                        </div>
-                      )}
+                       {/* Timestamps */}
+                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                         <div className="flex items-center gap-1">
+                           <Clock className="h-3 w-3" />
+                           Criado: {formatDate(notification.created_at)}
+                         </div>
+                       </div>
 
-                      {/* Timestamps */}
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Criado: {formatDate(notification.created_at)}
-                        </div>
-                        {notification.resolved_at && (
-                          <div className="flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3" />
-                            Resolvido: {formatDate(notification.resolved_at)}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Ações */}
-                      {notification.status === 'pending' && (
-                        <div className="flex gap-2 pt-2 border-t">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateNotificationStatus(notification.id, 'in_progress')}
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Assumir
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => updateNotificationStatus(notification.id, 'resolved')}
-                          >
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Resolver
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => updateNotificationStatus(notification.id, 'dismissed')}
-                          >
-                            Dispensar
-                          </Button>
-                        </div>
-                      )}
-
-                      {notification.status === 'in_progress' && (
-                        <div className="flex gap-2 pt-2 border-t">
-                          <Button
-                            size="sm"
-                            onClick={() => updateNotificationStatus(notification.id, 'resolved')}
-                          >
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Resolver
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateNotificationStatus(notification.id, 'pending')}
-                          >
-                            Voltar para Pendente
-                          </Button>
-                        </div>
-                      )}
+                       {/* Ações */}
+                       {!notification.is_sent && (
+                         <div className="flex gap-2 pt-2 border-t">
+                           <Button
+                             size="sm"
+                             onClick={() => markAsRead(notification.id)}
+                           >
+                             <CheckCircle className="h-3 w-3 mr-1" />
+                             Marcar como Lida
+                           </Button>
+                         </div>
+                       )}
                     </div>
                   </Card>
                 ))

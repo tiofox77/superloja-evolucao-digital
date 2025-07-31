@@ -110,6 +110,9 @@ async function handleMessage(messaging: any, supabase: any) {
       type: 'sent',
       timestamp: new Date().toISOString()
     });
+
+    // Verificar se precisa notificar admin
+    await checkAndNotifyAdmin(messageText, aiResponse, senderId, supabase);
     
   } catch (error) {
     console.error('❌ Erro ao processar mensagem:', error);
@@ -273,12 +276,26 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
 
     const systemPrompt = `Você é Carlos, um vendedor angolano experiente da SuperLoja (https://superloja.vip).
 
+INFORMAÇÕES OBRIGATÓRIAS DA LOJA:
+- WhatsApp para contacto: 939729902 (SEMPRE fornecer quando perguntarem)
+- Link direto WhatsApp: https://wa.me/244939729902
+- Localização para retirada urgente: Kilamba J13  
+- Entrega em Luanda: GRÁTIS
+- Entrega fora de Luanda: Sob orçamento (NOTIFICAR ADMIN)
+- NÃO temos loja física, apenas online
+
 PERSONALIDADE: 
 - Fala como um angolano real, informal mas respeitoso
 - Use expressões como "meu caro", "eh pá", "não é assim?"
 - Seja caloroso, paciente e entusiasmado com os produtos
 - Conte histórias sobre os produtos se apropriado
 - Mostre interesse genuíno nas necessidades do cliente
+
+REGRAS DE NOTIFICAÇÃO ADMIN (CRÍTICAS):
+- Se perguntarem sobre entrega fora de Luanda → NOTIFICAR ADMIN e informar orçamento
+- Se não souber responder algo → NOTIFICAR ADMIN
+- Se cliente quiser informações muito específicas → NOTIFICAR ADMIN
+- Para qualquer dúvida sobre localização de produto ou retirada urgente → informar Kilamba J13 e WhatsApp 939729902
 
 INTELIGÊNCIA CRÍTICA - ANTES DE RESPONDER:
 1. ANALISE A MENSAGEM: O que o cliente REALMENTE está perguntando?
@@ -942,5 +959,41 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
 
   } catch (error) {
     console.error('❌ Erro geral ao enviar mensagem:', error);
+  }
+}
+
+// Função para verificar e notificar admin quando necessário
+async function checkAndNotifyAdmin(userMessage: string, aiResponse: string, userId: string, supabase: any) {
+  const triggers = [
+    'entrega fora',
+    'entrega provincia',
+    'entrega nas provincia',
+    'não sei',
+    'não tenho certeza',
+    'deixa-me contactar',
+    'equipa especializada',
+    'informações mais precisas',
+    'orçamento'
+  ];
+  
+  const shouldNotify = triggers.some(trigger => 
+    userMessage.toLowerCase().includes(trigger) || 
+    aiResponse.toLowerCase().includes(trigger)
+  );
+  
+  if (shouldNotify) {
+    console.log('🔔 Notificando admin devido a:', userMessage);
+    
+    try {
+      await supabase.from('admin_notifications').insert({
+        admin_user_id: 'admin',
+        notification_type: 'user_needs_help',
+        message: `Usuário ${userId} precisa de ajuda especializada. Mensagem: "${userMessage}". Resposta IA: "${aiResponse.substring(0, 200)}..."`
+      });
+      
+      console.log('✅ Admin notificado com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao notificar admin:', error);
+    }
   }
 }
