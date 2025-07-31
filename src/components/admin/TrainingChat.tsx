@@ -136,8 +136,35 @@ const TrainingChat = () => {
     );
   };
 
+  // Verificar se precisa escalação para admin
+  const needsEscalation = (message: string): string | null => {
+    const lowerMessage = message.toLowerCase();
+    
+    // Casos que precisam escalação para admin
+    if (lowerMessage.includes('reclamação') || lowerMessage.includes('problema técnico')) {
+      return 'reclamacao_tecnica';
+    }
+    if (lowerMessage.includes('orçamento província') || lowerMessage.includes('entrega província')) {
+      return 'orcamento_provincia';
+    }
+    if (lowerMessage.includes('preço especial') || lowerMessage.includes('desconto especial')) {
+      return 'preco_especial';
+    }
+    if (lowerMessage.includes('produto específico') && !lowerMessage.includes('iphone') && !lowerMessage.includes('airpods') && !lowerMessage.includes('samsung')) {
+      return 'produto_especifico';
+    }
+    
+    return null;
+  };
+
   // Gerar resposta local inteligente
   const generateLocalResponse = async (message: string, context: ChatMessage[]): Promise<string> => {
+    // Verificar se precisa escalação
+    const escalationReason = needsEscalation(message);
+    if (escalationReason) {
+      return "Para essa informação específica, vou conectar você com nosso especialista. Um momento por favor... ⏳\n\n[USUÁRIO ESCALADO PARA ADMIN - AGUARDANDO INTERVENÇÃO]";
+    }
+
     // Buscar na base de conhecimento
     const { data: knowledgeItems } = await supabase
       .from('ai_knowledge_base')
@@ -157,34 +184,47 @@ const TrainingChat = () => {
       }
     }
 
-    // Resposta padrão mais inteligente
-    const contextSummary = context.slice(-3).map(msg => msg.content).join(' ');
-    
-    if (shouldSearchWeb(message)) {
-      return `Entendi sua pergunta sobre "${message}". Deixe-me pesquisar informações atualizadas na internet para dar uma resposta mais precisa.`;
-    }
-
-    // Detectar tipo de pergunta para resposta mais específica
+    // Resposta contextual baseada na mensagem com informações da loja
     const lowerMessage = message.toLowerCase();
     
+    if (lowerMessage.includes('whatsapp') || lowerMessage.includes('contacto') || lowerMessage.includes('contato')) {
+      return `Nosso WhatsApp é 939729902. Link direto: https://wa.me/244939729902. Estamos localizados no Kilamba J13, Luanda.`;
+    }
+    
+    if (lowerMessage.includes('localização') || lowerMessage.includes('onde fica') || lowerMessage.includes('endereço')) {
+      return `Nossa loja fica no Kilamba J13, Luanda. Para produtos urgentes, pode recolher diretamente na loja. WhatsApp: 939729902`;
+    }
+    
+    if (lowerMessage.includes('entrega')) {
+      return `Entrega GRÁTIS em Luanda! Para outras províncias, fazemos orçamento personalizado. Contacte 939729902 para mais detalhes.`;
+    }
+    
     if (lowerMessage.includes('preço') || lowerMessage.includes('custa') || lowerMessage.includes('valor')) {
-      return `Olá! Sou assistente da Superloja Evolução Digital. Para informações atualizadas sobre preços, recomendo entrar em contacto direto com nossa loja, pois os valores variam conforme promoções e stock disponível. Posso pesquisar informações técnicas detalhadas sobre o produto que procura. Gostaria que eu faça uma pesquisa web com especificações atualizadas?`;
+      return `Para informações de preços atualizados, recomendo contactar nossa loja pelo WhatsApp 939729902 ou visitar no Kilamba J13. Os preços variam conforme promoções ativas.`;
     }
     
     if (lowerMessage.includes('disponível') || lowerMessage.includes('stock') || lowerMessage.includes('tem')) {
-      return `Olá! Sou assistente da Superloja Evolução Digital. Para confirmar disponibilidade em stock, recomendo contactar nossa loja diretamente, pois o inventário muda constantemente. Posso pesquisar informações técnicas e comparações sobre o produto que procura. Gostaria dessa pesquisa?`;
+      return `Para confirmar disponibilidade atual, contacte-nos pelo WhatsApp 939729902. Nossa loja fica no Kilamba J13, Luanda.`;
     }
     
-    if (lowerMessage.includes('iphone') || lowerMessage.includes('samsung') || lowerMessage.includes('tws')) {
-      return `Olá! Sou assistente da Superloja Evolução Digital. Temos diversos modelos desses produtos populares em Angola. Para informações técnicas detalhadas e comparações atualizadas, posso fazer uma pesquisa web. Isso seria útil?`;
+    if (lowerMessage.includes('airpods') || lowerMessage.includes('fones')) {
+      return `Temos AirPods originais e também os populares TWS Pro6 com excelente qualidade. Para preços e disponibilidade atual, contacte 939729902 (Kilamba J13).`;
+    }
+    
+    if (lowerMessage.includes('iphone') || lowerMessage.includes('samsung') || lowerMessage.includes('smartphone')) {
+      return `Temos diversos modelos de smartphones iPhone e Samsung. Para informações específicas de modelos e preços, contacte 939729902 ou visite-nos no Kilamba J13.`;
     }
     
     if (lowerMessage.includes('garantia') || lowerMessage.includes('assistência')) {
-      return `Olá! Sou assistente da Superloja Evolução Digital. Todos nossos produtos têm garantia oficial com assistência técnica local em Angola. Para detalhes específicos sobre garantia do produto que procura, posso pesquisar informações atualizadas. Gostaria dessa pesquisa?`;
+      return `Todos nossos produtos têm garantia oficial com assistência técnica local. Para detalhes específicos da garantia, contacte 939729902.`;
+    }
+
+    if (shouldSearchWeb(message)) {
+      return `Entendi sua pergunta sobre "${message}". Deixe-me pesquisar informações atualizadas na internet para dar uma resposta mais precisa.`;
     }
     
-    // Resposta genérica melhorada
-    return `Olá! Sou assistente da Superloja Evolução Digital, a principal loja de tecnologia em Angola. Compreendi sua pergunta sobre "${message}". Posso ajudar com informações detalhadas e atualizadas através de pesquisa web. Gostaria que eu pesquise informações específicas sobre este assunto?`;
+    // Resposta genérica melhorada com informações da loja
+    return `Olá! Sou assistente da Superloja Evolução Digital, no Kilamba J13, Luanda. Para mais informações específicas sobre "${message}", contacte nosso WhatsApp 939729902. Posso ajudar com informações gerais ou fazer uma pesquisa web detalhada. O que prefere?`;
   };
   // Enviar mensagem para a IA
   const sendTrainingMessage = async (message: string, forceWebSearch: boolean = false) => {
@@ -403,12 +443,28 @@ const TrainingChat = () => {
                       </div>
                     </div>
                     <div>
+                      <Label className="font-medium">Escalação para Admin:</Label>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {['reclamação', 'orçamento província', 'preço especial', 'problema técnico'].map(trigger => (
+                          <Badge key={trigger} variant="destructive" className="text-xs">{trigger}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="font-medium">Informações da Loja:</Label>
+                      <ul className="mt-1 text-xs space-y-1">
+                        <li>• WhatsApp: 939729902</li>
+                        <li>• Localização: Kilamba J13</li>
+                        <li>• Entrega grátis em Luanda</li>
+                      </ul>
+                    </div>
+                    <div>
                       <Label className="font-medium">Funcionalidades:</Label>
                       <ul className="mt-1 text-xs space-y-1">
                         <li>• Pesquisa automática na web</li>
+                        <li>• Escalação automática para admin</li>
                         <li>• Base de conhecimento local</li>
-                        <li>• Sugestões relacionadas</li>
-                        <li>• Adição rápida de exemplos</li>
+                        <li>• Notificações para intervenção</li>
                       </ul>
                     </div>
                   </div>
