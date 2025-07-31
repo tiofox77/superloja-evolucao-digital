@@ -250,7 +250,7 @@ serve(async (req) => {
         instructions = [
           '👤 PROBLEMA: ID do admin não válido',
           '📋 Soluções:',
-          '1. Verifique se "carlosfox2" é o ID correto do Facebook',
+          '1. Verifique se "24320548907583618" é o ID correto do Facebook',
           '2. O ID deve ser o ID único do Facebook, não o nome de usuário',
           '3. Teste primeiro enviando mensagem do usuário para a página',
           '4. Use o ID que aparece nas conversas recebidas'
