@@ -163,9 +163,21 @@ async function processWithAI(message: string, senderId: string, supabase: any): 
     console.log('🎯 Usuário quer fotos:', wantsPhotos);
     console.log('==================');
 
-    const systemPrompt = `Você é um vendedor angolano inteligente da SuperLoja (https://superloja.vip).
+    const systemPrompt = `Você é Carlos, um vendedor angolano experiente da SuperLoja (https://superloja.vip).
 
-PERSONALIDADE: Amigável, direto, conhece bem os produtos, fala como um angolano real.
+PERSONALIDADE: 
+- Fala como um angolano real, informal mas respeitoso
+- Use expressões como "meu caro", "eh pá", "não é assim?"
+- Seja caloroso, paciente e entusiasmado com os produtos
+- Conte histórias sobre os produtos se apropriado
+- Mostre interesse genuíno nas necessidades do cliente
+
+COMPORTAMENTO HUMANO:
+- Quando cliente mostra interesse em comprar, seja mais detalhado e ajude com o processo
+- Pergunte se precisam de mais informações sobre entrega, garantia, etc.
+- Se o cliente quer finalizar compra, guie-o passo a passo de forma amigável
+- Use emojis moderadamente para expressar emoções
+- Varie suas respostas, não seja repetitivo
 
 ${productsInfo}
 
@@ -179,6 +191,12 @@ INSTRUÇÕES CRÍTICAS PARA FONES:
 - NUNCA corte a lista no meio ou limite a 5 produtos
 - NUNCA use frases como "entre outros" ou "e mais"
 - Se não mostrar todos os 9 fones, a resposta está INCORRETA
+
+PROCESSO DE VENDA HUMANIZADO:
+- Se cliente quer comprar algo, explique: "Óptimo! Para confirmar a sua compra, preciso só de alguns dados..."
+- Peça: Nome completo, contacto (telefone), produto escolhido
+- Seja empático: "Entendo que quer garantir que seja o produto certo"
+- Ofereça ajuda: "Quer saber mais sobre garantia? Entrega é grátis!"
 
 REGRAS PARA IMAGENS:
 ${wantsPhotos ? 
@@ -235,12 +253,14 @@ IMPORTANTE: Temos ${products?.filter((p: any) => p.name.toLowerCase().includes('
       console.log(`📊 Tokens usados: ${data.usage?.total_tokens || 'não disponível'}`);
       console.log(`📝 Tokens completion: ${data.usage?.completion_tokens || 'não disponível'}`);
       
-      // Detectar se é confirmação de compra e notificar admin
-      const lowerMessage = message.toLowerCase();
-      if (lowerMessage.includes('comprei') || lowerMessage.includes('nome:') || 
-          lowerMessage.includes('contacto:') || lowerMessage.includes('confirmar')) {
-        // Notificar admin em background
-        EdgeRuntime.waitUntil(notifyAdmin(senderId, message, supabase));
+      // Detectar intenção de compra mais ampla
+      const purchaseIntentDetected = detectPurchaseIntent(message, aiResponse);
+      if (purchaseIntentDetected) {
+        console.log('🛒 Intenção de compra detectada - notificando admin');
+        // Notificar admin em background (sem aguardar)
+        notifyAdmin(senderId, message, supabase, purchaseIntentDetected).catch(error => 
+          console.error('❌ Erro ao notificar admin:', error)
+        );
       }
       
       return aiResponse;
@@ -309,18 +329,45 @@ async function getFallbackResponse(message: string, supabase: any): Promise<stri
 Visite nosso site: https://superloja.vip`;
 }
 
-async function notifyAdmin(customerId: string, customerMessage: string, supabase: any) {
-  try {
-    console.log('🔔 Notificando admin sobre nova compra...');
-    
-    // Buscar ID do admin
-    const { data: adminData } = await supabase
-      .from('ai_settings')
-      .select('value')
-      .eq('key', 'admin_facebook_id')
-      .single();
+function detectPurchaseIntent(customerMessage: string, aiResponse: string): string | null {
+  const lowerMessage = customerMessage.toLowerCase();
+  const lowerResponse = aiResponse.toLowerCase();
+  
+  // Palavras que indicam interesse forte em comprar
+  const strongBuyKeywords = [
+    'quero comprar', 'vou comprar', 'compro', 'interesse', 'preço final',
+    'como faço para comprar', 'forma de pagamento', 'entrega', 'garantia',
+    'posso pagar', 'aceita cartão', 'disponível', 'stock', 'quanto tempo demora'
+  ];
+  
+  // Palavras que indicam dados pessoais/finalização
+  const finalizationKeywords = [
+    'nome:', 'contacto:', 'telefone:', 'endereço:', 'confirmar compra',
+    'finalizar', 'morada', 'dados pessoais', 'meu nome é', 'meu contacto'
+  ];
+  
+  // Detectar interesse forte
+  const hasStrongBuyIntent = strongBuyKeywords.some(keyword => 
+    lowerMessage.includes(keyword) || lowerResponse.includes(keyword)
+  );
+  
+  // Detectar tentativa de finalização
+  const hasFinalizationAttempt = finalizationKeywords.some(keyword => 
+    lowerMessage.includes(keyword)
+  );
+  
+  if (hasFinalizationAttempt) {
+    return 'finalization'; // Cliente tentando finalizar compra
+  } else if (hasStrongBuyIntent) {
+    return 'strong_interest'; // Cliente mostra interesse forte
+  }
+  
+  return null; // Nenhuma intenção de compra detectada
+}
 
-    const adminId = adminData?.value || 'carlosfox2';
+async function notifyAdmin(customerId: string, customerMessage: string, supabase: any, intentType: string) {
+  try {
+    console.log(`🔔 Notificando admin sobre ${intentType}...`);
     
     // Buscar token do Facebook
     const { data: tokenData } = await supabase
@@ -336,15 +383,37 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
       return;
     }
 
-    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
+    // Construir mensagem personalizada baseada no tipo de intenção
+    let notificationMessage = '';
+    let urgencyLevel = '';
     
-    const notificationMessage = `🚨 NOVA COMPRA CONFIRMADA! 🚨
+    if (intentType === 'finalization') {
+      urgencyLevel = '🚨 URGENTE';
+      notificationMessage = `${urgencyLevel} - CLIENTE TENTANDO FINALIZAR COMPRA! 🚨
 
 👤 Cliente: ${customerId}
 💬 Mensagem: "${customerMessage}"
 
-⚡ Entre em contacto com o cliente para finalizar a venda!
-🕐 ${new Date().toLocaleString('pt-AO')}`;
+🔥 AÇÃO IMEDIATA NECESSÁRIA!
+📱 Entre já em contacto com o cliente para fechar a venda!
+
+⏰ ${new Date().toLocaleString('pt-AO')}`;
+    } else if (intentType === 'strong_interest') {
+      urgencyLevel = '⚡ OPORTUNIDADE';
+      notificationMessage = `${urgencyLevel} - CLIENTE COM FORTE INTERESSE! ⚡
+
+👤 Cliente: ${customerId}
+💬 Mensagem: "${customerMessage}"
+
+💡 Cliente demonstra interesse real em comprar
+📞 Considere entrar em contacto para ajudar na decisão
+
+⏰ ${new Date().toLocaleString('pt-AO')}`;
+    }
+
+    // Tentar enviar para carlosfox2 (admin padrão)
+    const adminId = 'carlosfox2';
+    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
     
     const payload = {
       recipient: { id: adminId },
@@ -362,9 +431,41 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Erro notificar admin:', response.status, errorText);
+      
+      // Se falhar, tentar enviar como notificação normal (sem tag)
+      const fallbackPayload = {
+        recipient: { id: adminId },
+        message: { text: notificationMessage },
+        messaging_type: 'RESPONSE'
+      };
+      
+      const fallbackResponse = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fallbackPayload),
+      });
+      
+      if (fallbackResponse.ok) {
+        console.log('✅ Admin notificado via fallback!');
+      } else {
+        console.error('❌ Falha total ao notificar admin');
+      }
     } else {
-      console.log('✅ Admin notificado com sucesso!');
+      console.log('✅ Admin carlosfox2 notificado com sucesso!');
     }
+
+    // Salvar notificação no banco para histórico
+    await supabase.from('admin_notifications').insert({
+      admin_user_id: adminId,
+      notification_type: intentType,
+      message: notificationMessage,
+      metadata: {
+        customer_id: customerId,
+        customer_message: customerMessage,
+        intent_type: intentType,
+        timestamp: new Date().toISOString()
+      }
+    });
 
   } catch (error) {
     console.error('❌ Erro ao notificar admin:', error);
