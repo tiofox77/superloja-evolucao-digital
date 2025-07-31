@@ -104,6 +104,8 @@ const AdminAgentIA = () => {
   const [testMessage, setTestMessage] = useState('');
   const [messageCount, setMessageCount] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [userMessages, setUserMessages] = useState<RealtimeMessage[]>([]);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -224,6 +226,35 @@ const AdminAgentIA = () => {
     } catch (error) {
       console.error('Erro ao carregar conversas:', error);
     }
+  };
+
+  const loadUserMessages = async (userId: string, platform: string) => {
+    try {
+      const { data } = await supabase
+        .from('ai_conversations')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('platform', platform)
+        .order('timestamp', { ascending: true });
+      
+      if (data) {
+        const typedMessages = data.filter(msg => 
+          msg.type === 'received' || msg.type === 'sent'
+        ).map(msg => ({
+          ...msg,
+          type: msg.type as 'received' | 'sent'
+        }));
+        
+        setUserMessages(typedMessages);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mensagens do usuário:', error);
+    }
+  };
+
+  const handleUserSelect = (userId: string, platform: string) => {
+    setSelectedUser(`${userId}-${platform}`);
+    loadUserMessages(userId, platform);
   };
 
   const loadKnowledgeBase = async () => {
@@ -629,78 +660,167 @@ para verificar se os serviços estão rodando`);
 
         {/* Conversas */}
         <TabsContent value="conversations">
-          <Card>
-            <CardHeader>
-              <CardTitle>🗨️ Conversas Organizadas por Usuário</CardTitle>
-              <CardDescription>
-                Visualize conversas agrupadas por usuário e plataforma para melhor acompanhamento
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {conversations.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Nenhuma conversa encontrada.</p>
-                  </div>
-                ) : (
-                  conversations.map((conv, index) => (
-                    <div key={`${conv.user_id}-${conv.platform}-${index}`} 
-                         className={`border rounded-lg p-4 ${conv.isLead ? 'border-green-500 bg-green-50' : ''}`}>
-                      <div className="flex items-center justify-between mb-2">
+          <div className="h-[600px] border rounded-lg bg-background overflow-hidden">
+            <div className="flex h-full">
+              {/* Lista de usuários - estilo WhatsApp */}
+              <div className="w-1/3 border-r bg-muted/30">
+                <div className="p-4 border-b bg-primary text-primary-foreground">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Conversas ({conversations.length})
+                  </h3>
+                </div>
+                <div className="overflow-y-auto h-full">
+                  {conversations.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhuma conversa encontrada.</p>
+                    </div>
+                  ) : (
+                    conversations.map((conv, index) => (
+                      <div 
+                        key={`${conv.user_id}-${conv.platform}-${index}`}
+                        onClick={() => handleUserSelect(conv.user_id, conv.platform)}
+                        className={`p-3 border-b cursor-pointer hover:bg-accent transition-colors ${
+                          selectedUser === `${conv.user_id}-${conv.platform}` ? 'bg-accent' : ''
+                        } ${conv.isLead ? 'border-l-4 border-l-green-500' : ''}`}
+                      >
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${
                             conv.isLead ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 
                             'bg-gradient-to-br from-blue-500 to-purple-600'
                           }`}>
                             {conv.userName ? conv.userName.slice(0, 2).toUpperCase() : conv.user_id.slice(0, 2).toUpperCase()}
                           </div>
-                          <div>
-                            <h4 className="font-medium">
-                              {conv.userName || conv.user_id}
-                              {conv.isLead && <span className="ml-2 text-green-600">🔥 LEAD</span>}
-                            </h4>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                {conv.platform}
-                              </Badge>
-                              <Badge variant={conv.isLead ? 'default' : 'secondary'} className="text-xs">
-                                {conv.conversationStage || 'indefinido'}
-                              </Badge>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-medium text-sm truncate">
+                                {conv.userName || conv.user_id}
+                                {conv.isLead && <span className="ml-1 text-green-600">🔥</span>}
+                              </h4>
                               <span className="text-xs text-muted-foreground">
-                                {conv.messageCount} mensagens
+                                {new Date(conv.timestamp).toLocaleTimeString('pt-BR', {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
                               </span>
                             </div>
+                            <div className="flex items-center gap-1 mb-1">
+                              <Badge variant="outline" className="text-xs px-1 py-0">
+                                {conv.platform}
+                              </Badge>
+                              {conv.isLead && (
+                                <Badge variant="default" className="text-xs px-1 py-0">
+                                  LEAD
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {conv.lastMessage}
+                            </p>
                             {conv.userContact && (
-                              <div className="text-xs text-green-600 font-medium">
+                              <div className="text-xs text-green-600 mt-1">
                                 📞 {conv.userContact}
-                              </div>
-                            )}
-                            {conv.userAddress && (
-                              <div className="text-xs text-blue-600">
-                                📍 {conv.userAddress}
-                              </div>
-                            )}
-                            {conv.selectedProduct && (
-                              <div className="text-xs text-orange-600 font-medium">
-                                🛍️ {conv.selectedProduct}
                               </div>
                             )}
                           </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(conv.timestamp).toLocaleString('pt-BR')}
-                        </div>
                       </div>
-                      <div className="text-sm bg-gray-50 p-2 rounded">
-                        <span className="font-medium">Última mensagem:</span> {conv.lastMessage}
-                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Área do chat */}
+              <div className="flex-1 flex flex-col">
+                {selectedUser ? (
+                  <>
+                    {/* Header do chat */}
+                    <div className="p-4 border-b bg-background">
+                      {(() => {
+                        const conv = conversations.find(c => `${c.user_id}-${c.platform}` === selectedUser);
+                        return conv ? (
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                              conv.isLead ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 
+                              'bg-gradient-to-br from-blue-500 to-purple-600'
+                            }`}>
+                              {conv.userName ? conv.userName.slice(0, 2).toUpperCase() : conv.user_id.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <h4 className="font-semibold">
+                                {conv.userName || conv.user_id}
+                                {conv.isLead && <span className="ml-2 text-green-600">🔥 LEAD</span>}
+                              </h4>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Badge variant="outline" className="text-xs">
+                                  {conv.platform}
+                                </Badge>
+                                <span>{conv.conversationStage}</span>
+                                {conv.selectedProduct && (
+                                  <span className="text-orange-600">🛍️ {conv.selectedProduct}</span>
+                                )}
+                              </div>
+                              {conv.userContact && (
+                                <div className="text-sm text-green-600">
+                                  📞 {conv.userContact}
+                                </div>
+                              )}
+                              {conv.userAddress && (
+                                <div className="text-sm text-blue-600">
+                                  📍 {conv.userAddress}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
-                  ))
+
+                    {/* Mensagens do chat */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                      {userMessages.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                          <p>Carregando mensagens...</p>
+                        </div>
+                      ) : (
+                        userMessages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`flex ${msg.type === 'sent' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[70%] p-3 rounded-lg ${
+                                msg.type === 'sent'
+                                  ? 'bg-primary text-primary-foreground ml-auto'
+                                  : 'bg-muted'
+                              }`}
+                            >
+                              <p className="text-sm">{msg.message}</p>
+                              <span className={`text-xs ${
+                                msg.type === 'sent' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                              } block mt-1`}>
+                                {new Date(msg.timestamp).toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                      <h3 className="text-lg font-medium mb-2">Selecione uma conversa</h3>
+                      <p>Escolha um usuário na lista para ver suas mensagens</p>
+                    </div>
+                  </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Base de Conhecimento */}
