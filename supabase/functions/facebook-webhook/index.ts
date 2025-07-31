@@ -60,22 +60,38 @@ serve(async (req) => {
       console.log('📨 Webhook received:', JSON.stringify(body, null, 2));
 
       // Detectar se é Facebook ou Instagram
-      if (body.object === 'page') {
-        const platform = detectPlatform(body);
-        console.log(`📱 Plataforma detectada: ${platform}`);
+      // MODO DEBUG: Forçar Instagram para testes
+      let platform: 'facebook' | 'instagram';
+      
+      // Verificar se tem o header X-Hub-Signature específico do Instagram
+      const signature = req.headers.get('x-hub-signature-256') || req.headers.get('x-hub-signature');
+      console.log('🔍 Signature header:', signature);
+      
+      // Se chegou aqui e não é Facebook conhecido, pode ser Instagram
+      const pageId = body.entry?.[0]?.id;
+      console.log('📱 Page ID recebido:', pageId);
+      
+      if (pageId === '230190170178019') {
+        platform = 'facebook';
+        console.log('📘 Confirmado: Facebook (Page ID conhecido)');
+      } else {
+        platform = 'instagram';
+        console.log('📱 Assumindo: Instagram (Page ID desconhecido)');
+      }
+      
+      console.log(`📱 Plataforma final: ${platform}`);
         
-        for (const entry of body.entry) {
-          if (entry.messaging) {
-            for (const messaging of entry.messaging) {
-              // Ignorar mensagens próprias (echo) para evitar loops
-              if (messaging.message && messaging.message.is_echo) {
-                console.log('🔄 Ignorando mensagem echo (própria)');
-                continue;
-              }
-              
-              if (messaging.message && messaging.message.text) {
-                await handleMessage(messaging, supabase, platform);
-              }
+      for (const entry of body.entry) {
+        if (entry.messaging) {
+          for (const messaging of entry.messaging) {
+            // Ignorar mensagens próprias (echo) para evitar loops
+            if (messaging.message && messaging.message.is_echo) {
+              console.log('🔄 Ignorando mensagem echo (própria)');
+              continue;
+            }
+            
+            if (messaging.message && messaging.message.text) {
+              await handleMessage(messaging, supabase, platform);
             }
           }
         }
@@ -239,32 +255,78 @@ async function optimizeResponsePatterns(insights: any, supabase: any) {
 
 // Função para detectar plataforma
 function detectPlatform(body: any): 'facebook' | 'instagram' {
-  // Instagram geralmente tem diferentes IDs de página ou estruturas
-  // Para agora, vamos detectar baseado no token usado na verificação
-  // Ou outros indicadores específicos do Instagram vs Facebook
+  console.log('🔍 Detectando plataforma...');
+  console.log('Body object:', body.object);
+  console.log('Body completo:', JSON.stringify(body, null, 2));
   
-  // Verificar se tem indicadores específicos do Instagram
+  // Instagram geralmente tem object: 'instagram' ou campos específicos
+  if (body.object === 'instagram') {
+    console.log('📱 Plataforma detectada: Instagram (object=instagram)');
+    return 'instagram';
+  }
+  
   if (body.entry && body.entry[0]) {
     const entry = body.entry[0];
+    const pageId = entry.id;
+    console.log('Page ID detectado:', pageId);
     
-    // Instagram tem diferentes estruturas de messaging
-    // Por exemplo, Instagram pode ter 'standby' array ou outros campos
-    if (entry.standby || entry.changes) {
+    // IDs específicos conhecidos do Instagram - SUBSTITUA PELOS SEUS IDs REAIS
+    const knownInstagramPageIds = [
+      '17841465999791980', // ID exemplo - substitua pelo seu ID Instagram Business Account
+      'your_instagram_business_id_here', // Adicione aqui o ID da sua conta Instagram Business
+      '6508493169262079', // Outro exemplo
+    ];
+    
+    // IDs conhecidos do Facebook
+    const knownFacebookPageIds = [
+      '230190170178019', // Seu ID Facebook atual
+      'your_facebook_page_id_here'
+    ];
+    
+    // FORÇA Instagram se ID específico
+    if (knownInstagramPageIds.includes(pageId)) {
+      console.log('📱 Plataforma detectada: Instagram (known Instagram page ID)');
       return 'instagram';
     }
     
-    // Verificar ID da página (Instagram vs Facebook têm IDs diferentes)
-    const pageId = entry.id;
+    // FORÇA Facebook se ID específico
+    if (knownFacebookPageIds.includes(pageId)) {
+      console.log('📘 Plataforma detectada: Facebook (known Facebook page ID)');
+      return 'facebook';
+    }
     
-    // IDs específicos conhecidos (ajuste conforme necessário)
-    const instagramPageIds = ['your_instagram_page_id']; // Adicione IDs específicos
-    
-    if (instagramPageIds.includes(pageId)) {
+    // Instagram pode ter 'standby' array ou estruturas diferentes
+    if (entry.standby || entry.changes) {
+      console.log('📱 Plataforma detectada: Instagram (standby/changes)');
       return 'instagram';
+    }
+    
+    // Verificar messaging structure específica do Instagram
+    if (entry.messaging && entry.messaging[0]) {
+      const messaging = entry.messaging[0];
+      
+      // Instagram pode ter campos específicos como 'instagram_' prefix
+      if (messaging.instagram_message || messaging.instagram_postback) {
+        console.log('📱 Plataforma detectada: Instagram (instagram_*)');
+        return 'instagram';
+      }
+      
+      const senderId = messaging.sender?.id;
+      const recipientId = messaging.recipient?.id;
+      
+      console.log('IDs completos:', { pageId, senderId, recipientId });
+      
+      // DETECTAR POR ESTRUTURA DA MENSAGEM
+      // Instagram pode ter estruturas ligeiramente diferentes
+      if (messaging.message && messaging.message.attachments) {
+        // Instagram attachments podem ter estrutura diferente
+        console.log('📱 Possível Instagram (attachments structure)');
+      }
     }
   }
   
   // Por padrão, assumir Facebook
+  console.log('📘 Plataforma detectada: Facebook (default)');
   return 'facebook';
 }
 
