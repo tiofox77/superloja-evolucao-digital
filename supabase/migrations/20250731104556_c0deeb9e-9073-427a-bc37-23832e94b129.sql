@@ -1,0 +1,1 @@
+UPDATE ai_settings SET value = 'true' WHERE key = 'instagram_bot_enabled';
