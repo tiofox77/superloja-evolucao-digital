@@ -526,6 +526,16 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
   try {
     console.log(`🔔 Notificando admin sobre ${intentType}...`);
     
+    // Buscar admin ID do banco de dados
+    const { data: adminData } = await supabase
+      .from('ai_settings')
+      .select('value')
+      .eq('key', 'admin_facebook_id')
+      .single();
+
+    const adminId = adminData?.value || "24320548907583618";
+    console.log('🔍 Admin ID para notificação:', adminId);
+    
     // Buscar token do Facebook
     const { data: tokenData } = await supabase
       .from('ai_settings')
@@ -581,15 +591,13 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
 ⏰ ${new Date().toLocaleString('pt-AO')}`;
     }
 
-    // Tentar enviar para carlosfox2 (admin padrão)
-    const adminId = 'carlosfox2';
     const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
     
+    // Primeiro tentar com RESPONSE (que funciona no teste)
     const payload = {
       recipient: { id: adminId },
       message: { text: notificationMessage },
-      messaging_type: 'MESSAGE_TAG',
-      tag: 'BUSINESS_PRODUCTIVITY'
+      messaging_type: 'RESPONSE'
     };
 
     const response = await fetch(url, {
