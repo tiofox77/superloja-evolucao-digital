@@ -69,18 +69,32 @@ async function processWebsiteChat(
   // 1. Buscar produtos relevantes baseado na mensagem
   const products = await searchRelevantProducts(message, supabase);
   
-  // 2. Obter histórico da conversa
+  // 2. Obter histórico da conversa para auto-aprendizado
   const conversationHistory = await getConversationHistory(userId, supabase);
   
   // 3. Verificar se usuário está logado/registrado
   const userInfo = await getUserInfo(userId, supabase);
   
-  // 4. Processar com IA (sem base de conhecimento)
+  // 4. Detectar localização do usuário para ajudar com entrega
+  const userLocation = detectUserLocation(message);
+  
+  // 5. Verificar padrões repetitivos para variar respostas
+  const responsePattern = await analyzeResponsePatterns(userId, message, supabase);
+  
+  // 6. Salvar interação para aprendizado
+  await saveUserInteraction(userId, message, 'user', supabase);
+  
+  // 7. Processar com IA melhorada
   const aiResponse = await callOpenAI(message, {
     products,
     conversationHistory,
-    userInfo
+    userInfo,
+    userLocation,
+    responsePattern
   });
+  
+  // 8. Salvar resposta da IA
+  await saveUserInteraction(userId, aiResponse, 'ai', supabase);
   
   return aiResponse;
 }
@@ -128,61 +142,60 @@ async function callOpenAI(message: string, context: any): Promise<string> {
   }
 
   const systemPrompt = `
-Você é o SuperBot, assistente IA oficial da SuperLoja (https://superloja.vip).
+Você é o SuperBot da SuperLoja (https://superloja.vip), com personalidade angolana autêntica!
 
-INFORMAÇÕES DA EMPRESA:
-- SuperLoja: Loja online líder em Angola
-- Especialidade: Eletrônicos, gadgets, smartphones, acessórios
-- Entrega: Todo Angola (1-3 dias Luanda, 3-7 dias províncias)
+🇦🇴 PERSONALIDADE ANGOLANA:
+- Use expressões angolanas: "eh pá!", "meu caro/minha cara", "mano/mana", "bué de", "fixe", "porreiro"
+- Seja caloroso, persuasivo e próximo do cliente
+- Varie sempre as respostas, NUNCA repita exatamente igual
+- Adapte a energia conforme o contexto
+
+EMPRESA SuperLoja:
+- Loja online #1 em Angola em eletrônicos e gadgets
+- Entrega: 1-3 dias Luanda, 3-7 dias outras províncias 
 - Pagamento: Transferência, Multicaixa, TPA, Cartões
 - WhatsApp: +244 923 456 789
 
-PRODUTOS DISPONÍVEIS AGORA:
+PRODUTOS DISPONÍVEIS:
 ${context.products.map(p => 
-  `• ${p.name} - ${p.price} AOA - ${p.description} (Stock: ${p.stock})`
+  `• ${p.name} - ${p.price} AOA - ${p.description} (Stock: ${p.stock > 0 ? p.stock : 'Esgotado'})`
 ).join('\n')}
 
+${context.userLocation ? `LOCALIZAÇÃO USUÁRIO: ${context.userLocation}` : ''}
 
-HISTÓRICO DA CONVERSA:
-${context.conversationHistory.slice(-5).map(h => 
+PADRÃO DE RESPOSTA: ${context.responsePattern?.count || 0} perguntas similares
+${context.responsePattern?.count > 2 ? 'VARIE MUITO A RESPOSTA!' : ''}
+
+HISTÓRICO:
+${context.conversationHistory.slice(-3).map(h => 
   `${h.type}: ${h.message}`
 ).join('\n')}
 
-USUÁRIO: ${context.userInfo ? 
-  `Cliente registrado: ${context.userInfo.name} (${context.userInfo.email})` : 
-  'Visitante não registrado'
+CLIENTE: ${context.userInfo ? 
+  `${context.userInfo.name} (registrado)` : 
+  'Visitante'
 }
 
-SUAS FUNÇÕES:
-1. 🛍️ Ajudar a encontrar produtos
-2. 💳 Explicar como comprar (site + Facebook)
-3. 👤 Promover vantagens de criar conta
-4. 📞 Dar suporte ao cliente
-5. 🚚 Informar sobre entrega e pagamento
+🎯 ESTRATÉGIAS PERSUASIVAS ANGOLANAS:
+1. **Publicidade resumida**: Primeiro 3 produtos TOP, depois lista completa
+2. **Produtos esgotados**: Elogie o produto, informe que está esgotado, sugira similar
+3. **Imagens**: SEMPRE ofereça envio por anexo (não só links)
+4. **Outras províncias**: Guia passo-a-passo detalhado para encomenda
+5. **Auto-aprendizado**: Se pergunta repetida, mude completamente a abordagem
 
-VANTAGENS DE TER CONTA:
-✅ Checkout rápido
-✅ Histórico de pedidos
-✅ Lista de favoritos
-✅ Descontos exclusivos (até 15%)
-✅ Ofertas personalizadas
-✅ Suporte prioritário
+VARIAÇÕES ANGOLANAS para situações comuns:
+- Cumprimento: "Eh pá!", "Bom dia meu caro!", "Oi mana, como vai?", "Bom mano!"
+- Empolgação: "Bué fixe!", "Porreiro demais!", "Isso sim é top!", "Que coisa boa!"
+- Persuasão: "Acredita que...", "Sabes que...", "Olha só...", "Deixa-me te contar..."
+- Despedida: "Força aí!", "Fica bem!", "Qualquer coisa apita!", "Até já!"
 
-INSTRUÇÕES:
-- Responda em português de Angola
-- Seja amigável, útil e profissional
-- Máximo 200 caracteres por resposta
-- Se não souber, redirecione para suporte humano
-- Promova sempre os produtos e vantagens da conta
-- Use emojis moderadamente
-
-PALAVRA-CHAVE ESPECIAIS:
-- "conta/registro" → Explique vantagens + link de registro
-- "comprar" → Guie o processo de compra
-- "preço/desconto" → Mostre produtos em promoção
-- "entrega" → Explique política de entrega
-- "pagamento" → Liste formas aceitas
-- "problema/ajuda" → Ofereça suporte humano
+INSTRUÇÕES CRÍTICAS:
+- NUNCA repita respostas idênticas (varie SEMPRE)
+- Use gírias angolanas naturalmente
+- Seja persuasivo mas respeitoso
+- Se usuário fora de Luanda, explique processo detalhado
+- Para imagens, ofereça anexo e descrição
+- Maximum 250 caracteres por resposta
 `;
 
   try {
@@ -193,13 +206,13 @@ PALAVRA-CHAVE ESPECIAIS:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 200,
-        temperature: 0.7,
+        max_tokens: 300,
+        temperature: 0.9,
       }),
     });
 
@@ -217,34 +230,139 @@ PALAVRA-CHAVE ESPECIAIS:
   }
 }
 
-function getFallbackResponse(message: string, context: any): string {
+// Novas funções para auto-aprendizado e personalização
+function detectUserLocation(message: string): string | null {
   const lowerMessage = message.toLowerCase();
   
-  // Respostas baseadas em palavras-chave
+  // Províncias de Angola
+  const provinces = [
+    'luanda', 'benguela', 'huambo', 'lobito', 'namibe', 'lubango', 'malanje', 
+    'cabinda', 'uíge', 'soyo', 'kuanza norte', 'kuanza sul', 'lunda norte', 
+    'lunda sul', 'moxico', 'cuando cubango', 'cunene', 'huíla', 'bié'
+  ];
+  
+  for (const province of provinces) {
+    if (lowerMessage.includes(province)) {
+      return province;
+    }
+  }
+  
+  // Bairros de Luanda
+  const luandaAreas = [
+    'kilamba', 'talatona', 'maianga', 'rangel', 'sambizanga', 'ingombota', 
+    'cacuaco', 'viana', 'belas', 'luanda sul', 'ilha do cabo', 'samba'
+  ];
+  
+  for (const area of luandaAreas) {
+    if (lowerMessage.includes(area)) {
+      return `luanda - ${area}`;
+    }
+  }
+  
+  return null;
+}
+
+async function analyzeResponsePatterns(userId: string, message: string, supabase: any) {
+  // Buscar mensagens similares do usuário nos últimos 7 dias
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  const { data: similarMessages } = await supabase
+    .from('ai_conversations')
+    .select('message, response, timestamp')
+    .eq('user_id', userId)
+    .eq('type', 'user')
+    .gte('timestamp', sevenDaysAgo.toISOString())
+    .ilike('message', `%${message.substring(0, 10)}%`);
+    
+  return {
+    count: similarMessages?.length || 0,
+    lastSimilar: similarMessages?.[0]?.timestamp,
+    responses: similarMessages?.map(m => m.response) || []
+  };
+}
+
+async function saveUserInteraction(userId: string, message: string, type: 'user' | 'ai', supabase: any) {
+  await supabase
+    .from('ai_conversations')
+    .insert({
+      user_id: userId,
+      message: message,
+      type: type,
+      platform: 'website',
+      timestamp: new Date().toISOString()
+    });
+}
+
+function getFallbackResponse(message: string, context: any): string {
+  const lowerMessage = message.toLowerCase();
+  const greetings = ["Eh pá!", "Bom dia meu caro!", "Oi mana!", "Bom mano!"];
+  const excitement = ["Bué fixe!", "Porreiro demais!", "Isso sim é top!"];
+  const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+  const randomExcitement = excitement[Math.floor(Math.random() * excitement.length)];
+  
+  // Respostas variadas baseadas em contexto
   if (lowerMessage.includes('produto') || lowerMessage.includes('comprar')) {
     if (context.products.length > 0) {
       const product = context.products[0];
-      return `Temos ${product.name} por ${product.price} AOA! Ver mais produtos em https://superloja.vip 🛍️`;
+      if (product.stock > 0) {
+        return `${randomGreeting} Temos ${product.name} por ${product.price} AOA! ${randomExcitement} Quer ver mais? 🛍️`;
+      } else {
+        return `${product.name} está bué bom mesmo! Mas agora tá esgotado, meu caro. Tenho outros fixos para te mostrar! 📱`;
+      }
     }
-    return `Veja nosso catálogo completo em https://superloja.vip! Temos eletrônicos incríveis com entrega rápida 📱`;
+    
+    const responses = [
+      `${randomGreeting} Temos eletrônicos que vais adorar! Dá uma olhada no nosso catálogo 📱`,
+      `Eh pá, bué de produtos fixes! Qual tipo de gadget procuras? 🔥`,
+      `Mano, temos smartphones, fones, tudo que precisas! O que te interessa? 💎`
+    ];
+    
+    return responses[Math.floor(Math.random() * responses.length)];
+  }
+  
+  if (lowerMessage.includes('publicidade') || lowerMessage.includes('produtos')) {
+    // Lista resumida primeiro
+    const topProducts = context.products.slice(0, 3);
+    if (topProducts.length > 0) {
+      const summary = `🔥 TOP 3:\n${topProducts.map(p => `• ${p.name} - ${p.price} AOA`).join('\n')}`;
+      return `${randomGreeting} Aqui estão os mais procurados:\n\n${summary}\n\nQuer ver a lista completa? 💫`;
+    }
+  }
+  
+  if (lowerMessage.includes('imagem')) {
+    return `${randomGreeting} Vou te enviar a imagem por anexo agora mesmo! Já vais ver como é fixe 📸✨`;
+  }
+  
+  if (context.userLocation && !lowerMessage.includes('luanda')) {
+    const stepByStep = `
+📦 ENCOMENDA PARA ${context.userLocation.toUpperCase()}:
+1️⃣ Escolhe o produto no site
+2️⃣ Adiciona ao carrinho 
+3️⃣ Preenche dados (nome, telefone, morada)
+4️⃣ Escolhe forma de pagamento
+5️⃣ Confirma pedido
+6️⃣ Entrega em 3-7 dias úteis
+
+Precisas de ajuda com algum passo? 🚚`;
+    return stepByStep;
   }
   
   if (lowerMessage.includes('conta') || lowerMessage.includes('registro')) {
-    return `Crie sua conta grátis e ganhe 10% desconto na primeira compra! Checkout rápido + ofertas exclusivas → https://superloja.vip/register 👤`;
+    const responses = [
+      `${randomGreeting} Cria conta e ganha 10% desconto! Bué vantajoso 👤✨`,
+      `Mana, com conta tens descontos especiais e entrega mais rápida! Vale a pena 🎁`,
+      `Eh pá, conta grátis = mais vantagens! Checkout rápido e ofertas exclusivas 🔥`
+    ];
+    return responses[Math.floor(Math.random() * responses.length)];
   }
   
-  if (lowerMessage.includes('entrega') || lowerMessage.includes('envio')) {
-    return `Entregamos em todo Angola! 1-3 dias em Luanda, 3-7 dias nas províncias. Frete grátis acima de 15.000 AOA 🚚`;
-  }
+  // Respostas padrão variadas
+  const defaultResponses = [
+    `${randomGreeting} Sou o SuperBot! Como posso ajudar-te hoje? 🤖`,
+    `Bom mano! Precisa de algo? Temos produtos fixes aqui! 💎`,
+    `Oi mana! Em que posso ser útil? SuperLoja tem tudo! ⚡`
+  ];
   
-  if (lowerMessage.includes('pagamento')) {
-    return `Aceito: Transferência bancária, Multicaixa Express, TPA na entrega e cartões Visa/Mastercard. Pagamento 100% seguro 💳`;
-  }
-  
-  if (lowerMessage.includes('ajuda') || lowerMessage.includes('problema')) {
-    return `Nossa equipe está pronta para ajudar! WhatsApp: +244 923 456 789 ou suporte em https://superloja.vip/suporte 📞`;
-  }
-  
-  // Resposta padrão
-  return `Olá! Sou o SuperBot da SuperLoja 🤖 Como posso ajudá-lo? Temos produtos incríveis com entrega rápida em Angola! https://superloja.vip`;
+  return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
 }
