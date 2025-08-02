@@ -1092,31 +1092,59 @@ async function getFallbackResponse(message: string, supabase: any): Promise<stri
   console.log('🔄 Usando getFallbackResponse para:', message);
   
   // Detectar pedidos de imagem no fallback
-  const imageKeywords = ['imagem', 'foto', 'mostrar', 'ver foto', 'manda imagem', 'pode enviar foto', 'manda foto'];
+  const imageKeywords = ['imagem', 'foto', 'mostrar', 'ver foto', 'manda imagem', 'pode enviar foto', 'manda foto', 'anexo', 'em anexo'];
   const wantsImage = imageKeywords.some(keyword => lowerMessage.includes(keyword));
+  
+  console.log('🔍 Palavras-chave encontradas:', imageKeywords.filter(keyword => lowerMessage.includes(keyword)));
+  console.log('🖼️ Quer imagem?', wantsImage);
   
   if (wantsImage) {
     console.log('🖼️ Pedido de imagem detectado no fallback');
+    console.log('🔍 Mensagem original:', message);
     
     // Buscar produtos que podem ter imagem
     try {
+      console.log('📊 Buscando produtos com imagem...');
+      
+      // Primeiro tentar busca específica por "pro6"
+      let searchQuery = 'pro6';
+      if (lowerMessage.includes('pro6')) {
+        searchQuery = 'pro6';
+      } else if (lowerMessage.includes('x83')) {
+        searchQuery = 'x83';
+      } else if (lowerMessage.includes('fone')) {
+        searchQuery = 'fone';
+      }
+      
+      console.log('🔍 Query de busca:', searchQuery);
+      
       const { data: products } = await supabase
         .from('products')
         .select('id, name, price, description, image_url')
-        .or(`name.ilike.%${message}%,description.ilike.%${message}%`)
+        .or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
         .eq('active', true)
         .not('image_url', 'is', null)
         .limit(1);
         
+      console.log('📦 Produtos encontrados:', products?.length || 0);
+      console.log('📦 Primeiro produto:', products?.[0] ? JSON.stringify(products[0], null, 2) : 'Nenhum');
+        
       if (products && products.length > 0) {
         const product = products[0];
         console.log('✅ Produto com imagem encontrado:', product.name);
+        console.log('🖼️ URL da imagem:', product.image_url);
         
-        return {
+        const responseObj = {
           message: `Meu estimado, aqui está a imagem do ${product.name} que pediu! Preço: ${product.price} AOA 😊`,
           image_url: product.image_url,
           attach_image: true
         };
+        
+        console.log('📤 Retornando objeto para anexar imagem:', JSON.stringify(responseObj, null, 2));
+        
+        return responseObj;
+      } else {
+        console.log('❌ Nenhum produto encontrado com imagem');
       }
     } catch (error) {
       console.error('❌ Erro buscar produto com imagem:', error);
