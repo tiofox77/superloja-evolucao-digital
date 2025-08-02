@@ -75,12 +75,26 @@ async function processWebsiteChat(
   // 3. Verificar se usuário está logado/registrado
   const userInfo = await getUserInfo(userId, supabase);
   
-  // 4. Processar com IA (sem base de conhecimento)
+  // 4. Analisar padrões de repetição
+  const responsePatterns = await analyzeResponsePatterns(userId, message, supabase);
+  
+  // 5. Verificar localização do usuário
+  const userLocation = await detectUserLocation(message, conversationHistory);
+  
+  // 6. Salvar conversa
+  await saveConversation(userId, message, 'user', supabase);
+  
+  // 7. Processar com IA
   const aiResponse = await callOpenAI(message, {
     products,
     conversationHistory,
-    userInfo
+    userInfo,
+    responsePatterns,
+    userLocation
   });
+  
+  // 8. Salvar resposta da IA
+  await saveConversation(userId, aiResponse, 'assistant', supabase);
   
   return aiResponse;
 }
@@ -137,52 +151,44 @@ INFORMAÇÕES DA EMPRESA:
 - Pagamento: Transferência, Multicaixa, TPA, Cartões
 - WhatsApp: +244 923 456 789
 
-PRODUTOS DISPONÍVEIS AGORA:
+PRODUTOS DISPONÍVEIS:
 ${context.products.map(p => 
-  `• ${p.name} - ${p.price} AOA - ${p.description} (Stock: ${p.stock})`
+  `• ${p.name} - ${p.price} AOA - ${p.description} (Stock: ${p.stock || 0})`
 ).join('\n')}
-
 
 HISTÓRICO DA CONVERSA:
 ${context.conversationHistory.slice(-5).map(h => 
   `${h.type}: ${h.message}`
 ).join('\n')}
 
-USUÁRIO: ${context.userInfo ? 
-  `Cliente registrado: ${context.userInfo.name} (${context.userInfo.email})` : 
-  'Visitante não registrado'
-}
+PADRÕES DE RESPOSTA ANTERIORES: 
+${context.responsePatterns ? `Evite repetir: ${context.responsePatterns.repeatedResponses.join(', ')}` : ''}
 
-SUAS FUNÇÕES:
-1. 🛍️ Ajudar a encontrar produtos
-2. 💳 Explicar como comprar (site + Facebook)
-3. 👤 Promover vantagens de criar conta
-4. 📞 Dar suporte ao cliente
-5. 🚚 Informar sobre entrega e pagamento
+LOCALIZAÇÃO DO USUÁRIO:
+${context.userLocation || 'Não identificada'}
 
-VANTAGENS DE TER CONTA:
-✅ Checkout rápido
-✅ Histórico de pedidos
-✅ Lista de favoritos
-✅ Descontos exclusivos (até 15%)
-✅ Ofertas personalizadas
-✅ Suporte prioritário
+EXPRESSÕES ANGOLANAS PROFISSIONAIS (USE VARIADAS):
+- Saudações: "Meu estimado", "Prezado cliente", "Mano querido", "Companheiro"
+- Afirmações: "Fixe mesmo!", "Está bom assim", "Excelente escolha", "Boa ideia"
+- Persuasão: "Recomendo vivamente", "É uma oportunidade única", "Não vai se arrepender"
+- Cordialidade: "Com todo o prazer", "À sua disposição", "Sempre às ordens"
 
-INSTRUÇÕES:
-- Responda em português de Angola
-- Seja amigável, útil e profissional
-- Máximo 200 caracteres por resposta
-- Se não souber, redirecione para suporte humano
-- Promova sempre os produtos e vantagens da conta
-- Use emojis moderadamente
+INSTRUÇÕES ESPECIAIS:
+1. NUNCA use "eh pá" - use alternativas profissionais
+2. VARIE as expressões em cada resposta para evitar repetição
+3. Para produtos fora de stock: elogie mas informe "atualmente sem stock"
+4. Para publicidade: liste produtos resumidamente primeiro
+5. Para usuários fora de Luanda: explique processo de encomenda passo-a-passo
+6. Use linguagem comercial angolana respeitosa
 
-PALAVRA-CHAVE ESPECIAIS:
-- "conta/registro" → Explique vantagens + link de registro
-- "comprar" → Guie o processo de compra
-- "preço/desconto" → Mostre produtos em promoção
-- "entrega" → Explique política de entrega
-- "pagamento" → Liste formas aceitas
-- "problema/ajuda" → Ofereça suporte humano
+LOCALIZAÇÃO E ENTREGA:
+- Luanda: Entrega grátis, 1-3 dias
+- Outras províncias: Orçamento de entrega, 3-7 dias
+
+PADRÃO ANTI-REPETIÇÃO:
+- Analise mensagens anteriores para evitar respostas idênticas
+- Use sinônimos e variações de expressão
+- Adapte tom baseado no histórico do usuário
 `;
 
   try {
@@ -220,31 +226,145 @@ PALAVRA-CHAVE ESPECIAIS:
 function getFallbackResponse(message: string, context: any): string {
   const lowerMessage = message.toLowerCase();
   
-  // Respostas baseadas em palavras-chave
+  // Respostas variadas para produtos
   if (lowerMessage.includes('produto') || lowerMessage.includes('comprar')) {
+    const productResponses = [
+      "Meu estimado, temos produtos incríveis! ",
+      "Prezado cliente, recomendo vivamente nossos ",
+      "Companheiro, vai adorar nossos ",
+      "Excelente escolha! Temos "
+    ];
+    
     if (context.products.length > 0) {
       const product = context.products[0];
-      return `Temos ${product.name} por ${product.price} AOA! Ver mais produtos em https://superloja.vip 🛍️`;
+      const stockInfo = product.stock > 0 ? "disponível" : "atualmente sem stock";
+      const randomResponse = productResponses[Math.floor(Math.random() * productResponses.length)];
+      return `${randomResponse}${product.name} por ${product.price} AOA (${stockInfo}) 🛍️`;
     }
-    return `Veja nosso catálogo completo em https://superloja.vip! Temos eletrônicos incríveis com entrega rápida 📱`;
+    
+    const catalogResponses = [
+      "Meu estimado, veja nosso catálogo em https://superloja.vip! Eletrônicos de qualidade com entrega rápida 📱",
+      "Prezado cliente, recomendo visitar https://superloja.vip! Produtos tecnológicos à sua disposição 🔥",
+      "Companheiro, não vai se arrepender! Catálogo completo em https://superloja.vip 📲"
+    ];
+    return catalogResponses[Math.floor(Math.random() * catalogResponses.length)];
   }
   
+  // Respostas variadas para conta
   if (lowerMessage.includes('conta') || lowerMessage.includes('registro')) {
-    return `Crie sua conta grátis e ganhe 10% desconto na primeira compra! Checkout rápido + ofertas exclusivas → https://superloja.vip/register 👤`;
+    const accountResponses = [
+      "Meu estimado, crie conta grátis e ganhe 10% desconto! Sempre às ordens → https://superloja.vip/register 👤",
+      "Prezado cliente, recomendo vivamente criar conta! Ofertas exclusivas esperando → https://superloja.vip/register ✨",
+      "Excelente ideia! Conta grátis + descontos especiais → https://superloja.vip/register 🎯"
+    ];
+    return accountResponses[Math.floor(Math.random() * accountResponses.length)];
   }
   
+  // Respostas variadas para entrega
   if (lowerMessage.includes('entrega') || lowerMessage.includes('envio')) {
-    return `Entregamos em todo Angola! 1-3 dias em Luanda, 3-7 dias nas províncias. Frete grátis acima de 15.000 AOA 🚚`;
+    const deliveryResponses = [
+      "Com todo o prazer! Entregamos em todo Angola: 1-3 dias Luanda, 3-7 dias províncias 🚚",
+      "À sua disposição! Entrega rápida em Angola toda. Frete grátis acima de 15.000 AOA 📦",
+      "Sempre às ordens! Cobrimos Angola inteiro com entrega express 🚛"
+    ];
+    return deliveryResponses[Math.floor(Math.random() * deliveryResponses.length)];
   }
   
+  // Respostas variadas para pagamento
   if (lowerMessage.includes('pagamento')) {
-    return `Aceito: Transferência bancária, Multicaixa Express, TPA na entrega e cartões Visa/Mastercard. Pagamento 100% seguro 💳`;
+    const paymentResponses = [
+      "Meu estimado, aceitamos: Transferência, Multicaixa, TPA, Visa/Mastercard. Pagamento 100% seguro 💳",
+      "Prezado cliente, várias opções: Banco, Multicaixa Express, cartões. Tudo protegido 🔒",
+      "Fixe mesmo! Multicaixa, transferência, TPA na entrega, cartões internacionais 💰"
+    ];
+    return paymentResponses[Math.floor(Math.random() * paymentResponses.length)];
   }
   
+  // Respostas variadas para ajuda
   if (lowerMessage.includes('ajuda') || lowerMessage.includes('problema')) {
-    return `Nossa equipe está pronta para ajudar! WhatsApp: +244 923 456 789 ou suporte em https://superloja.vip/suporte 📞`;
+    const helpResponses = [
+      "Com todo o prazer! Nossa equipe está à disposição: WhatsApp +244 923 456 789 📞",
+      "Sempre às ordens! Suporte direto: https://superloja.vip/suporte ou WhatsApp +244 923 456 789 🆘",
+      "Meu estimado, estamos aqui para ajudar! Contacte-nos já 💬"
+    ];
+    return helpResponses[Math.floor(Math.random() * helpResponses.length)];
   }
   
-  // Resposta padrão
-  return `Olá! Sou o SuperBot da SuperLoja 🤖 Como posso ajudá-lo? Temos produtos incríveis com entrega rápida em Angola! https://superloja.vip`;
+  // Respostas variadas para publicidade
+  if (lowerMessage.includes('publicidade') || lowerMessage.includes('produtos') || lowerMessage.includes('ver mais')) {
+    if (context.products.length > 0) {
+      const resumo = context.products.slice(0, 3).map(p => `• ${p.name} - ${p.price} AOA`).join('\n');
+      return `Meu estimado, aqui estão algumas opções:\n${resumo}\n\nQuer ver lista completa? À sua disposição! 🛍️`;
+    }
+  }
+  
+  // Saudações variadas padrão
+  const greetings = [
+    "Meu estimado! Como posso auxiliá-lo na SuperLoja hoje?",
+    "Bem-vindo à SuperLoja! À sua disposição para ajudar",
+    "Prezado cliente, sou o SuperBot! Em que posso ser útil?",
+    "Boa! Recomendo vivamente conhecer nossos produtos. Como posso ajudar?",
+    "Companheiro, sempre às ordens! O que procura hoje?",
+    "Excelente! Está no lugar certo para tecnologia. Como posso auxiliar?"
+  ];
+  
+  return greetings[Math.floor(Math.random() * greetings.length)] + " 🛍️";
+}
+
+// Função para analisar padrões de resposta
+async function analyzeResponsePatterns(userId: string, message: string, supabase: any) {
+  const { data: recentResponses } = await supabase
+    .from('ai_conversations')
+    .select('message')
+    .eq('user_id', userId)
+    .eq('type', 'assistant')
+    .order('timestamp', { ascending: false })
+    .limit(5);
+
+  const repeatedResponses = recentResponses?.map(r => r.message.substring(0, 30)) || [];
+  
+  return {
+    repeatedResponses,
+    messageCount: recentResponses?.length || 0
+  };
+}
+
+// Função para detectar localização do usuário
+async function detectUserLocation(message: string, history: any[]) {
+  const locationKeywords = {
+    'luanda': ['luanda', 'luanda norte', 'luanda sul', 'maianga', 'ingombota'],
+    'benguela': ['benguela', 'lobito'],
+    'huambo': ['huambo'],
+    'lubango': ['lubango', 'huíla'],
+    'malanje': ['malanje'],
+    'namibe': ['namibe', 'moçâmedes']
+  };
+
+  const lowerMessage = message.toLowerCase();
+  const fullText = [message, ...history.map(h => h.message)].join(' ').toLowerCase();
+
+  for (const [province, keywords] of Object.entries(locationKeywords)) {
+    if (keywords.some(keyword => fullText.includes(keyword))) {
+      return province;
+    }
+  }
+
+  return null;
+}
+
+// Função para salvar conversas
+async function saveConversation(userId: string, message: string, type: string, supabase: any) {
+  try {
+    await supabase
+      .from('ai_conversations')
+      .insert({
+        user_id: userId,
+        message,
+        type,
+        platform: 'website',
+        timestamp: new Date().toISOString()
+      });
+  } catch (error) {
+    console.error('Error saving conversation:', error);
+  }
 }
