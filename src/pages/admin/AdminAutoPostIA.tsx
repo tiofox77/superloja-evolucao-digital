@@ -41,6 +41,16 @@ interface ScheduledPost {
   products?: Product;
 }
 
+interface SocialMediaSettings {
+  platform: string;
+  settings: {
+    access_token?: string;
+    page_id?: string;
+    business_id?: string;
+  };
+  is_active: boolean;
+}
+
 const AdminAutoPostIA: React.FC = () => {
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,9 +65,22 @@ const AdminAutoPostIA: React.FC = () => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
 
+  // Social media settings states
+  const [socialSettings, setSocialSettings] = useState<SocialMediaSettings[]>([]);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [facebookSettings, setFacebookSettings] = useState({
+    access_token: '',
+    page_id: ''
+  });
+  const [instagramSettings, setInstagramSettings] = useState({
+    access_token: '',
+    business_id: ''
+  });
+
   useEffect(() => {
     loadProducts();
     loadScheduledPosts();
+    loadSocialSettings();
   }, []);
 
   const loadProducts = async () => {
@@ -87,6 +110,47 @@ const AdminAutoPostIA: React.FC = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar posts agendados:', error);
+    }
+  };
+
+  const loadSocialSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('social_media_settings')
+        .select('*')
+        .in('platform', ['facebook', 'instagram']);
+
+      if (error) throw error;
+
+      // Type assertion for proper handling
+      const typedData = data as Array<{
+        platform: string;
+        settings: any;
+        is_active: boolean;
+      }>;
+
+      setSocialSettings(typedData || []);
+      
+      // Set individual platform settings
+      const facebook = typedData?.find(s => s.platform === 'facebook');
+      if (facebook && facebook.settings && typeof facebook.settings === 'object') {
+        const fbSettings = facebook.settings as any;
+        setFacebookSettings({
+          access_token: fbSettings.access_token || '',
+          page_id: fbSettings.page_id || ''
+        });
+      }
+
+      const instagram = typedData?.find(s => s.platform === 'instagram');
+      if (instagram && instagram.settings && typeof instagram.settings === 'object') {
+        const igSettings = instagram.settings as any;
+        setInstagramSettings({
+          access_token: igSettings.access_token || '',
+          business_id: igSettings.business_id || ''
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
     }
   };
 
@@ -237,6 +301,41 @@ const AdminAutoPostIA: React.FC = () => {
       case 'facebook': return 'bg-blue-500';
       case 'instagram': return 'bg-pink-500';
       default: return 'bg-purple-500';
+    }
+  };
+
+  const saveSocialSettings = async (platform: 'facebook' | 'instagram') => {
+    setSettingsLoading(true);
+    try {
+      const settings = platform === 'facebook' ? facebookSettings : instagramSettings;
+      
+      const { error } = await supabase
+        .from('social_media_settings')
+        .upsert({
+          platform,
+          settings,
+          is_active: true
+        }, {
+          onConflict: 'platform'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Configurações salvas!",
+        description: `Configurações do ${platform === 'facebook' ? 'Facebook' : 'Instagram'} foram salvas com sucesso`,
+      });
+      
+      loadSocialSettings();
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao salvar configurações",
+        variant: "destructive",
+      });
+    } finally {
+      setSettingsLoading(false);
     }
   };
 
@@ -462,37 +561,137 @@ const AdminAutoPostIA: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Configurações de Integração
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Facebook className="h-4 w-4" />
-                    Facebook
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Configure o token de acesso da página do Facebook nas variáveis de ambiente:
-                    <br />• FACEBOOK_PAGE_ACCESS_TOKEN
-                    <br />• FACEBOOK_PAGE_ID
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Facebook Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Facebook className="h-5 w-5 text-blue-600" />
+                  Facebook
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fb-access-token">Token de Acesso da Página</Label>
+                  <Input
+                    id="fb-access-token"
+                    type="password"
+                    placeholder="Insira o Facebook Page Access Token"
+                    value={facebookSettings.access_token}
+                    onChange={(e) => setFacebookSettings(prev => ({
+                      ...prev,
+                      access_token: e.target.value
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Token obtido no Facebook Developers para sua página
                   </p>
                 </div>
-                
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Instagram className="h-4 w-4" />
-                    Instagram
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Configure as credenciais do Instagram Business nas variáveis de ambiente:
-                    <br />• INSTAGRAM_ACCESS_TOKEN
-                    <br />• INSTAGRAM_BUSINESS_ID
+
+                <div className="space-y-2">
+                  <Label htmlFor="fb-page-id">ID da Página</Label>
+                  <Input
+                    id="fb-page-id"
+                    placeholder="Insira o Facebook Page ID"
+                    value={facebookSettings.page_id}
+                    onChange={(e) => setFacebookSettings(prev => ({
+                      ...prev,
+                      page_id: e.target.value
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    ID numérico da sua página do Facebook
                   </p>
+                </div>
+
+                <Button 
+                  onClick={() => saveSocialSettings('facebook')}
+                  disabled={settingsLoading || !facebookSettings.access_token || !facebookSettings.page_id}
+                  className="w-full"
+                >
+                  {settingsLoading ? 'Salvando...' : 'Salvar Configurações Facebook'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Instagram Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Instagram className="h-5 w-5 text-pink-600" />
+                  Instagram
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ig-access-token">Token de Acesso</Label>
+                  <Input
+                    id="ig-access-token"
+                    type="password"
+                    placeholder="Insira o Instagram Access Token"
+                    value={instagramSettings.access_token}
+                    onChange={(e) => setInstagramSettings(prev => ({
+                      ...prev,
+                      access_token: e.target.value
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Token do Instagram Business Account
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ig-business-id">ID da Conta Business</Label>
+                  <Input
+                    id="ig-business-id"
+                    placeholder="Insira o Instagram Business ID"
+                    value={instagramSettings.business_id}
+                    onChange={(e) => setInstagramSettings(prev => ({
+                      ...prev,
+                      business_id: e.target.value
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    ID da sua conta Instagram Business
+                  </p>
+                </div>
+
+                <Button 
+                  onClick={() => saveSocialSettings('instagram')}
+                  disabled={settingsLoading || !instagramSettings.access_token || !instagramSettings.business_id}
+                  className="w-full"
+                >
+                  {settingsLoading ? 'Salvando...' : 'Salvar Configurações Instagram'}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Status das Configurações */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Status das Integrações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Facebook className="h-4 w-4 text-blue-600" />
+                    <span>Facebook</span>
+                  </div>
+                  <Badge variant={facebookSettings.access_token && facebookSettings.page_id ? "default" : "secondary"}>
+                    {facebookSettings.access_token && facebookSettings.page_id ? "Configurado" : "Não configurado"}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Instagram className="h-4 w-4 text-pink-600" />
+                    <span>Instagram</span>
+                  </div>
+                  <Badge variant={instagramSettings.access_token && instagramSettings.business_id ? "default" : "secondary"}>
+                    {instagramSettings.access_token && instagramSettings.business_id ? "Configurado" : "Não configurado"}
+                  </Badge>
                 </div>
               </div>
             </CardContent>
