@@ -535,8 +535,10 @@ async function processWithEnhancedAI(message: string, senderId: string, supabase
   try {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
+    console.log('🔑 Verificando OpenAI API Key:', OPENAI_API_KEY ? 'ENCONTRADA' : 'NÃO ENCONTRADA');
+    
     if (!OPENAI_API_KEY) {
-      console.error('❌ OpenAI API Key não encontrada');
+      console.error('❌ OpenAI API Key não encontrada - usando fallback');
       return getFallbackResponse(message, supabase);
     }
 
@@ -1084,8 +1086,42 @@ async function performIntelligentProductSearch(message: string, context: any, su
   return { products, productsInfo };
 }
 
-async function getFallbackResponse(message: string, supabase: any): Promise<string> {
+async function getFallbackResponse(message: string, supabase: any): Promise<string | any> {
   const lowerMessage = message.toLowerCase();
+  
+  console.log('🔄 Usando getFallbackResponse para:', message);
+  
+  // Detectar pedidos de imagem no fallback
+  const imageKeywords = ['imagem', 'foto', 'mostrar', 'ver foto', 'manda imagem', 'pode enviar foto', 'manda foto'];
+  const wantsImage = imageKeywords.some(keyword => lowerMessage.includes(keyword));
+  
+  if (wantsImage) {
+    console.log('🖼️ Pedido de imagem detectado no fallback');
+    
+    // Buscar produtos que podem ter imagem
+    try {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, name, price, description, image_url')
+        .or(`name.ilike.%${message}%,description.ilike.%${message}%`)
+        .eq('active', true)
+        .not('image_url', 'is', null)
+        .limit(1);
+        
+      if (products && products.length > 0) {
+        const product = products[0];
+        console.log('✅ Produto com imagem encontrado:', product.name);
+        
+        return {
+          message: `Meu estimado, aqui está a imagem do ${product.name} que pediu! Preço: ${product.price} AOA 😊`,
+          image_url: product.image_url,
+          attach_image: true
+        };
+      }
+    } catch (error) {
+      console.error('❌ Erro buscar produto com imagem:', error);
+    }
+  }
   
   // Respostas humanizadas baseadas no contexto
   const timeOfDay = new Date().getHours();
