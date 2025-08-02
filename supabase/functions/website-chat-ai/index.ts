@@ -144,12 +144,12 @@ async function callOpenAI(message: string, context: any): Promise<string> {
   const systemPrompt = `
 Você é o SuperBot da SuperLoja (https://superloja.vip), com personalidade angolana autêntica!
 
-🇦🇴 PERSONALIDADE ANGOLANA PROFISSIONAL:
-- Use expressões respeitosas: "meu estimado/minha estimada", "caro cliente", "prezado/prezada", "saiba que", "tenha a certeza", "permita-me informar", "gostaria de destacar"
-- Cumprimentos profissionais: "Como está meu estimado?", "Bom dia prezado!", "Muito prazer em ajudar!", "Como posso servi-lo?", "É um prazer atendê-lo!"
-- Empolgação profissional: "Excelente escolha!", "Produto de qualidade superior!", "Recomendo vivamente!", "É uma oportunidade única!", "Garanto que ficará satisfeito!"
-- Persuasão elegante: "Saiba que...", "Tenha a certeza de que...", "Permita-me sugerir...", "Gostaria de destacar...", "Posso assegurar-lhe..."
-- Despedidas cordiais: "Fico ao dispor!", "Estarei aqui quando precisar!", "Conte sempre conosco!", "Até breve meu estimado!", "Que Deus o abençoe!"
+🇦🇴 PERSONALIDADE ANGOLANA:
+- Use expressões angolanas: "aca meu!", "bom mano/mana", "fixe!", "porreiro!", "bué de bom!", "aiuê!", "meu caro/minha cara", "olha só!", "sabes que", "acredita que", "deixa-me te contar"
+- Cumprimentos variados: "Como vai meu?", "Oi mana!", "Bom dia caro!", "Tudo fixe?", "Como andas?"
+- Empolgação: "Bué fixe!", "Porreiro demais!", "Isso sim é top!", "Que coisa boa!", "Aca, que maravilha!"
+- Persuasão: "Sabes que...", "Olha só...", "Deixa-me te contar...", "Acredita que...", "Meu caro..."
+- Despedidas: "Força aí!", "Fica bem!", "Qualquer coisa apita!", "Até já!", "Vai com Deus!"
 - Seja caloroso, persuasivo e próximo do cliente
 - Varie sempre as respostas, NUNCA repita exatamente igual
 - Adapte a energia conforme o contexto
@@ -187,11 +187,11 @@ CLIENTE: ${context.userInfo ?
 4. **Outras províncias**: Guia passo-a-passo detalhado para encomenda
 5. **Auto-aprendizado**: Se pergunta repetida, mude completamente a abordagem
 
-VARIAÇÕES PROFISSIONAIS ANGOLANAS para situações comuns:
-- Cumprimento: "Como está meu estimado?", "Bom dia prezado!", "Muito prazer em ajudar!", "Como posso servi-lo?", "É um prazer atendê-lo!"
-- Empolgação: "Excelente escolha!", "Produto de qualidade superior!", "Recomendo vivamente!", "É uma oportunidade única!", "Garanto que ficará satisfeito!"
-- Persuasão: "Saiba que...", "Tenha a certeza de que...", "Permita-me sugerir...", "Gostaria de destacar...", "Posso assegurar-lhe..."
-- Despedida: "Fico ao dispor!", "Estarei aqui quando precisar!", "Conte sempre conosco!", "Até breve meu estimado!", "Que Deus o abençoe!"
+VARIAÇÕES ANGOLANAS para situações comuns:
+- Cumprimento: "Aca meu!", "Bom dia caro!", "Oi mana, como vai?", "Bom mano!", "Como andas?", "Tudo fixe?"
+- Empolgação: "Bué fixe!", "Porreiro demais!", "Isso sim é top!", "Que coisa boa!", "Aca, que maravilha!", "Aiuê, que bom!"
+- Persuasão: "Acredita que...", "Sabes que...", "Olha só...", "Deixa-me te contar...", "Meu caro..."
+- Despedida: "Força aí!", "Fica bem!", "Qualquer coisa apita!", "Até já!", "Vai com Deus!"
 
 INSTRUÇÕES CRÍTICAS:
 - NUNCA repita respostas idênticas (varie SEMPRE)
@@ -300,8 +300,8 @@ async function saveUserInteraction(userId: string, message: string, type: 'user'
 
 function getFallbackResponse(message: string, context: any): string {
   const lowerMessage = message.toLowerCase();
-  const greetings = ["Como está meu estimado?", "Bom dia prezado!", "Muito prazer em ajudar!", "Como posso servi-lo?", "É um prazer atendê-lo!"];
-  const excitement = ["Excelente escolha!", "Produto de qualidade superior!", "Recomendo vivamente!", "É uma oportunidade única!", "Garanto que ficará satisfeito!"];
+  const greetings = ["Aca meu!", "Bom dia caro!", "Oi mana!", "Bom mano!", "Como andas?", "Tudo fixe?"];
+  const excitement = ["Bué fixe!", "Porreiro demais!", "Isso sim é top!", "Aca, que maravilha!", "Aiuê, que bom!"];
   const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
   const randomExcitement = excitement[Math.floor(Math.random() * excitement.length)];
   
@@ -312,14 +312,14 @@ function getFallbackResponse(message: string, context: any): string {
       if (product.stock > 0) {
         return `${randomGreeting} Temos ${product.name} por ${product.price} AOA! ${randomExcitement} Quer ver mais? 🛍️`;
       } else {
-        return `${product.name} é um produto de qualidade superior! Mas agora está esgotado, meu estimado. Permita-me mostrar outras excelentes opções! 📱`;
+        return `${product.name} está bué bom mesmo! Mas agora tá esgotado, meu caro. Tenho outros fixos para te mostrar! 📱`;
       }
     }
     
     const responses = [
-      `${randomGreeting} Temos eletrônicos de qualidade superior! Permita-me mostrar nosso catálogo 📱`,
-      `Saiba que temos produtos excelentes! Que tipo de gadget procura meu estimado? 🔥`,
-      `Posso assegurar-lhe que temos smartphones, fones, tudo que precisa! O que lhe interessa? 💎`
+      `${randomGreeting} Temos eletrônicos que vais adorar! Dá uma olhada no nosso catálogo 📱`,
+      `Eh pá, bué de produtos fixes! Qual tipo de gadget procuras? 🔥`,
+      `Mano, temos smartphones, fones, tudo que precisas! O que te interessa? 💎`
     ];
     
     return responses[Math.floor(Math.random() * responses.length)];
@@ -335,7 +335,7 @@ function getFallbackResponse(message: string, context: any): string {
   }
   
   if (lowerMessage.includes('imagem')) {
-    return `${randomGreeting} Enviarei a imagem por anexo imediatamente! Tenha a certeza de que ficará satisfeito 📸✨`;
+    return `${randomGreeting} Vou te enviar a imagem por anexo agora mesmo! Já vais ver como é fixe 📸✨`;
   }
   
   if (context.userLocation && !lowerMessage.includes('luanda')) {
@@ -354,18 +354,18 @@ Precisas de ajuda com algum passo? 🚚`;
   
   if (lowerMessage.includes('conta') || lowerMessage.includes('registro')) {
     const responses = [
-      `${randomGreeting} Crie conta e ganhe 10% desconto! É uma excelente oportunidade 👤✨`,
-      `Meu estimado, com conta tem descontos especiais e entrega mais rápida! Recomendo vivamente 🎁`,
-      `Saiba que conta gratuita oferece mais vantagens! Checkout rápido e ofertas exclusivas 🔥`
+      `${randomGreeting} Cria conta e ganha 10% desconto! Bué vantajoso 👤✨`,
+      `Mana, com conta tens descontos especiais e entrega mais rápida! Vale a pena 🎁`,
+      `Eh pá, conta grátis = mais vantagens! Checkout rápido e ofertas exclusivas 🔥`
     ];
     return responses[Math.floor(Math.random() * responses.length)];
   }
   
   // Respostas padrão variadas
   const defaultResponses = [
-    `${randomGreeting} Sou o SuperBot! Como posso servi-lo hoje? 🤖`,
-    `Prezado cliente! Precisa de algo? Temos produtos de qualidade superior aqui! 💎`,
-    `Meu estimado! Em que posso ser útil? SuperLoja tem tudo que precisa! ⚡`
+    `${randomGreeting} Sou o SuperBot! Como posso ajudar-te hoje? 🤖`,
+    `Bom mano! Precisa de algo? Temos produtos fixes aqui! 💎`,
+    `Oi mana! Em que posso ser útil? SuperLoja tem tudo! ⚡`
   ];
   
   return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
