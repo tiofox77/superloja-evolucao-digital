@@ -1349,7 +1349,14 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
             payload: {
               url: imageUrl,
               is_reusable: true
-  }
+            }
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao enviar imagem via URL:', error);
+    }
 }
 
 // Função auxiliar para converter blob para base64
