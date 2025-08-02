@@ -361,8 +361,13 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     // Atualizar perfil do usuário com aprendizado contínuo
     await updateUserProfile(senderId, messageText, supabase);
     
+    console.log(`📨 Processando mensagem: "${messageText}"`);
+    
     // Processar com IA humanizada e contextual
     const aiResponse = await processWithEnhancedAI(messageText, senderId, supabase);
+    
+    console.log(`🤖 Tipo de resposta IA:`, typeof aiResponse);
+    console.log(`🤖 Resposta IA completa:`, JSON.stringify(aiResponse, null, 2));
     
     // Verificar se resposta inclui imagem para anexar
     if (typeof aiResponse === 'object' && aiResponse.attach_image && aiResponse.image_url) {
@@ -729,12 +734,16 @@ RESPONDA COMO UM SER HUMANO REAL QUE:
         model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: enhancedSystemPrompt },
-          { role: 'user', content: `INSTRUÇÕES PARA IMAGENS: Se o cliente pedir "imagem", "foto", "mostrar", "ver foto", responda exatamente neste formato JSON:
-{"message": "Sua resposta em português angolano", "image_url": "url_da_imagem_do_produto", "attach_image": true}
+          { role: 'user', content: `ATENÇÃO: Se o cliente pedir "imagem", "foto", "mostrar", "ver foto", "manda imagem", "pode enviar foto", você DEVE responder EXATAMENTE neste formato JSON:
 
-Use APENAS produtos da lista que tenham ImageURL.
+{"message": "Sua resposta em português angolano profissional", "image_url": "url_completa_da_imagem", "attach_image": true}
 
-Mensagem do cliente: ${message}` }
+PRODUTOS DISPONÍVEIS COM IMAGENS:
+${productsInfo || 'Nenhum produto encontrado'}
+
+Mensagem do cliente: ${message}
+
+IMPORTANTE: Se detectar pedido de imagem, responda APENAS o JSON, nada mais!` }
         ],
         max_tokens: 10000,
         temperature: 0.7, // Aumentado para mais criatividade
@@ -754,16 +763,19 @@ Mensagem do cliente: ${message}` }
     if (data.choices && data.choices[0]) {
       const responseContent = data.choices[0].message.content.trim();
       console.log(`✅ Resposta IA gerada - Tamanho: ${responseContent.length} caracteres`);
+      console.log(`🔍 Conteúdo da resposta:`, responseContent.substring(0, 200) + '...');
       
       // Tentar parsear como JSON (para respostas com imagem)
       try {
         const parsedResponse = JSON.parse(responseContent);
+        console.log(`📦 JSON parseado com sucesso:`, parsedResponse);
         if (parsedResponse.message && parsedResponse.attach_image) {
           console.log('🖼️ Resposta com imagem detectada');
           return parsedResponse;
         }
-      } catch {
-        // Se não for JSON válido, continua como texto normal
+      } catch (jsonError) {
+        console.log('📝 Não é JSON válido, tratando como texto normal');
+        console.log('🔍 Erro JSON:', jsonError.message);
       }
       
       // Detectar intenção de compra
