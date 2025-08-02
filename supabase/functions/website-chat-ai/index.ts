@@ -64,7 +64,7 @@ async function processWebsiteChat(
   userId: string, 
   sessionId: string, 
   supabase: any
-): Promise<string> {
+): Promise<any> {
   
   // 1. Buscar produtos relevantes baseado na mensagem
   const products = await searchRelevantProducts(message, supabase);
@@ -94,7 +94,8 @@ async function processWebsiteChat(
   });
   
   // 8. Salvar resposta da IA
-  await saveConversation(userId, aiResponse, 'assistant', supabase);
+  const responseText = typeof aiResponse === 'object' ? aiResponse.message : aiResponse;
+  await saveConversation(userId, responseText, 'assistant', supabase);
   
   return aiResponse;
 }
@@ -134,7 +135,7 @@ async function getUserInfo(userId: string, supabase: any) {
   return user;
 }
 
-async function callOpenAI(message: string, context: any): Promise<string> {
+async function callOpenAI(message: string, context: any): Promise<any> {
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
   
   if (!OPENAI_API_KEY) {
@@ -223,9 +224,33 @@ PADRÃO ANTI-REPETIÇÃO:
   }
 }
 
-function getFallbackResponse(message: string, context: any): string {
+function getFallbackResponse(message: string, context: any): any {
   const lowerMessage = message.toLowerCase();
   
+  // Respostas para solicitação de imagens
+  if (lowerMessage.includes('imagem') || lowerMessage.includes('foto') || lowerMessage.includes('ver foto') || lowerMessage.includes('mostrar')) {
+    if (context.products.length > 0) {
+      const product = context.products[0];
+      const stockInfo = product.stock > 0 ? "disponível" : "atualmente sem stock";
+      
+      const imageResponses = [
+        "Aqui está a imagem que solicitou, meu estimado! ",
+        "Prezado cliente, confira a foto do produto: ",
+        "Veja só que maravilha! ",
+        "Olhe que produto incrível! "
+      ];
+      
+      const randomResponse = imageResponses[Math.floor(Math.random() * imageResponses.length)];
+      
+      // Retorna com formato especial para anexar imagem
+      return {
+        message: `${randomResponse}${product.name} por ${product.price} AOA (${stockInfo}) 🛍️`,
+        image_url: product.image_url,
+        attach_image: true
+      };
+    }
+  }
+
   // Respostas variadas para produtos
   if (lowerMessage.includes('produto') || lowerMessage.includes('comprar')) {
     const productResponses = [
