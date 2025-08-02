@@ -1370,7 +1370,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
-// Função para enviar mensagem com imagem como anexo
+// Função para enviar mensagem com imagem como anexo via Upload API
 async function sendFacebookMessageWithImage(recipientId: string, text: string, imageBase64: string, supabase: any) {
   try {
     const PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
@@ -1380,8 +1380,79 @@ async function sendFacebookMessageWithImage(recipientId: string, text: string, i
       return;
     }
 
-    // Enviar imagem como anexo via API do Facebook
-    const response = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+    console.log('🖼️ Método 1: Tentando upload direto via Attachment Upload API');
+    
+    // Converter base64 para binary
+    const binaryString = atob(imageBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    // Criar FormData para upload
+    const formData = new FormData();
+    const imageBlob = new Blob([bytes], { type: 'image/jpeg' });
+    formData.append('message', JSON.stringify({
+      attachment: {
+        type: 'image',
+        payload: {
+          is_reusable: false
+        }
+      }
+    }));
+    formData.append('filedata', imageBlob, 'image.jpg');
+
+    // 1. Fazer upload da imagem primeiro
+    const uploadResponse = await fetch(`https://graph.facebook.com/v18.0/me/message_attachments?access_token=${PAGE_ACCESS_TOKEN}`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (uploadResponse.ok) {
+      const uploadResult = await uploadResponse.json();
+      console.log('✅ Upload realizado com sucesso, attachment_id:', uploadResult.attachment_id);
+      
+      // 2. Enviar mensagem usando o attachment_id
+      const messageResponse = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipient: { id: recipientId },
+          message: {
+            attachment: {
+              type: 'image',
+              payload: {
+                attachment_id: uploadResult.attachment_id
+              }
+            }
+          }
+        })
+      });
+
+      if (messageResponse.ok) {
+        console.log('✅ Imagem enviada via Upload API');
+        
+        // Enviar texto separado se houver
+        if (text && text.trim()) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Pausa para evitar rate limit
+          await sendFacebookMessage(recipientId, text, supabase);
+        }
+        return;
+      } else {
+        const errorData = await messageResponse.text();
+        console.error('❌ Erro ao enviar mensagem com attachment_id:', errorData);
+      }
+    } else {
+      const errorData = await uploadResponse.text();
+      console.error('❌ Erro no upload:', errorData);
+    }
+
+    // Método 2: Fallback com URL direta (método original melhorado)
+    console.log('🖼️ Método 2: Tentando envio direto via URL');
+    
+    const directResponse = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1392,33 +1463,35 @@ async function sendFacebookMessageWithImage(recipientId: string, text: string, i
           attachment: {
             type: 'image',
             payload: {
-              is_reusable: false,
-              url: `data:image/jpeg;base64,${imageBase64}`
+              url: `data:image/jpeg;base64,${imageBase64}`,
+              is_reusable: false
             }
           }
         }
       })
     });
 
-    if (response.ok) {
-      console.log('✅ Imagem enviada para Facebook');
+    if (directResponse.ok) {
+      console.log('✅ Imagem enviada via URL direta');
       
       // Enviar texto separado se houver
       if (text && text.trim()) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
         await sendFacebookMessage(recipientId, text, supabase);
       }
     } else {
-      const errorData = await response.text();
-      console.error('❌ Erro ao enviar imagem:', errorData);
+      const errorData = await directResponse.text();
+      console.error('❌ Erro no envio direto:', errorData);
       
-      // Fallback: enviar só o texto
-      await sendFacebookMessage(recipientId, text, supabase);
+      // Método 3: Último fallback - enviar só o texto
+      console.log('🖼️ Método 3: Fallback - enviando apenas texto');
+      await sendFacebookMessage(recipientId, text + ' (Imagem temporariamente indisponível)', supabase);
     }
     
   } catch (error) {
     console.error('❌ Erro ao processar envio de imagem:', error);
-    // Fallback: enviar só o texto
-    await sendFacebookMessage(recipientId, text, supabase);
+    // Fallback final: enviar só o texto
+    await sendFacebookMessage(recipientId, text + ' (Erro ao carregar imagem)', supabase);
   }
 }
 async function checkAndNotifyAdmin(userMessage: string, aiResponse: string, userId: string, supabase: any) {
