@@ -364,17 +364,53 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     // Processar com IA humanizada e contextual
     const aiResponse = await processWithEnhancedAI(messageText, senderId, supabase);
     
-    // Enviar resposta
-    await sendFacebookMessage(senderId, aiResponse, supabase);
-    
-    // Salvar resposta enviada
-    await supabase.from('ai_conversations').insert({
-      platform: platform,
-      user_id: senderId,
-      message: aiResponse,
-      type: 'sent',
-      timestamp: new Date().toISOString()
-    });
+    // Verificar se resposta inclui imagem para anexar
+    if (typeof aiResponse === 'object' && aiResponse.attach_image && aiResponse.image_url) {
+      try {
+        // Baixar imagem e enviar como anexo
+        const imageResponse = await fetch(aiResponse.image_url);
+        const imageBlob = await imageResponse.blob();
+        const imageBase64 = await blobToBase64(imageBlob);
+        
+        // Enviar texto + imagem
+        await sendFacebookMessageWithImage(senderId, aiResponse.message, imageBase64, supabase);
+        
+        // Salvar resposta enviada
+        await supabase.from('ai_conversations').insert({
+          platform: platform,
+          user_id: senderId,
+          message: aiResponse.message,
+          type: 'sent',
+          timestamp: new Date().toISOString()
+        });
+      } catch (imageError) {
+        console.error('Erro ao processar imagem:', imageError);
+        // Se falhar, enviar apenas texto
+        const responseText = aiResponse.message;
+        await sendFacebookMessage(senderId, responseText, supabase);
+        
+        await supabase.from('ai_conversations').insert({
+          platform: platform,
+          user_id: senderId,
+          message: responseText,
+          type: 'sent',
+          timestamp: new Date().toISOString()
+        });
+      }
+    } else {
+      // Resposta normal sem imagem
+      const responseText = typeof aiResponse === 'object' ? aiResponse.message : aiResponse;
+      await sendFacebookMessage(senderId, responseText, supabase);
+      
+      // Salvar resposta enviada
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: senderId,
+        message: responseText,
+        type: 'sent',
+        timestamp: new Date().toISOString()
+      });
+    }
 
     // Verificar se precisa notificar admin
     await checkAndNotifyAdmin(messageText, aiResponse, senderId, supabase);
@@ -490,7 +526,7 @@ function detectCustomerMood(message: string): string {
   return 'neutral';
 }
 
-async function processWithEnhancedAI(message: string, senderId: string, supabase: any): Promise<string> {
+async function processWithEnhancedAI(message: string, senderId: string, supabase: any): Promise<string | any> {
   try {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
@@ -690,10 +726,15 @@ RESPONDA COMO UM SER HUMANO REAL QUE:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: enhancedSystemPrompt },
-          { role: 'user', content: message }
+          { role: 'user', content: `INSTRUÇÕES PARA IMAGENS: Se o cliente pedir "imagem", "foto", "mostrar", "ver foto", responda exatamente neste formato JSON:
+{"message": "Sua resposta em português angolano", "image_url": "url_da_imagem_do_produto", "attach_image": true}
+
+Use APENAS produtos da lista que tenham ImageURL.
+
+Mensagem do cliente: ${message}` }
         ],
         max_tokens: 10000,
         temperature: 0.7, // Aumentado para mais criatividade
@@ -711,11 +752,22 @@ RESPONDA COMO UM SER HUMANO REAL QUE:
     const data = await response.json();
     
     if (data.choices && data.choices[0]) {
-      const aiResponse = data.choices[0].message.content.trim();
-      console.log(`✅ Resposta IA gerada - Tamanho: ${aiResponse.length} caracteres`);
+      const responseContent = data.choices[0].message.content.trim();
+      console.log(`✅ Resposta IA gerada - Tamanho: ${responseContent.length} caracteres`);
+      
+      // Tentar parsear como JSON (para respostas com imagem)
+      try {
+        const parsedResponse = JSON.parse(responseContent);
+        if (parsedResponse.message && parsedResponse.attach_image) {
+          console.log('🖼️ Resposta com imagem detectada');
+          return parsedResponse;
+        }
+      } catch {
+        // Se não for JSON válido, continua como texto normal
+      }
       
       // Detectar intenção de compra
-      const purchaseIntentDetected = detectPurchaseIntent(message, aiResponse);
+      const purchaseIntentDetected = detectPurchaseIntent(message, responseContent);
       if (purchaseIntentDetected) {
         console.log('🛒 Intenção de compra detectada - notificando admin');
         notifyAdmin(senderId, message, supabase, purchaseIntentDetected, context).catch(error => 
@@ -723,7 +775,7 @@ RESPONDA COMO UM SER HUMANO REAL QUE:
         );
       }
       
-      return aiResponse;
+      return responseContent;
     } else {
       throw new Error('Resposta inválida da OpenAI');
     }
@@ -1297,8 +1349,71 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
             payload: {
               url: imageUrl,
               is_reusable: true
+  }
+}
+
+// Função auxiliar para converter blob para base64
+async function blobToBase64(blob: Blob): Promise<string> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let i = 0; i < uint8Array.length; i++) {
+    binary += String.fromCharCode(uint8Array[i]);
+  }
+  return btoa(binary);
+}
+
+// Função para enviar mensagem com imagem como anexo
+async function sendFacebookMessageWithImage(recipientId: string, text: string, imageBase64: string, supabase: any) {
+  try {
+    const PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+    
+    if (!PAGE_ACCESS_TOKEN) {
+      console.error('❌ Token do Facebook não configurado');
+      return;
+    }
+
+    // Enviar imagem como anexo via API do Facebook
+    const response = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        message: {
+          attachment: {
+            type: 'image',
+            payload: {
+              is_reusable: false,
+              url: `data:image/jpeg;base64,${imageBase64}`
             }
           }
+        }
+      })
+    });
+
+    if (response.ok) {
+      console.log('✅ Imagem enviada para Facebook');
+      
+      // Enviar texto separado se houver
+      if (text && text.trim()) {
+        await sendFacebookMessage(recipientId, text, supabase);
+      }
+    } else {
+      const errorData = await response.text();
+      console.error('❌ Erro ao enviar imagem:', errorData);
+      
+      // Fallback: enviar só o texto
+      await sendFacebookMessage(recipientId, text, supabase);
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao processar envio de imagem:', error);
+    // Fallback: enviar só o texto
+    await sendFacebookMessage(recipientId, text, supabase);
+  }
+}
         },
         messaging_type: 'RESPONSE'
       };
