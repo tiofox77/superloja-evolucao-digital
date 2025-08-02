@@ -71,12 +71,13 @@ serve(async (req) => {
       const pageId = body.entry?.[0]?.id;
       console.log('📱 Page ID recebido:', pageId);
       
+      // Forçar Instagram para debug
       if (pageId === '230190170178019') {
-        platform = 'facebook';
-        console.log('📘 Confirmado: Facebook (Page ID conhecido)');
+        platform = 'instagram';
+        console.log('📘 Confirmado: Instagram (Page ID conhecido)');
       } else {
         platform = 'instagram';
-        console.log('📱 Assumindo: Instagram (Page ID desconhecido)');
+        console.log('🔧 DEBUG: Forçando Instagram para testes');
       }
       
       console.log(`📱 Plataforma final: ${platform}`);
@@ -90,8 +91,14 @@ serve(async (req) => {
               continue;
             }
             
+            // Processar mensagem de texto
             if (messaging.message && messaging.message.text) {
               await handleMessage(messaging, supabase, platform);
+            }
+            
+            // Processar mensagem com imagem/anexo
+            if (messaging.message && messaging.message.attachments) {
+              await handleImageMessage(messaging, supabase, platform);
             }
           }
         }
@@ -385,6 +392,225 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
   }
 }
 
+// Nova função para processar mensagens com imagem
+async function handleImageMessage(messaging: any, supabase: any, platform: 'facebook' | 'instagram' = 'instagram') {
+  const senderId = messaging.sender.id;
+  const attachments = messaging.message.attachments;
+  const messageText = messaging.message.text || 'Que produto é este?';
+  
+  console.log(`📸 Imagem recebida de ${senderId}: ${attachments.length} anexo(s)`);
+  
+  try {
+    for (const attachment of attachments) {
+      if (attachment.type === 'image') {
+        const imageUrl = attachment.payload?.url;
+        
+        // Salvar mensagem de imagem recebida
+        await supabase.from('ai_conversations').insert({
+          platform: platform,
+          user_id: senderId,
+          message: `[IMAGEM] ${messageText}`,
+          type: 'received',
+          timestamp: new Date().toISOString()
+        });
+        
+        // Identificar produto pela imagem
+        const productIdentification = await identifyProductFromImage(imageUrl, messageText, supabase);
+        
+        let response = '';
+        if (productIdentification.found) {
+          const product = productIdentification.product;
+          
+          // Resposta angolana persuasiva
+          const greetings = ['Eh pá!', 'Bom mano!', 'Fixe!', 'Que coisa boa!'];
+          const excitement = ['Bué bom esse!', 'Porreiro demais!', 'Tá fixe!'];
+          const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+          const excite = excitement[Math.floor(Math.random() * excitement.length)];
+          
+          if (product.stock > 0) {
+            response = `${greeting} Identifiquei esse produto: ${product.name}! ${excite}
+
+💰 Preço: ${product.price} AOA
+📝 ${product.description}
+
+Vou te enviar a imagem oficial por anexo agora! Queres saber mais detalhes ou fazer encomenda? 🔥`;
+          } else {
+            response = `${greeting} Esse produto é ${product.name} - ${excite} Mas agora tá esgotado, meu caro! 😔
+
+Temos outros produtos similares que vais adorar! Quer que te mostre alternativas?`;
+          }
+          
+          // Enviar imagem como anexo se disponível
+          if (product.image_url && product.stock > 0) {
+            await sendImageAttachment(senderId, product.image_url, platform, supabase);
+          }
+          
+        } else {
+          const responses = [
+            'Bom mano! Vi a tua imagem mas não consegui identificar o produto específico 🤔\n\nPodes me dar mais detalhes? Tipo cor, marca ou nome? Assim consigo ajudar-te melhor!',
+            'Eh pá! A imagem tá boa mas preciso de mais informações 📸\n\nConta-me mais sobre o produto: marca, modelo, cor? Vou encontrar o que procuras!',
+            'Fixe a imagem! Mas deixa-me saber mais detalhes do produto para te ajudar melhor, meu caro! 💫'
+          ];
+          response = responses[Math.floor(Math.random() * responses.length)];
+        }
+        
+        // Enviar resposta
+        await sendFacebookMessage(senderId, response, supabase);
+        
+        // Salvar resposta enviada
+        await supabase.from('ai_conversations').insert({
+          platform: platform,
+          user_id: senderId,
+          message: response,
+          type: 'sent',
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  } catch (error) {
+    console.error('❌ Erro ao processar imagem:', error);
+    await sendFacebookMessage(senderId, 'Eh pá, tive um problema a processar a imagem. Tenta enviar novamente!', supabase);
+  }
+}
+
+// Identificar produto pela imagem usando OpenAI Vision
+async function identifyProductFromImage(imageUrl: string, userMessage: string, supabase: any) {
+  try {
+    console.log('🔍 Tentando identificar produto pela imagem...');
+    
+    // 1. Buscar produtos no banco de dados
+    const { data: products } = await supabase
+      .from('products')
+      .select('*')
+      .eq('active', true);
+    
+    if (!products || products.length === 0) {
+      return { found: false, product: null };
+    }
+    
+    // 2. Usar OpenAI Vision para identificar produto
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      console.log('⚠️ OpenAI API Key não encontrada, usando busca por texto');
+      return searchProductByText(userMessage, supabase);
+    }
+    
+    const prompt = `
+Analise esta imagem e identifique se corresponde a algum destes produtos:
+
+${products.map(p => `- ${p.name}: ${p.description}`).join('\n')}
+
+Responda APENAS com o nome EXATO do produto se encontrar correspondência, ou "NENHUM" se não conseguir identificar.
+
+Contexto da mensagem: "${userMessage}"
+`;
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: imageUrl } }
+            ]
+          }
+        ],
+        max_tokens: 100,
+      }),
+    });
+    
+    const data = await response.json();
+    const aiResponse = data.choices?.[0]?.message?.content?.trim();
+    
+    if (aiResponse && aiResponse !== 'NENHUM') {
+      // Buscar produto identificado
+      const identifiedProduct = products.find(p => 
+        p.name.toLowerCase().includes(aiResponse.toLowerCase()) ||
+        aiResponse.toLowerCase().includes(p.name.toLowerCase())
+      );
+      
+      if (identifiedProduct) {
+        console.log('✅ Produto identificado:', identifiedProduct.name);
+        return { found: true, product: identifiedProduct };
+      }
+    }
+    
+    // Fallback: buscar por texto da mensagem
+    return searchProductByText(userMessage, supabase);
+    
+  } catch (error) {
+    console.error('❌ Erro na identificação de produto:', error);
+    return searchProductByText(userMessage, supabase);
+  }
+}
+
+async function searchProductByText(message: string, supabase: any) {
+  try {
+    const { data: products } = await supabase
+      .from('products')
+      .select('*')
+      .or(`name.ilike.%${message}%,description.ilike.%${message}%,category.ilike.%${message}%`)
+      .eq('active', true)
+      .limit(1);
+    
+    if (products && products.length > 0) {
+      return { found: true, product: products[0] };
+    }
+    
+    return { found: false, product: null };
+  } catch (error) {
+    console.error('❌ Erro na busca por texto:', error);
+    return { found: false, product: null };
+  }
+}
+
+async function sendImageAttachment(senderId: string, imageUrl: string, platform: string, supabase: any) {
+  try {
+    console.log('📤 Enviando imagem como anexo...');
+    
+    const FACEBOOK_ACCESS_TOKEN = Deno.env.get('FACEBOOK_ACCESS_TOKEN');
+    const PAGE_ID = Deno.env.get('FACEBOOK_PAGE_ID') || '230190170178019';
+    
+    const apiUrl = `https://graph.facebook.com/v18.0/${PAGE_ID}/messages`;
+    
+    const messageData = {
+      recipient: { id: senderId },
+      message: {
+        attachment: {
+          type: 'image',
+          payload: {
+            url: imageUrl,
+            is_reusable: true
+          }
+        }
+      }
+    };
+    
+    const response = await fetch(`${apiUrl}?access_token=${FACEBOOK_ACCESS_TOKEN}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(messageData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('❌ Erro ao enviar imagem:', errorData);
+    } else {
+      console.log('✅ Imagem enviada como anexo com sucesso');
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao enviar anexo de imagem:', error);
+  }
+}
+
 // Sistema de perfil de usuário com aprendizado contínuo
 async function updateUserProfile(userId: string, message: string, supabase: any) {
   try {
@@ -492,6 +718,29 @@ function detectCustomerMood(message: string): string {
 
 async function processWithEnhancedAI(message: string, senderId: string, supabase: any): Promise<string> {
   try {
+    // 1. Detectar localização do usuário para guia de entrega
+    const userLocation = detectUserLocation(message);
+    
+    // 2. Verificar padrões repetitivos para variar respostas
+    const responsePattern = await analyzeResponsePatterns(senderId, message, supabase);
+    
+    // 3. Buscar perfil do usuário para personalização
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', senderId)
+      .eq('platform', 'instagram')
+      .single();
+    
+    // 4. Buscar produtos relevantes
+    const products = await searchRelevantProducts(message, supabase);
+    
+    // 5. Verificar se é pedido de publicidade/lista de produtos
+    if (isProductListRequest(message)) {
+      return handleProductListRequest(products, userLocation, supabase);
+    }
+    
+    // 6. Chamar IA melhorada com contexto angolano
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
     if (!OPENAI_API_KEY) {
