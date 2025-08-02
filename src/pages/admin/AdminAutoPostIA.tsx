@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { OpenAIKeySetup } from '@/components/admin/OpenAIKeySetup';
 import { 
   Bot, 
   Calendar, 
@@ -76,6 +77,7 @@ const AdminAutoPostIA: React.FC = () => {
     access_token: '',
     business_id: ''
   });
+  const [showKeySetup, setShowKeySetup] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -173,15 +175,35 @@ const AdminAutoPostIA: React.FC = () => {
           description: "Conteúdo criado pela IA com sucesso",
         });
       } else {
+        // Check if the error is related to missing OpenAI key
+        if (response.error?.message?.includes('OpenAI API Key não configurada')) {
+          setShowKeySetup(true);
+          toast({
+            title: "Configuração Necessária",
+            description: "Configure sua chave OpenAI para gerar conteúdo",
+            variant: "destructive",
+          });
+          return;
+        }
         throw new Error('Erro ao gerar conteúdo');
       }
     } catch (error) {
       console.error('Erro ao gerar conteúdo:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao gerar conteúdo com IA",
-        variant: "destructive",
-      });
+      // Check if the error is related to missing OpenAI key
+      if (error.message?.includes('OpenAI API Key não configurada')) {
+        setShowKeySetup(true);
+        toast({
+          title: "Configuração Necessária",
+          description: "Configure sua chave OpenAI para gerar conteúdo",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: "Falha ao gerar conteúdo com IA",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -338,6 +360,21 @@ const AdminAutoPostIA: React.FC = () => {
       setSettingsLoading(false);
     }
   };
+
+  if (showKeySetup) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Bot className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold">Auto Post IA</h1>
+            <p className="text-muted-foreground">Sistema automático de postagens para redes sociais</p>
+          </div>
+        </div>
+        <OpenAIKeySetup onKeyConfigured={() => setShowKeySetup(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
