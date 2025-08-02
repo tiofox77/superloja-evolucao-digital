@@ -181,7 +181,7 @@ async function callOpenAI(message: string, context: any): Promise<any> {
   }
 
   const systemPrompt = `
-Você é o SuperBot, assistente IA oficial da SuperLoja (https://superloja.vip).
+Você é o SuperBot, assistente IA oficial da SuperLoja (https://superloja.vip) usando ChatGPT para responder inteligentemente.
 
 INFORMAÇÕES DA EMPRESA:
 - SuperLoja: Loja online líder em Angola
@@ -192,7 +192,7 @@ INFORMAÇÕES DA EMPRESA:
 
 PRODUTOS DISPONÍVEIS:
 ${context.products.map(p => 
-  `• ${p.name} - ${p.price} AOA - ${p.description} (Stock: ${p.stock || 0})`
+  `• ${p.name} - ${p.price} AOA - ${p.description} (Stock: ${p.stock || 0}) - Imagem: ${p.image_url || 'sem imagem'}`
 ).join('\n')}
 
 HISTÓRICO DA CONVERSA:
@@ -205,6 +205,13 @@ ${context.responsePatterns ? `Evite repetir: ${context.responsePatterns.repeated
 
 LOCALIZAÇÃO DO USUÁRIO:
 ${context.userLocation || 'Não identificada'}
+
+INSTRUÇÕES CRÍTICAS PARA IMAGENS:
+- Quando o cliente pedir "imagem", "foto", "mostrar", "ver foto", "quero ver" de um produto
+- RESPONDA EXATAMENTE neste formato JSON:
+{"message": "Sua resposta em português angolano", "image_url": "url_da_imagem_do_produto", "attach_image": true}
+- Use APENAS produtos da lista acima que tenham image_url
+- Sempre explique o produto na mensagem
 
 EXPRESSÕES ANGOLANAS PROFISSIONAIS (USE VARIADAS):
 - Saudações: "Meu estimado", "Prezado cliente", "Mano querido", "Companheiro"
@@ -219,6 +226,7 @@ INSTRUÇÕES ESPECIAIS:
 4. Para publicidade: liste produtos resumidamente primeiro
 5. Para usuários fora de Luanda: explique processo de encomenda passo-a-passo
 6. Use linguagem comercial angolana respeitosa
+7. Analise o contexto completo da mensagem, não apenas palavras-chave
 
 LOCALIZAÇÃO E ENTREGA:
 - Luanda: Entrega grátis, 1-3 dias
@@ -238,20 +246,32 @@ PADRÃO ANTI-REPETIÇÃO:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 200,
-        temperature: 0.7,
+        max_tokens: 300,
+        temperature: 0.8,
       }),
     });
 
     const data = await response.json();
     
     if (data.choices && data.choices[0]) {
-      return data.choices[0].message.content.trim();
+      const response = data.choices[0].message.content.trim();
+      
+      // Tentar parsear como JSON (para respostas com imagem)
+      try {
+        const parsedResponse = JSON.parse(response);
+        if (parsedResponse.message && parsedResponse.attach_image) {
+          return parsedResponse;
+        }
+      } catch {
+        // Se não for JSON válido, retorna como texto normal
+      }
+      
+      return response;
     } else {
       throw new Error('Invalid OpenAI response');
     }
