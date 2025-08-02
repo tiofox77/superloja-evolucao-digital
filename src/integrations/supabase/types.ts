@@ -1347,6 +1347,56 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_posts: {
+        Row: {
+          content: string
+          created_at: string
+          error_message: string | null
+          id: string
+          platform: string
+          post_type: string
+          posted_at: string | null
+          product_id: string | null
+          scheduled_for: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          platform: string
+          post_type?: string
+          posted_at?: string | null
+          product_id?: string | null
+          scheduled_for: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          platform?: string
+          post_type?: string
+          posted_at?: string | null
+          product_id?: string | null
+          scheduled_for?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seo_settings: {
         Row: {
           canonical_url: string | null
@@ -1433,6 +1483,47 @@ export type Database = {
           value?: Json
         }
         Relationships: []
+      }
+      social_posts_history: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          platform: string
+          post_type: string
+          posted_at: string
+          product_id: string | null
+          results: Json | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          platform: string
+          post_type?: string
+          posted_at?: string
+          product_id?: string | null
+          results?: Json | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          platform?: string
+          post_type?: string
+          posted_at?: string
+          product_id?: string | null
+          results?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_posts_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       static_pages: {
         Row: {
