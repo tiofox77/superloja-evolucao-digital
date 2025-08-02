@@ -19,7 +19,8 @@ import {
   Image,
   BookOpen,
   FileDown,
-  Bot
+  Bot,
+  Sparkles
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -99,6 +100,11 @@ const menuItems = [
     title: 'Agente IA',
     url: '/admin/agente-ia',
     icon: Bot,
+  },
+  {
+    title: 'Auto Post IA',
+    url: '/admin/auto-post-ia',
+    icon: Sparkles,
   },
 ];
 

@@ -40,6 +40,7 @@ import AdminBannerGerador from "@/pages/admin/AdminBannerGerador";
 import AdminCatalogoProdutos from "@/pages/admin/AdminCatalogoProdutos";
 import { AdminAnalytics } from "@/pages/admin/AdminAnalytics";
 import AdminAgentIA from "@/pages/admin/AdminAgentIA";
+import AdminAutoPostIA from "@/pages/admin/AdminAutoPostIA";
 import { CatalogPage } from "@/pages/CatalogPage";
 import SolicitarProduto from "@/pages/SolicitarProduto";
 import Contato from "@/pages/Contato";
@@ -118,6 +119,7 @@ function App() {
                 <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="catalogo-gerado" element={<CatalogPage />} />
                 <Route path="agente-ia" element={<AdminAgentIA />} />
+                <Route path="auto-post-ia" element={<AdminAutoPostIA />} />
               </Route>
               
               <Route path="*" element={<NotFound />} />
