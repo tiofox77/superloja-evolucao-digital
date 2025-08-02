@@ -1421,31 +1421,6 @@ async function sendFacebookMessageWithImage(recipientId: string, text: string, i
     await sendFacebookMessage(recipientId, text, supabase);
   }
 }
-        },
-        messaging_type: 'RESPONSE'
-      };
-
-      const imageResponse = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(imagePayload),
-      });
-
-      if (!imageResponse.ok) {
-        console.error('❌ Erro ao enviar imagem:', await imageResponse.text());
-      } else {
-        console.log('✅ Imagem enviada com sucesso');
-      }
-      
-      // Pausa entre envios
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-  } catch (error) {
-    console.error('❌ Erro geral ao enviar mensagem:', error);
-  }
-}
-
 async function checkAndNotifyAdmin(userMessage: string, aiResponse: string, userId: string, supabase: any) {
   const triggers = [
     'entrega fora', 'entrega provincia', 'entrega nas provincia',
