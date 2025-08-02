@@ -39,8 +39,46 @@ serve(async (req) => {
     // Processar mensagem com IA
     const response = await processWebsiteChat(message, userId, sessionId, supabase);
 
+    // Verificar se a resposta inclui uma imagem para anexar
+    if (typeof response === 'object' && response.attach_image && response.image_url) {
+      try {
+        // Baixar a imagem do Supabase Storage
+        const imageResponse = await fetch(response.image_url);
+        const imageBlob = await imageResponse.blob();
+        const imageBase64 = await blobToBase64(imageBlob);
+        
+        return new Response(
+          JSON.stringify({ 
+            response: response.message,
+            image: {
+              data: imageBase64,
+              type: imageBlob.type,
+              filename: getFilenameFromUrl(response.image_url)
+            }
+          }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json', ...corsHeaders } 
+          }
+        );
+      } catch (imageError) {
+        console.error('Error processing image:', imageError);
+        // Se falhar, retorna apenas o texto
+        const responseText = typeof response === 'object' ? response.message : response;
+        return new Response(
+          JSON.stringify({ response: responseText }),
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json', ...corsHeaders } 
+          }
+        );
+      }
+    }
+
+    // Resposta normal sem imagem
+    const responseText = typeof response === 'object' ? response.message : response;
     return new Response(
-      JSON.stringify({ response }),
+      JSON.stringify({ response: responseText }),
       { 
         status: 200, 
         headers: { 'Content-Type': 'application/json', ...corsHeaders } 
@@ -391,5 +429,27 @@ async function saveConversation(userId: string, message: string, type: string, s
       });
   } catch (error) {
     console.error('Error saving conversation:', error);
+  }
+}
+
+// Função auxiliar para converter blob para base64
+async function blobToBase64(blob: Blob): Promise<string> {
+  const arrayBuffer = await blob.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let i = 0; i < uint8Array.length; i++) {
+    binary += String.fromCharCode(uint8Array[i]);
+  }
+  return btoa(binary);
+}
+
+// Função auxiliar para extrair nome do arquivo da URL
+function getFilenameFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname;
+    return pathname.split('/').pop() || 'image.jpg';
+  } catch {
+    return 'image.jpg';
   }
 }
