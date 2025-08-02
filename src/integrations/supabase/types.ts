@@ -1484,6 +1484,33 @@ export type Database = {
         }
         Relationships: []
       }
+      social_media_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          platform: string
+          settings: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          platform: string
+          settings?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          platform?: string
+          settings?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       social_posts_history: {
         Row: {
           content: string
