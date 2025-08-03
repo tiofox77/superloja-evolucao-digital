@@ -380,13 +380,24 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
 }
 
 async function postToFacebook(content: string, product_id?: string, supabase?: any) {
+  console.log('🔍 [FACEBOOK DEBUG] Iniciando postagem...');
+  
   // Buscar configurações do banco de dados
-  const { data: settings } = await supabase
+  const { data: settings, error: settingsError } = await supabase
     .from('social_media_settings')
     .select('settings')
     .eq('platform', 'facebook')
     .eq('is_active', true)
     .single();
+  
+  console.log('🔍 [FACEBOOK DEBUG] Configurações encontradas:', {
+    hasSettings: !!settings,
+    settingsError,
+    hasAccessToken: !!settings?.settings?.access_token,
+    hasPageId: !!settings?.settings?.page_id,
+    tokenPrefix: settings?.settings?.access_token?.substring(0, 10) + '...',
+    pageId: settings?.settings?.page_id
+  });
   
   if (!settings?.settings?.access_token || !settings?.settings?.page_id) {
     throw new Error('Token do Facebook não configurado');
@@ -431,13 +442,24 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
 }
 
 async function postToInstagram(content: string, product_id?: string, supabase?: any) {
+  console.log('🔍 [INSTAGRAM DEBUG] Iniciando postagem...');
+  
   // Buscar configurações do banco de dados
-  const { data: settings } = await supabase
+  const { data: settings, error: settingsError } = await supabase
     .from('social_media_settings')
     .select('settings')
     .eq('platform', 'instagram')
     .eq('is_active', true)
     .single();
+  
+  console.log('🔍 [INSTAGRAM DEBUG] Configurações encontradas:', {
+    hasSettings: !!settings,
+    settingsError,
+    hasAccessToken: !!settings?.settings?.access_token,
+    hasBusinessId: !!settings?.settings?.business_id,
+    tokenPrefix: settings?.settings?.access_token?.substring(0, 10) + '...',
+    businessId: settings?.settings?.business_id
+  });
   
   if (!settings?.settings?.access_token || !settings?.settings?.business_id) {
     throw new Error('Credenciais do Instagram não configuradas');

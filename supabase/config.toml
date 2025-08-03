@@ -89,3 +89,6 @@ verify_jwt = false
 
 [functions.process-weekly-plans]
 verify_jwt = false
+
+[functions.test-social-config]
+verify_jwt = false

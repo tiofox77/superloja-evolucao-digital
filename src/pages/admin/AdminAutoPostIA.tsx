@@ -331,10 +331,37 @@ const AdminAutoPostIA: React.FC = () => {
         const results = response.data.results;
         const successCount = results.filter((r: any) => r.success).length;
         
-        toast({
-          title: "Posts publicados!",
-          description: `${successCount} de ${results.length} posts publicados com sucesso`,
-        });
+        // Mostrar detalhes dos erros se houver
+        const errors = results.filter((r: any) => !r.success);
+        if (errors.length > 0) {
+          console.log('❌ Erros nas postagens:', errors);
+          
+          // Mostrar erro específico do token expirado
+          const expiredToken = errors.find((e: any) => 
+            e.error?.includes('Session has expired') || 
+            e.error?.includes('expired')
+          );
+          
+          if (expiredToken) {
+            toast({
+              title: "Token Expirado",
+              description: "O token do Facebook expirou. Atualize na aba Configurações.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: `${successCount} de ${results.length} posts publicados`,
+              description: errors.map((e: any) => `${e.platform}: ${e.error}`).join('\n'),
+              variant: successCount > 0 ? "default" : "destructive",
+            });
+          }
+        } else {
+          toast({
+            title: "Posts publicados!",
+            description: `${successCount} de ${results.length} posts publicados com sucesso`,
+          });
+        }
+        
         setGeneratedContent('');
       } else {
         throw new Error('Erro ao publicar posts');
@@ -348,6 +375,35 @@ const AdminAutoPostIA: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testSocialConfig = async () => {
+    setSettingsLoading(true);
+    try {
+      const response = await supabase.functions.invoke('test-social-config');
+      
+      if (response.data?.success) {
+        const results = response.data.results;
+        const summary = response.data.summary;
+        
+        console.log('🔍 Teste de configurações:', results);
+        
+        toast({
+          title: "Teste de Configurações",
+          description: `Facebook: ${summary.facebookReady ? '✅ OK' : '❌ Problema'} | Instagram: ${summary.instagramReady ? '✅ OK' : '❌ Problema'}`,
+          variant: summary.facebookReady || summary.instagramReady ? "default" : "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Erro no teste:', error);
+      toast({
+        title: "Erro no teste",
+        description: "Falha ao testar configurações",
+        variant: "destructive",
+      });
+    } finally {
+      setSettingsLoading(false);
     }
   };
 
@@ -762,7 +818,17 @@ const AdminAutoPostIA: React.FC = () => {
           {/* Status das Configurações */}
           <Card>
             <CardHeader>
-              <CardTitle>Status das Integrações</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                Status das Integrações
+                <Button 
+                  onClick={testSocialConfig}
+                  disabled={settingsLoading}
+                  variant="outline"
+                  size="sm"
+                >
+                  {settingsLoading ? 'Testando...' : 'Testar Configurações'}
+                </Button>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
