@@ -300,51 +300,83 @@ async function schedulePost(platform?: string, product_id?: string, custom_promp
 }
 
 async function postNow(platform?: string, product_id?: string, custom_prompt?: string, post_type?: string, supabase?: any) {
-  // Gerar conteúdo
-  const contentResponse = await generateContent(product_id, post_type, custom_prompt, supabase);
-  const contentData = await contentResponse.json();
-  
-  // Postar nas redes sociais
-  const results = [];
-  
-  if (platform === 'facebook' || platform === 'both') {
-    try {
-      const facebookResult = await postToFacebook(contentData.content, product_id, supabase);
-      results.push({ platform: 'facebook', ...facebookResult });
-    } catch (error) {
-      results.push({ platform: 'facebook', success: false, error: error.message });
+  try {
+    console.log('🚀 Iniciando postagem imediata:', { platform, product_id, post_type });
+    
+    // Gerar conteúdo
+    const contentResponse = await generateContent(product_id, post_type, custom_prompt, supabase);
+    const contentData = await contentResponse.json();
+    
+    console.log('📝 Conteúdo gerado:', contentData);
+    
+    // Postar nas redes sociais
+    const results = [];
+    
+    if (platform === 'facebook' || platform === 'both') {
+      try {
+        console.log('📘 Postando no Facebook...');
+        const facebookResult = await postToFacebook(contentData.content, product_id, supabase);
+        results.push({ platform: 'facebook', ...facebookResult });
+        console.log('✅ Facebook result:', facebookResult);
+      } catch (error) {
+        console.error('❌ Erro no Facebook:', error);
+        results.push({ platform: 'facebook', success: false, error: error.message });
+      }
     }
-  }
-  
-  if (platform === 'instagram' || platform === 'both') {
-    try {
-      const instagramResult = await postToInstagram(contentData.content, product_id, supabase);
-      results.push({ platform: 'instagram', ...instagramResult });
-    } catch (error) {
-      results.push({ platform: 'instagram', success: false, error: error.message });
+    
+    if (platform === 'instagram' || platform === 'both') {
+      try {
+        console.log('📷 Postando no Instagram...');
+        const instagramResult = await postToInstagram(contentData.content, product_id, supabase);
+        results.push({ platform: 'instagram', ...instagramResult });
+        console.log('✅ Instagram result:', instagramResult);
+      } catch (error) {
+        console.error('❌ Erro no Instagram:', error);
+        results.push({ platform: 'instagram', success: false, error: error.message });
+      }
     }
+
+    // Salvar histórico
+    console.log('💾 Salvando histórico...');
+    const { error: historyError } = await supabase
+      .from('social_posts_history')
+      .insert({
+        platform: platform,
+        content: contentData.content,
+        product_id: product_id,
+        post_type: post_type,
+        results: results,
+        posted_at: new Date().toISOString()
+      });
+
+    if (historyError) {
+      console.error('❌ Erro ao salvar histórico:', historyError);
+    } else {
+      console.log('✅ Histórico salvo com sucesso');
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        content: contentData.content,
+        results: results,
+        banner_url: contentData.banner_url
+      }),
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+    );
+  } catch (error) {
+    console.error('❌ Erro geral em postNow:', error);
+    return new Response(
+      JSON.stringify({ 
+        success: false,
+        error: error.message 
+      }),
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders } 
+      }
+    );
   }
-
-  // Salvar histórico
-  await supabase
-    .from('social_posts_history')
-    .insert({
-      platform: platform,
-      content: contentData.content,
-      product_id: product_id,
-      post_type: post_type,
-      results: results,
-      posted_at: new Date().toISOString()
-    });
-
-  return new Response(
-    JSON.stringify({ 
-      success: true,
-      content: contentData.content,
-      results: results
-    }),
-    { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-  );
 }
 
 async function postToFacebook(content: string, product_id?: string, supabase?: any) {
