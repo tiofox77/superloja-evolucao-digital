@@ -1740,6 +1740,120 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_plan_posts: {
+        Row: {
+          banner_url: string | null
+          content: string | null
+          created_at: string
+          error_message: string | null
+          generated_content: string | null
+          id: string
+          plan_id: string
+          platform: string
+          post_type: string
+          product_id: string | null
+          scheduled_for: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          banner_url?: string | null
+          content?: string | null
+          created_at?: string
+          error_message?: string | null
+          generated_content?: string | null
+          id?: string
+          plan_id: string
+          platform: string
+          post_type: string
+          product_id?: string | null
+          scheduled_for: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          banner_url?: string | null
+          content?: string | null
+          created_at?: string
+          error_message?: string | null
+          generated_content?: string | null
+          id?: string
+          plan_id?: string
+          platform?: string
+          post_type?: string
+          product_id?: string | null
+          scheduled_for?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_plan_posts_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_posting_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_plan_posts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_posting_plans: {
+        Row: {
+          auto_generate: boolean | null
+          created_at: string
+          description: string | null
+          end_date: string
+          id: string
+          name: string
+          platforms: string[] | null
+          post_types: string[] | null
+          preferred_times: string[] | null
+          product_categories: string[] | null
+          start_date: string
+          status: string | null
+          target_posts_per_day: number | null
+          updated_at: string
+        }
+        Insert: {
+          auto_generate?: boolean | null
+          created_at?: string
+          description?: string | null
+          end_date: string
+          id?: string
+          name: string
+          platforms?: string[] | null
+          post_types?: string[] | null
+          preferred_times?: string[] | null
+          product_categories?: string[] | null
+          start_date: string
+          status?: string | null
+          target_posts_per_day?: number | null
+          updated_at?: string
+        }
+        Update: {
+          auto_generate?: boolean | null
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          id?: string
+          name?: string
+          platforms?: string[] | null
+          post_types?: string[] | null
+          preferred_times?: string[] | null
+          product_categories?: string[] | null
+          start_date?: string
+          status?: string | null
+          target_posts_per_day?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

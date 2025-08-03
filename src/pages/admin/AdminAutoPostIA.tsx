@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { OpenAIKeySetup } from '@/components/admin/OpenAIKeySetup';
 import { PostPreview } from '@/components/admin/PostPreview';
+import { WeeklyPlanner } from '@/components/admin/WeeklyPlanner';
 import { 
   Bot, 
   Calendar, 
@@ -23,7 +24,8 @@ import {
   History,
   Settings,
   Image,
-  Zap
+  Zap,
+  CalendarDays
 } from 'lucide-react';
 
 interface Product {
@@ -426,10 +428,14 @@ const AdminAutoPostIA: React.FC = () => {
       </div>
 
       <Tabs defaultValue="create" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="create" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             Criar Post
+          </TabsTrigger>
+          <TabsTrigger value="weekly" className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Planos Semanais
           </TabsTrigger>
           <TabsTrigger value="scheduled" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
@@ -596,6 +602,10 @@ const AdminAutoPostIA: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="weekly" className="space-y-6">
+          <WeeklyPlanner />
         </TabsContent>
 
         <TabsContent value="scheduled" className="space-y-6">
