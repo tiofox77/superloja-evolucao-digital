@@ -126,15 +126,22 @@ export const useAnalytics = () => {
       const deviceInfo = getDeviceInfo();
       const locationData = await getLocationData();
       
-      await supabase.from('visitor_analytics').insert({
+      const result = await supabase.from('visitor_analytics').insert({
         visitor_id: visitorId,
         session_id: sessionId,
         page_url: data.page_url,
         page_title: data.page_title || document.title,
         referrer: data.referrer || document.referrer,
-        ...deviceInfo,
-        ...locationData
+        ip_address: locationData.ip_address || null,
+        country: locationData.country || null,
+        city: locationData.city || null,
+        browser: deviceInfo.browser,
+        device_type: deviceInfo.device_type
       });
+
+      if (result.error) {
+        console.warn('Analytics tracking error:', result.error);
+      }
 
       // Rastrear evento de página
       await supabase.from('analytics_events').insert({
