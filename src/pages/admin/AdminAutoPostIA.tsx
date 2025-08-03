@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { OpenAIKeySetup } from '@/components/admin/OpenAIKeySetup';
+import { PostPreview } from '@/components/admin/PostPreview';
 import { 
   Bot, 
   Calendar, 
@@ -172,7 +173,9 @@ const AdminAutoPostIA: React.FC = () => {
         setGeneratedContent(response.data.content);
         toast({
           title: "Conteúdo gerado!",
-          description: "Conteúdo criado pela IA com sucesso",
+          description: response.data.has_banner 
+            ? "Conteúdo criado com banner promocional incluído"
+            : "Conteúdo criado pela IA com sucesso",
         });
       } else {
         // Check if the error is related to missing OpenAI key
@@ -503,9 +506,13 @@ const AdminAutoPostIA: React.FC = () => {
               <CardContent className="space-y-4">
                 {generatedContent ? (
                   <>
-                    <div className="p-4 bg-muted rounded-lg">
-                      <p className="whitespace-pre-wrap text-sm">{generatedContent}</p>
-                    </div>
+                    <PostPreview 
+                      content={generatedContent}
+                      platform={platform}
+                      postType={postType}
+                      productData={selectedProduct ? products.find(p => p.id === selectedProduct) : undefined}
+                      hasBanner={true}
+                    />
                     
                     <Separator />
                     
@@ -546,6 +553,7 @@ const AdminAutoPostIA: React.FC = () => {
                   <div className="text-center py-8 text-muted-foreground">
                     <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>Configure as opções e clique em "Gerar Conteúdo IA" para começar</p>
+                    <p className="text-xs mt-2">✨ Banners promocionais serão gerados automaticamente para produtos</p>
                   </div>
                 )}
               </CardContent>

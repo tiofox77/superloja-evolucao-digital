@@ -664,6 +664,44 @@ export type Database = {
           },
         ]
       }
+      generated_banners: {
+        Row: {
+          banner_data: Json
+          created_at: string
+          id: string
+          image_url: string | null
+          post_type: string
+          processed: boolean | null
+          product_id: string | null
+        }
+        Insert: {
+          banner_data: Json
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          post_type: string
+          processed?: boolean | null
+          product_id?: string | null
+        }
+        Update: {
+          banner_data?: Json
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          post_type?: string
+          processed?: boolean | null
+          product_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_banners_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       layout_settings: {
         Row: {
           content: Json
