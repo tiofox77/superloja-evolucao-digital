@@ -66,14 +66,17 @@ async function generateContent(product_id?: string, post_type?: string, custom_p
   }
 
   let productInfo = '';
+  let productData = null;
+  
   if (product_id) {
     const { data: product } = await supabase
       .from('products')
-      .select('name, description, price, image_url')
+      .select('id, name, description, price, image_url')
       .eq('id', product_id)
       .single();
     
     if (product) {
+      productData = product;
       productInfo = `
 PRODUTO:
 - Nome: ${product.name}
@@ -81,6 +84,16 @@ PRODUTO:
 - Preço: ${product.price} AOA
 - Imagem: ${product.image_url}
 `;
+    }
+  }
+
+  // Gerar banner automaticamente para qualquer post
+  let bannerUrl = null;
+  if (productData) {
+    try {
+      bannerUrl = await generateProductBanner(productData, post_type, supabase);
+    } catch (error) {
+      console.error('Erro ao gerar banner:', error);
     }
   }
 
@@ -99,6 +112,7 @@ DIRETRIZES PARA POSTS:
 4. Mencione entrega grátis em Luanda quando relevante
 5. Inclua hashtags angolanas e de tecnologia
 6. Máximo 280 caracteres para melhor engajamento
+7. ${bannerUrl ? 'IMPORTANTE: Uma imagem promocional será anexada automaticamente ao post' : 'Crie um texto atrativo e descritivo'}
 
 TIPOS DE POST:
 - product: Foco no produto específico
@@ -154,13 +168,101 @@ HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #Eletronic
     return new Response(
       JSON.stringify({ 
         content: generatedContent,
-        product_info: productInfo ? 'Produto incluído' : 'Sem produto específico'
+        banner_url: bannerUrl,
+        product_info: productInfo ? 'Produto incluído' : 'Sem produto específico',
+        has_banner: !!bannerUrl
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } else {
     throw new Error('Erro ao gerar conteúdo com IA');
   }
+}
+
+// Função para gerar banner do produto
+async function generateProductBanner(productData: any, postType: string, supabase: any) {
+  try {
+    // Configurações do banner baseadas no tipo de post
+    const bannerConfig = {
+      width: 1080,
+      height: 1080,
+      background: postType === 'promotional' ? '#E86C00' : '#8B4FA3',
+      textColor: '#FFFFFF',
+      logoEnabled: true
+    };
+
+    // Carregar logo da loja
+    const { data: storeSettings } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'store_info')
+      .single();
+
+    const logoUrl = storeSettings?.value?.logo_url || '';
+
+    // Gerar HTML do banner
+    const bannerHtml = createBannerHtml(productData, bannerConfig, postType, logoUrl);
+    
+    // Para esta implementação server-side, vamos retornar uma URL de placeholder
+    // que pode ser processada pelo cliente ou por um serviço de screenshot
+    const bannerData = {
+      html: bannerHtml,
+      config: bannerConfig,
+      product: productData,
+      type: postType
+    };
+
+    // Salvar dados do banner temporariamente
+    const { data: bannerRecord } = await supabase
+      .from('generated_banners')
+      .insert({
+        product_id: productData.id,
+        banner_data: bannerData,
+        post_type: postType,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (bannerRecord) {
+      // Retornar URL que pode ser usada para gerar a imagem
+      return `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-banner/${bannerRecord.id}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Erro ao gerar banner:', error);
+    return null;
+  }
+}
+
+// Função para criar HTML do banner
+function createBannerHtml(product: any, config: any, postType: string, logoUrl: string) {
+  const promoTag = postType === 'promotional' ? 
+    `<div style="background: #FF6B35; color: white; padding: 10px 20px; border-radius: 20px; font-size: 24px; font-weight: bold; position: absolute; top: 80px; right: 40px; transform: rotate(15deg); box-shadow: 0 4px 15px rgba(0,0,0,0.3);">OFERTA ESPECIAL!</div>` : '';
+
+  return `
+    <div style="width: ${config.width}px; height: ${config.height}px; background: ${config.background}; color: ${config.textColor}; position: relative; font-family: Arial, sans-serif; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; box-sizing: border-box;">
+      ${promoTag}
+      
+      ${logoUrl ? `<div style="width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 20px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.2); margin-bottom: 30px;">
+        <img src="${logoUrl}" style="max-width: 80px; max-height: 80px; object-fit: contain;" />
+      </div>` : ''}
+      
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+        ${product.image_url ? `<img src="${product.image_url}" style="max-width: 300px; max-height: 300px; object-fit: contain; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.3); margin-bottom: 30px;" />` : ''}
+        
+        <h2 style="font-size: 48px; font-weight: bold; margin: 0 0 20px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); line-height: 1.2;">${product.name}</h2>
+        
+        <div style="font-size: 42px; font-weight: bold; background: rgba(255,255,255,0.2); padding: 15px 30px; border-radius: 25px; margin: 20px 0; border: 3px solid ${config.textColor};">${product.price.toLocaleString()} AOA</div>
+      </div>
+      
+      <div style="font-size: 24px; opacity: 0.9; text-align: center;">
+        <div style="font-weight: bold; margin-bottom: 5px;">SuperLoja Angola</div>
+        <div>Entrega grátis em Luanda • www.superloja.ao</div>
+      </div>
+    </div>
+  `;
 }
 
 async function schedulePost(platform?: string, product_id?: string, custom_prompt?: string, schedule_time?: string, post_type?: string, supabase?: any) {
