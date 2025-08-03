@@ -13,6 +13,7 @@ interface PostPreviewProps {
   };
   postType: string;
   hasBanner?: boolean;
+  bannerUrl?: string;
 }
 
 export const PostPreview: React.FC<PostPreviewProps> = ({
@@ -20,7 +21,8 @@ export const PostPreview: React.FC<PostPreviewProps> = ({
   platform,
   productData,
   postType,
-  hasBanner = false
+  hasBanner = false,
+  bannerUrl
 }) => {
   const getPlatformInfo = (platform: string) => {
     switch (platform) {
@@ -74,8 +76,16 @@ export const PostPreview: React.FC<PostPreviewProps> = ({
           <div className="space-y-4">
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
             
-            {/* Banner/Imagem Simulada */}
-            {hasBanner && productData && (
+            {/* Banner/Imagem Gerada */}
+            {bannerUrl ? (
+              <div className="border rounded-lg overflow-hidden">
+                <img 
+                  src={bannerUrl} 
+                  alt="Banner promocional gerado"
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+            ) : hasBanner && productData && (
               <div className="border rounded-lg overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5">
                 <div className="aspect-square relative bg-primary/20 flex items-center justify-center">
                   {productData.image_url ? (

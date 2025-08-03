@@ -59,6 +59,7 @@ const AdminAutoPostIA: React.FC = () => {
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState('');
+  const [generatedBanner, setGeneratedBanner] = useState<string | null>(null);
   
   // Form states
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -157,9 +158,44 @@ const AdminAutoPostIA: React.FC = () => {
     }
   };
 
+  const generateBanner = async (product: Product) => {
+    try {
+      const { BannerService } = await import('@/utils/BannerService');
+      
+      const bannerDataUrl = await BannerService.generateProductBanner(
+        {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          image_url: product.image_url
+        },
+        postType
+      );
+      
+      if (bannerDataUrl) {
+        setGeneratedBanner(bannerDataUrl);
+        return bannerDataUrl;
+      }
+    } catch (error) {
+      console.error('Erro ao gerar banner:', error);
+    }
+    return null;
+  };
+
   const generateContent = async () => {
     setLoading(true);
+    setGeneratedBanner(null);
+    
     try {
+      // Gerar banner primeiro se houver produto selecionado
+      let bannerUrl = null;
+      if (selectedProduct) {
+        const product = products.find(p => p.id === selectedProduct);
+        if (product) {
+          bannerUrl = await generateBanner(product);
+        }
+      }
+
       const response = await supabase.functions.invoke('auto-post-social', {
         body: {
           action: 'generate_content',
@@ -173,7 +209,7 @@ const AdminAutoPostIA: React.FC = () => {
         setGeneratedContent(response.data.content);
         toast({
           title: "Conteúdo gerado!",
-          description: response.data.has_banner 
+          description: bannerUrl 
             ? "Conteúdo criado com banner promocional incluído"
             : "Conteúdo criado pela IA com sucesso",
         });
@@ -511,7 +547,8 @@ const AdminAutoPostIA: React.FC = () => {
                       platform={platform}
                       postType={postType}
                       productData={selectedProduct ? products.find(p => p.id === selectedProduct) : undefined}
-                      hasBanner={true}
+                      hasBanner={!!generatedBanner || !!selectedProduct}
+                      bannerUrl={generatedBanner || undefined}
                     />
                     
                     <Separator />
