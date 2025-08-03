@@ -380,12 +380,20 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
 }
 
 async function postToFacebook(content: string, product_id?: string, supabase?: any) {
-  const FACEBOOK_PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
-  const FACEBOOK_PAGE_ID = Deno.env.get('FACEBOOK_PAGE_ID') || '230190170178019';
+  // Buscar configurações do banco de dados
+  const { data: settings } = await supabase
+    .from('social_media_settings')
+    .select('settings')
+    .eq('platform', 'facebook')
+    .eq('is_active', true)
+    .single();
   
-  if (!FACEBOOK_PAGE_ACCESS_TOKEN) {
+  if (!settings?.settings?.access_token || !settings?.settings?.page_id) {
     throw new Error('Token do Facebook não configurado');
   }
+  
+  const FACEBOOK_PAGE_ACCESS_TOKEN = settings.settings.access_token;
+  const FACEBOOK_PAGE_ID = settings.settings.page_id;
 
   let postData: any = {
     message: content,
@@ -423,12 +431,20 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
 }
 
 async function postToInstagram(content: string, product_id?: string, supabase?: any) {
-  const INSTAGRAM_ACCESS_TOKEN = Deno.env.get('INSTAGRAM_ACCESS_TOKEN');
-  const INSTAGRAM_BUSINESS_ID = Deno.env.get('INSTAGRAM_BUSINESS_ID');
+  // Buscar configurações do banco de dados
+  const { data: settings } = await supabase
+    .from('social_media_settings')
+    .select('settings')
+    .eq('platform', 'instagram')
+    .eq('is_active', true)
+    .single();
   
-  if (!INSTAGRAM_ACCESS_TOKEN || !INSTAGRAM_BUSINESS_ID) {
+  if (!settings?.settings?.access_token || !settings?.settings?.business_id) {
     throw new Error('Credenciais do Instagram não configuradas');
   }
+  
+  const INSTAGRAM_ACCESS_TOKEN = settings.settings.access_token;
+  const INSTAGRAM_BUSINESS_ID = settings.settings.business_id;
 
   // Instagram requer imagem para posts
   let imageUrl = 'https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/product-images/default-post.jpg';
