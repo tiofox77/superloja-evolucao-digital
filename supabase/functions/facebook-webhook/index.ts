@@ -1417,21 +1417,36 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
     
     // Enviar imagens como attachments
     for (const imageUrl of images) {
-      const imagePayload = {
-        recipient: { id: recipientId },
-        message: {
-          attachment: {
-            type: 'image',
-            payload: {
-              url: imageUrl,
-              is_reusable: true
+      try {
+        const imagePayload = {
+          recipient: { id: recipientId },
+          message: {
+            attachment: {
+              type: 'image',
+              payload: {
+                url: imageUrl,
+                is_reusable: true
+              }
             }
           }
-        }
-      });
+        };
 
-    } catch (error) {
-      console.error('❌ Erro ao enviar imagem via URL:', error);
+        const imageResponse = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${FACEBOOK_PAGE_ACCESS_TOKEN}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(imagePayload)
+        });
+
+        if (!imageResponse.ok) {
+          console.error('❌ Erro ao enviar imagem Facebook:', await imageResponse.text());
+        } else {
+          console.log('✅ Imagem enviada para Facebook');
+        }
+      } catch (error) {
+        console.error('❌ Erro ao enviar imagem via URL:', error);
+      }
     }
 }
 
