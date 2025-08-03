@@ -1448,6 +1448,9 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
         console.error('❌ Erro ao enviar imagem via URL:', error);
       }
     }
+  } catch (error) {
+    console.error('❌ Erro ao enviar mensagem Facebook:', error);
+  }
 }
 
 // Função auxiliar para converter blob para base64
