@@ -67,16 +67,22 @@ serve(async (req) => {
       const signature = req.headers.get('x-hub-signature-256') || req.headers.get('x-hub-signature');
       console.log('🔍 Signature header:', signature);
       
-      // Se chegou aqui e não é Facebook conhecido, pode ser Instagram
+      // Debug detalhado da estrutura recebida
       const pageId = body.entry?.[0]?.id;
       console.log('📱 Page ID recebido:', pageId);
+      console.log('🔍 Entry structure:', JSON.stringify(body.entry?.[0], null, 2));
       
+      // Verificar se é definitivamente Facebook 
       if (pageId === '230190170178019') {
         platform = 'facebook';
         console.log('📘 Confirmado: Facebook (Page ID conhecido)');
       } else {
         platform = 'instagram';
-        console.log('📱 Assumindo: Instagram (Page ID desconhecido)');
+        console.log('📱 Assumindo: Instagram (Page ID desconhecido ou novo)');
+        
+        // Log adicional para identificar ID do Instagram
+        console.log('🆔 INSTAGRAM ID DETECTADO:', pageId);
+        console.log('📋 Para configurar, adicione este ID aos knownInstagramPageIds');
       }
       
       console.log(`📱 Plataforma final: ${platform}`);
@@ -270,11 +276,11 @@ function detectPlatform(body: any): 'facebook' | 'instagram' {
     const pageId = entry.id;
     console.log('Page ID detectado:', pageId);
     
-    // IDs específicos conhecidos do Instagram - SUBSTITUA PELOS SEUS IDs REAIS
+    // IDs específicos conhecidos do Instagram - ADICIONE O SEU ID AQUI
     const knownInstagramPageIds = [
-      '17841465999791980', // ID exemplo - substitua pelo seu ID Instagram Business Account
-      'your_instagram_business_id_here', // Adicione aqui o ID da sua conta Instagram Business
-      '6508493169262079', // Outro exemplo
+      '17841465999791980', // ID exemplo 
+      // ADICIONE AQUI O ID REAL DA SUA CONTA INSTAGRAM BUSINESS
+      // Você pode ver este ID nos logs quando receber uma mensagem do Instagram
     ];
     
     // IDs conhecidos do Facebook

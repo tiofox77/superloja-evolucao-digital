@@ -92,3 +92,6 @@ verify_jwt = false
 
 [functions.test-social-config]
 verify_jwt = false
+
+[functions.debug-instagram-detection]
+verify_jwt = false
