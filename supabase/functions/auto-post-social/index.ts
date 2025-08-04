@@ -317,7 +317,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     if (platform === 'facebook' || platform === 'both') {
       try {
         console.log('📘 Postando no Facebook...');
-        const facebookResult = await postToFacebook(contentData.content, product_id, supabase);
+        const facebookResult = await postToFacebook(contentData.content, product_id, supabase, contentData.banner_url);
         results.push({ platform: 'facebook', ...facebookResult });
         console.log('✅ Facebook result:', facebookResult);
       } catch (error) {
@@ -329,7 +329,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     if (platform === 'instagram' || platform === 'both') {
       try {
         console.log('📷 Postando no Instagram...');
-        const instagramResult = await postToInstagram(contentData.content, product_id, supabase);
+        const instagramResult = await postToInstagram(contentData.content, product_id, supabase, contentData.banner_url);
         results.push({ platform: 'instagram', ...instagramResult });
         console.log('✅ Instagram result:', instagramResult);
       } catch (error) {
@@ -381,7 +381,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
   }
 }
 
-async function postToFacebook(content: string, product_id?: string, supabase?: any) {
+async function postToFacebook(content: string, product_id?: string, supabase?: any, bannerUrl?: string) {
   console.log('🔍 [FACEBOOK DEBUG] Iniciando postagem...');
   
   // Buscar configurações do banco de dados
@@ -413,8 +413,13 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     access_token: FACEBOOK_PAGE_ACCESS_TOKEN
   };
 
-  // Adicionar imagem se houver produto
-  if (product_id) {
+  // Adicionar banner se disponível  
+  if (bannerUrl) {
+    console.log('🖼️ [FACEBOOK DEBUG] Anexando banner:', bannerUrl);
+    postData.link = bannerUrl;
+  }
+  // Adicionar imagem do produto se houver e não tiver banner
+  else if (product_id) {
     const { data: product } = await supabase
       .from('products')
       .select('image_url')
@@ -422,6 +427,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
       .single();
     
     if (product?.image_url && !product.image_url.includes('supabase.co')) {
+      console.log('🖼️ [FACEBOOK DEBUG] Anexando imagem do produto:', product.image_url);
       postData.link = product.image_url;
     }
   }
@@ -471,7 +477,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
   }
 }
 
-async function postToInstagram(content: string, product_id?: string, supabase?: any) {
+async function postToInstagram(content: string, product_id?: string, supabase?: any, bannerUrl?: string) {
   console.log('🔍 [INSTAGRAM DEBUG] Iniciando postagem...');
   
   // Buscar configurações do banco de dados
