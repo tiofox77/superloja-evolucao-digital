@@ -419,19 +419,35 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
       .eq('id', product_id)
       .single();
     
-    if (product?.image_url) {
+    if (product?.image_url && !product.image_url.includes('supabase.co')) {
       postData.link = product.image_url;
     }
   }
 
   // Primeiro obter o Page Access Token usando o User Token
+  console.log('🔍 [FACEBOOK DEBUG] Obtendo Page Token...');
   const pageTokenResponse = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${FACEBOOK_PAGE_ACCESS_TOKEN}`);
   const pageTokenData = await pageTokenResponse.json();
   
+  console.log('🔍 [FACEBOOK DEBUG] Resposta das páginas:', {
+    success: pageTokenResponse.ok,
+    hasData: !!pageTokenData.data,
+    pagesCount: pageTokenData.data?.length,
+    targetPageId: FACEBOOK_PAGE_ID
+  });
+  
+  if (!pageTokenResponse.ok || pageTokenData.error) {
+    console.error('❌ [FACEBOOK DEBUG] Erro ao obter páginas:', pageTokenData.error);
+    throw new Error('Erro ao obter páginas: ' + JSON.stringify(pageTokenData.error));
+  }
+  
   const pageInfo = pageTokenData.data?.find((page: any) => page.id === FACEBOOK_PAGE_ID);
   if (!pageInfo) {
+    console.error('❌ [FACEBOOK DEBUG] Página não encontrada. Páginas disponíveis:', pageTokenData.data?.map((p: any) => ({ id: p.id, name: p.name })));
     throw new Error('Página não encontrada ou sem acesso');
   }
+  
+  console.log('✅ [FACEBOOK DEBUG] Página encontrada:', { name: pageInfo.name, hasToken: !!pageInfo.access_token });
   
   // Usar o Page Access Token para postar
   postData.access_token = pageInfo.access_token;
