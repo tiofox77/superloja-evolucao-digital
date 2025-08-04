@@ -88,10 +88,10 @@ PRODUTO:
   }
 
   // Gerar banner automaticamente para qualquer post
-  let bannerUrl = null;
+  let bannerBase64 = null;
   if (productData) {
     try {
-      bannerUrl = await generateProductBanner(productData, post_type, supabase);
+      bannerBase64 = await generateProductBanner(productData, post_type, supabase);
     } catch (error) {
       console.error('Erro ao gerar banner:', error);
     }
@@ -112,7 +112,7 @@ DIRETRIZES PARA POSTS:
 4. Mencione entrega grátis em Luanda quando relevante
 5. Inclua hashtags angolanas e de tecnologia
 6. Máximo 280 caracteres para melhor engajamento
-7. ${bannerUrl ? 'IMPORTANTE: Uma imagem promocional será anexada automaticamente ao post' : 'Crie um texto atrativo e descritivo'}
+7. ${bannerBase64 ? 'IMPORTANTE: Uma imagem promocional será anexada automaticamente ao post' : 'Crie um texto atrativo e descritivo'}
 
 TIPOS DE POST:
 - product: Foco no produto específico
@@ -168,9 +168,9 @@ HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #Eletronic
     return new Response(
       JSON.stringify({ 
         content: generatedContent,
-        banner_url: bannerUrl,
+        banner_base64: bannerBase64,
         product_info: productInfo ? 'Produto incluído' : 'Sem produto específico',
-        has_banner: !!bannerUrl
+        has_banner: !!bannerBase64
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
@@ -179,59 +179,67 @@ HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #Eletronic
   }
 }
 
-// Função para gerar banner do produto
+// Função para gerar banner do produto com OpenAI
 async function generateProductBanner(productData: any, postType: string, supabase: any) {
   try {
-    // Configurações do banner baseadas no tipo de post
-    const bannerConfig = {
-      width: 1080,
-      height: 1080,
-      background: postType === 'promotional' ? '#E86C00' : '#8B4FA3',
-      textColor: '#FFFFFF',
-      logoEnabled: true
-    };
-
-    // Carregar logo da loja
-    const { data: storeSettings } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'store_info')
-      .single();
-
-    const logoUrl = storeSettings?.value?.logo_url || '';
-
-    // Gerar HTML do banner
-    const bannerHtml = createBannerHtml(productData, bannerConfig, postType, logoUrl);
+    console.log('🎨 [BANNER] Gerando imagem promocional com OpenAI...');
     
-    // Para esta implementação server-side, vamos retornar uma URL de placeholder
-    // que pode ser processada pelo cliente ou por um serviço de screenshot
-    const bannerData = {
-      html: bannerHtml,
-      config: bannerConfig,
-      product: productData,
-      type: postType
-    };
-
-    // Salvar dados do banner temporariamente
-    const { data: bannerRecord } = await supabase
-      .from('generated_banners')
-      .insert({
-        product_id: productData.id,
-        banner_data: bannerData,
-        post_type: postType,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (bannerRecord) {
-      // Retornar URL que pode ser usada para gerar a imagem
-      return `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-banner/${bannerRecord.id}`;
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      console.log('❌ [BANNER] OpenAI API Key não configurada');
+      return null;
     }
 
-    return null;
+    // Criar prompt para gerar banner promocional
+    const backgroundStyle = postType === 'promotional' ? 'laranja vibrante (#E86C00)' : 'roxo moderno (#8B4FA3)';
+    const promoText = postType === 'promotional' ? 'OFERTA ESPECIAL!' : '';
+    
+    const prompt = `Criar banner promocional para rede social (1080x1080px) para produto de tecnologia:
+    
+PRODUTO: ${productData.name}
+PREÇO: ${productData.price} AOA
+DESCRIÇÃO: ${productData.description}
+
+DESIGN:
+- Fundo: gradiente ${backgroundStyle}
+- Logo: "SuperLoja Angola" no topo
+- Imagem do produto no centro (baseado na descrição)
+- Preço em destaque com fonte grande e clara
+- ${promoText ? `Tag "${promoText}" inclinada no canto` : ''}
+- Texto "Entrega grátis em Luanda" na parte inferior
+- WhatsApp: +244 939729902
+- Estilo: moderno, profissional, clean
+- Cores: predominantemente ${backgroundStyle} com texto branco
+
+Ultra high resolution, professional marketing banner`;
+
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-1',
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'high',
+        response_format: 'b64_json'
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (data.data && data.data[0] && data.data[0].b64_json) {
+      console.log('✅ [BANNER] Imagem gerada com sucesso');
+      return data.data[0].b64_json; // Retorna base64 da imagem
+    } else {
+      console.error('❌ [BANNER] Erro na resposta da OpenAI:', data);
+      return null;
+    }
   } catch (error) {
-    console.error('Erro ao gerar banner:', error);
+    console.error('❌ [BANNER] Erro ao gerar banner:', error);
     return null;
   }
 }
@@ -315,7 +323,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     if (platform === 'facebook' || platform === 'both') {
       try {
         console.log('📘 Postando no Facebook...');
-        const facebookResult = await postToFacebook(contentData.content, product_id, supabase);
+        const facebookResult = await postToFacebook(contentData.content, product_id, supabase, contentData.banner_base64);
         results.push({ platform: 'facebook', ...facebookResult });
         console.log('✅ Facebook result:', facebookResult);
       } catch (error) {
@@ -360,7 +368,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
         success: true,
         content: contentData.content,
         results: results,
-        banner_url: contentData.banner_url
+        has_banner: !!contentData.banner_base64
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
@@ -379,7 +387,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
   }
 }
 
-async function postToFacebook(content: string, product_id?: string, supabase?: any) {
+async function postToFacebook(content: string, product_id?: string, supabase?: any, bannerBase64?: string) {
   console.log('🔍 [FACEBOOK DEBUG] Iniciando postagem...');
   
   // Buscar configurações do banco de dados
@@ -396,7 +404,8 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     hasAccessToken: !!settings?.settings?.access_token,
     hasPageId: !!settings?.settings?.page_id,
     tokenPrefix: settings?.settings?.access_token?.substring(0, 10) + '...',
-    pageId: settings?.settings?.page_id
+    pageId: settings?.settings?.page_id,
+    hasBanner: !!bannerBase64
   });
   
   if (!settings?.settings?.access_token || !settings?.settings?.page_id) {
@@ -406,50 +415,97 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
   const FACEBOOK_PAGE_ACCESS_TOKEN = settings.settings.access_token;
   const FACEBOOK_PAGE_ID = settings.settings.page_id;
 
-  let postData: any = {
-    message: content,
-    access_token: FACEBOOK_PAGE_ACCESS_TOKEN
-  };
-
-  // Adicionar imagem se houver produto
-  if (product_id) {
-    const { data: product } = await supabase
-      .from('products')
-      .select('image_url')
-      .eq('id', product_id)
-      .single();
-    
-    if (product?.image_url) {
-      postData.link = product.image_url;
-    }
-  }
-
-  // Primeiro obter o Page Access Token usando o User Token
+  // Primeiro obter o Page Access Token
+  console.log('🔍 [FACEBOOK DEBUG] Obtendo Page Token...');
   const pageTokenResponse = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${FACEBOOK_PAGE_ACCESS_TOKEN}`);
   const pageTokenData = await pageTokenResponse.json();
+  
+  console.log('🔍 [FACEBOOK DEBUG] Resposta das páginas:', {
+    success: pageTokenResponse.ok,
+    hasData: !!pageTokenData.data,
+    pagesCount: pageTokenData.data?.length || 0,
+    targetPageId: FACEBOOK_PAGE_ID
+  });
   
   const pageInfo = pageTokenData.data?.find((page: any) => page.id === FACEBOOK_PAGE_ID);
   if (!pageInfo) {
     throw new Error('Página não encontrada ou sem acesso');
   }
   
-  // Usar o Page Access Token para postar
-  postData.access_token = pageInfo.access_token;
-  
-  const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams(postData).toString()
+  console.log('✅ [FACEBOOK DEBUG] Página encontrada:', {
+    name: pageInfo.name,
+    hasToken: !!pageInfo.access_token
   });
 
-  const result = await response.json();
-  
-  if (response.ok) {
-    return { success: true, post_id: result.id };
+  // Se temos banner gerado, postar como foto com legenda
+  if (bannerBase64) {
+    console.log('📷 [FACEBOOK DEBUG] Postando imagem gerada...');
+    
+    // Converter base64 para blob
+    const binaryString = atob(bannerBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    // Criar FormData para upload da imagem
+    const formData = new FormData();
+    const imageBlob = new Blob([bytes], { type: 'image/png' });
+    formData.append('source', imageBlob);
+    formData.append('message', content);
+    formData.append('access_token', pageInfo.access_token);
+    
+    const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/photos`, {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log('✅ [FACEBOOK DEBUG] Imagem postada com sucesso:', result.id);
+      return { success: true, post_id: result.id };
+    } else {
+      console.error('❌ [FACEBOOK DEBUG] Erro ao postar imagem:', result);
+      throw new Error('Erro no Facebook: ' + JSON.stringify(result));
+    }
   } else {
-    throw new Error('Erro no Facebook: ' + JSON.stringify(result));
+    // Post de texto apenas ou com link de imagem do produto
+    console.log('📝 [FACEBOOK DEBUG] Postando texto...');
+    
+    let postData: any = {
+      message: content,
+      access_token: pageInfo.access_token
+    };
+
+    // Adicionar imagem do produto se houver
+    if (product_id) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('image_url')
+        .eq('id', product_id)
+        .single();
+      
+      if (product?.image_url) {
+        postData.link = product.image_url;
+      }
+    }
+    
+    const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(postData).toString()
+    });
+
+    const result = await response.json();
+    
+    if (response.ok) {
+      return { success: true, post_id: result.id };
+    } else {
+      throw new Error('Erro no Facebook: ' + JSON.stringify(result));
+    }
   }
 }
 
