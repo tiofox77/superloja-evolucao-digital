@@ -414,9 +414,9 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
   };
 
   // Adicionar banner se disponível  
-  if (bannerUrl) {
-    console.log('🖼️ [FACEBOOK DEBUG] Anexando banner:', bannerUrl);
-    postData.link = bannerUrl;
+  if (bannerUrl && !bannerUrl.includes('supabase.co')) {
+    console.log('🖼️ [FACEBOOK DEBUG] Anexando banner como imagem:', bannerUrl);
+    postData.url = bannerUrl;
   }
   // Adicionar imagem do produto se houver e não tiver banner
   else if (product_id) {
@@ -428,7 +428,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     
     if (product?.image_url && !product.image_url.includes('supabase.co')) {
       console.log('🖼️ [FACEBOOK DEBUG] Anexando imagem do produto:', product.image_url);
-      postData.link = product.image_url;
+      postData.url = product.image_url;
     }
   }
 
