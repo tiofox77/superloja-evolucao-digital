@@ -64,54 +64,70 @@ const getDeviceInfo = () => {
   };
 };
 
-// Obter localização via IP (usando múltiplas APIs com fallback)
+// Obter localização via Edge Function (evita CORS)
 const getLocationData = async () => {
-  const apis = [
-    {
-      url: 'https://ipapi.co/json/',
-      parser: (data: any) => ({
-        country: data.country_name || 'Angola',
-        region: data.region || 'Luanda',
-        city: data.city || 'Luanda',
-        ip_address: data.ip || 'unknown'
-      })
+  try {
+    console.log('📍 Obtendo localização via edge function...');
+    
+    const response = await supabase.functions.invoke('get-location');
+
+    if (response.data?.success && response.data?.data) {
+      console.log('✅ Localização obtida:', response.data.data);
+      return response.data.data;
     }
-  ];
-  
-  for (const api of apis) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 segundos timeout
-      
-      const response = await fetch(api.url, { 
-        signal: controller.signal,
-        mode: 'cors',
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        const parsed = api.parser(data);
-        // Se conseguiu dados úteis, retornar
-        if (parsed.country || parsed.ip_address) {
-          return parsed;
-        }
-      }
-    } catch (error: any) {
-      console.info(`API ${api.url} falhou:`, error?.message || 'Unknown error');
-      continue; // Tentar próxima API
-    }
+  } catch (error: any) {
+    console.info('⚠️ Edge function de localização falhou:', error?.message);
   }
   
-  // Fallback padrão para Angola se todas as APIs falharam
-  console.info('Usando localização padrão (Angola) - APIs indisponíveis');
+  // Fallback para APIs diretas (com tratamento de CORS)
+  try {
+    const apis = [
+      {
+        url: 'https://ipapi.co/json/',
+        parser: (data: any) => ({
+          country: data.country_name || 'Angola',
+          region: data.region || 'Luanda',
+          city: data.city || 'Luanda',
+          ip_address: data.ip && data.ip !== 'unknown' ? data.ip : null
+        })
+      }
+    ];
+    
+    for (const api of apis) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        
+        const response = await fetch(api.url, { 
+          signal: controller.signal,
+          mode: 'cors',
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const parsed = api.parser(data);
+          console.log('📊 Dados de localização obtidos via API direta:', parsed);
+          return parsed;
+        }
+      } catch (apiError: any) {
+        console.info(`📍 API ${api.url} falhou (CORS/Network):`, apiError?.message);
+        continue;
+      }
+    }
+  } catch (error) {
+    console.info('⚠️ Todas as APIs diretas falharam');
+  }
+  
+  // Fallback final para Angola
+  console.info('📍 Usando localização padrão (Angola) - todas as APIs indisponíveis');
   return {
     country: 'Angola',
     region: 'Luanda',
     city: 'Luanda',
-    ip_address: 'unknown'
+    ip_address: null // NULL para evitar erro de tipo inet
   };
 };
 
@@ -126,21 +142,30 @@ export const useAnalytics = () => {
       const deviceInfo = getDeviceInfo();
       const locationData = await getLocationData();
       
+      console.log('📊 Inserindo analytics:', {
+        visitor_id: visitorId,
+        session_id: sessionId,
+        ip_address: locationData.ip_address,
+        country: locationData.country
+      });
+      
       const result = await supabase.from('visitor_analytics').insert({
         visitor_id: visitorId,
         session_id: sessionId,
         page_url: data.page_url,
         page_title: data.page_title || document.title,
         referrer: data.referrer || document.referrer,
-        ip_address: locationData.ip_address || null,
+        ip_address: locationData.ip_address, // Agora será null ou IP válido
         country: locationData.country || null,
+        region: locationData.region || null,
         city: locationData.city || null,
-        browser: deviceInfo.browser,
-        device_type: deviceInfo.device_type
+        ...deviceInfo
       });
 
       if (result.error) {
-        console.warn('Analytics tracking error:', result.error);
+        console.error('❌ Analytics tracking error:', result.error);
+      } else {
+        console.log('✅ Analytics registrado com sucesso');
       }
 
       // Rastrear evento de página
