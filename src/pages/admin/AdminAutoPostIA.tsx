@@ -25,8 +25,10 @@ import {
   Settings,
   Image,
   Zap,
-  CalendarDays
+  CalendarDays,
+  HelpCircle
 } from 'lucide-react';
+import { TokenHelpDialog } from '@/components/admin/TokenHelpDialog';
 
 interface Product {
   id: string;
@@ -82,6 +84,7 @@ const AdminAutoPostIA: React.FC = () => {
     business_id: ''
   });
   const [showKeySetup, setShowKeySetup] = useState(false);
+  const [showTokenHelp, setShowTokenHelp] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -820,14 +823,24 @@ const AdminAutoPostIA: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 Status das Integrações
-                <Button 
-                  onClick={testSocialConfig}
-                  disabled={settingsLoading}
-                  variant="outline"
-                  size="sm"
-                >
-                  {settingsLoading ? 'Testando...' : 'Testar Configurações'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => setShowTokenHelp(true)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <HelpCircle className="h-4 w-4 mr-1" />
+                    Ajuda
+                  </Button>
+                  <Button 
+                    onClick={testSocialConfig}
+                    disabled={settingsLoading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {settingsLoading ? 'Testando...' : 'Testar Configurações'}
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -856,6 +869,11 @@ const AdminAutoPostIA: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <TokenHelpDialog 
+        open={showTokenHelp} 
+        onOpenChange={setShowTokenHelp} 
+      />
     </div>
   );
 };

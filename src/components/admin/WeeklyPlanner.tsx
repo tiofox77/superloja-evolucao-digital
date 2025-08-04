@@ -380,8 +380,13 @@ export const WeeklyPlanner: React.FC = () => {
                     checked={formData.auto_generate}
                     onCheckedChange={(checked) => setFormData({...formData, auto_generate: checked})}
                   />
-                  <Label>Gerar conteúdo automaticamente</Label>
+                  <Label>Gerar conteúdo automaticamente pela IA</Label>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {formData.auto_generate 
+                    ? "✅ A IA irá gerar o conteúdo automaticamente nos horários agendados" 
+                    : "⚠️ Você precisará gerar o conteúdo manualmente para cada post"}
+                </p>
               </div>
             </div>
 
