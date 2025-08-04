@@ -424,6 +424,18 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     }
   }
 
+  // Primeiro obter o Page Access Token usando o User Token
+  const pageTokenResponse = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${FACEBOOK_PAGE_ACCESS_TOKEN}`);
+  const pageTokenData = await pageTokenResponse.json();
+  
+  const pageInfo = pageTokenData.data?.find((page: any) => page.id === FACEBOOK_PAGE_ID);
+  if (!pageInfo) {
+    throw new Error('Página não encontrada ou sem acesso');
+  }
+  
+  // Usar o Page Access Token para postar
+  postData.access_token = pageInfo.access_token;
+  
   const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
     method: 'POST',
     headers: {
