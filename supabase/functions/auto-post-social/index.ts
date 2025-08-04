@@ -104,17 +104,15 @@ IDENTIDADE DA MARCA:
 - Especialidade: Eletrônicos, gadgets, smartphones, acessórios
 - Tom: Profissional mas descontraído, linguagem angolana moderna
 - Público: Jovens e adultos interessados em tecnologia
-- WhatsApp: +244 939729902 para contato direto
 
 DIRETRIZES PARA POSTS:
 1. Use expressões angolanas naturais mas profissionais
 2. Inclua sempre call-to-action
 3. Use emojis relevantes mas sem exagero
 4. Mencione entrega grátis em Luanda quando relevante
-5. Para contato: "Chama no WhatsApp: +244 939729902"
-6. Inclua hashtags angolanas e de tecnologia
-7. Máximo 280 caracteres para melhor engajamento
-8. ${bannerUrl ? 'IMPORTANTE: Uma imagem promocional será anexada automaticamente ao post' : 'Crie um texto atrativo e descritivo'}
+5. Inclua hashtags angolanas e de tecnologia
+6. Máximo 280 caracteres para melhor engajamento
+7. ${bannerUrl ? 'IMPORTANTE: Uma imagem promocional será anexada automaticamente ao post' : 'Crie um texto atrativo e descritivo'}
 
 TIPOS DE POST:
 - product: Foco no produto específico
@@ -181,58 +179,59 @@ HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #Eletronic
   }
 }
 
-// Função para gerar banner do produto usando OpenAI
+// Função para gerar banner do produto
 async function generateProductBanner(productData: any, postType: string, supabase: any) {
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    // Configurações do banner baseadas no tipo de post
+    const bannerConfig = {
+      width: 1080,
+      height: 1080,
+      background: postType === 'promotional' ? '#E86C00' : '#8B4FA3',
+      textColor: '#FFFFFF',
+      logoEnabled: true
+    };
+
+    // Carregar logo da loja
+    const { data: storeSettings } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'store_info')
+      .single();
+
+    const logoUrl = storeSettings?.value?.logo_url || '';
+
+    // Gerar HTML do banner
+    const bannerHtml = createBannerHtml(productData, bannerConfig, postType, logoUrl);
     
-    if (!OPENAI_API_KEY) {
-      console.error('OpenAI API Key não configurada para geração de imagens');
-      return null;
+    // Para esta implementação server-side, vamos retornar uma URL de placeholder
+    // que pode ser processada pelo cliente ou por um serviço de screenshot
+    const bannerData = {
+      html: bannerHtml,
+      config: bannerConfig,
+      product: productData,
+      type: postType
+    };
+
+    // Salvar dados do banner temporariamente
+    const { data: bannerRecord } = await supabase
+      .from('generated_banners')
+      .insert({
+        product_id: productData.id,
+        banner_data: bannerData,
+        post_type: postType,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (bannerRecord) {
+      // Retornar URL que pode ser usada para gerar a imagem
+      return `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-banner/${bannerRecord.id}`;
     }
 
-    // Criar prompt para gerar imagem promocional
-    const promoText = postType === 'promotional' ? 'OFERTA ESPECIAL! ' : '';
-    const prompt = `Create a professional product banner for ${productData.name}. 
-    ${promoText}Product: ${productData.name}
-    Price: ${productData.price} AOA
-    Style: Modern, tech-focused, purple and orange gradient background
-    Include: Product name prominently displayed, price clearly visible
-    Brand: SuperLoja Angola
-    Layout: Social media banner format, professional tech store aesthetic
-    Colors: Purple (#8B4FA3) and orange (#E86C00) gradient
-    Text: White text with good contrast
-    Overall: Clean, modern, promotional banner for a tech store`;
-
-    console.log('🎨 [BANNER] Gerando imagem com OpenAI...');
-    
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: prompt,
-        size: '1024x1024',
-        quality: 'high',
-        output_format: 'png'
-      }),
-    });
-
-    const imageData = await response.json();
-    
-    if (imageData.data && imageData.data[0]) {
-      console.log('✅ [BANNER] Imagem gerada com sucesso');
-      // O gpt-image-1 retorna base64, mas vamos retornar a URL da imagem
-      return imageData.data[0].url || `data:image/png;base64,${imageData.data[0].b64_json}`;
-    } else {
-      console.error('❌ [BANNER] Erro na resposta da OpenAI:', imageData);
-      return null;
-    }
+    return null;
   } catch (error) {
-    console.error('❌ [BANNER] Erro ao gerar banner:', error);
+    console.error('Erro ao gerar banner:', error);
     return null;
   }
 }
@@ -316,7 +315,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     if (platform === 'facebook' || platform === 'both') {
       try {
         console.log('📘 Postando no Facebook...');
-        const facebookResult = await postToFacebook(contentData.content, product_id, supabase, contentData.banner_url);
+        const facebookResult = await postToFacebook(contentData.content, product_id, supabase);
         results.push({ platform: 'facebook', ...facebookResult });
         console.log('✅ Facebook result:', facebookResult);
       } catch (error) {
@@ -328,7 +327,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     if (platform === 'instagram' || platform === 'both') {
       try {
         console.log('📷 Postando no Instagram...');
-        const instagramResult = await postToInstagram(contentData.content, product_id, supabase, contentData.banner_url);
+        const instagramResult = await postToInstagram(contentData.content, product_id, supabase);
         results.push({ platform: 'instagram', ...instagramResult });
         console.log('✅ Instagram result:', instagramResult);
       } catch (error) {
@@ -380,7 +379,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
   }
 }
 
-async function postToFacebook(content: string, product_id?: string, supabase?: any, bannerUrl?: string) {
+async function postToFacebook(content: string, product_id?: string, supabase?: any) {
   console.log('🔍 [FACEBOOK DEBUG] Iniciando postagem...');
   
   // Buscar configurações do banco de dados
@@ -412,58 +411,32 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     access_token: FACEBOOK_PAGE_ACCESS_TOKEN
   };
 
-  // Adicionar banner se disponível  
-  if (bannerUrl) {
-    console.log('🖼️ [FACEBOOK DEBUG] Anexando banner como imagem:', bannerUrl);
-    postData.url = bannerUrl;
-  }
-  // Adicionar imagem do produto se houver e não tiver banner
-  else if (product_id) {
+  // Adicionar imagem se houver produto
+  if (product_id) {
     const { data: product } = await supabase
       .from('products')
       .select('image_url')
       .eq('id', product_id)
       .single();
     
-    if (product?.image_url && !product.image_url.includes('supabase.co')) {
-      console.log('🖼️ [FACEBOOK DEBUG] Anexando imagem do produto:', product.image_url);
-      postData.url = product.image_url;
+    if (product?.image_url) {
+      postData.link = product.image_url;
     }
   }
 
   // Primeiro obter o Page Access Token usando o User Token
-  console.log('🔍 [FACEBOOK DEBUG] Obtendo Page Token...');
   const pageTokenResponse = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${FACEBOOK_PAGE_ACCESS_TOKEN}`);
   const pageTokenData = await pageTokenResponse.json();
   
-  console.log('🔍 [FACEBOOK DEBUG] Resposta das páginas:', {
-    success: pageTokenResponse.ok,
-    hasData: !!pageTokenData.data,
-    pagesCount: pageTokenData.data?.length,
-    targetPageId: FACEBOOK_PAGE_ID
-  });
-  
-  if (!pageTokenResponse.ok || pageTokenData.error) {
-    console.error('❌ [FACEBOOK DEBUG] Erro ao obter páginas:', pageTokenData.error);
-    throw new Error('Erro ao obter páginas: ' + JSON.stringify(pageTokenData.error));
-  }
-  
   const pageInfo = pageTokenData.data?.find((page: any) => page.id === FACEBOOK_PAGE_ID);
   if (!pageInfo) {
-    console.error('❌ [FACEBOOK DEBUG] Página não encontrada. Páginas disponíveis:', pageTokenData.data?.map((p: any) => ({ id: p.id, name: p.name })));
     throw new Error('Página não encontrada ou sem acesso');
   }
-  
-  console.log('✅ [FACEBOOK DEBUG] Página encontrada:', { name: pageInfo.name, hasToken: !!pageInfo.access_token });
   
   // Usar o Page Access Token para postar
   postData.access_token = pageInfo.access_token;
   
-  // Se há imagem, usar o endpoint /photos, senão usar /feed
-  const endpoint = bannerUrl || (product_id && postData.url) ? 'photos' : 'feed';
-  console.log(`🔍 [FACEBOOK DEBUG] Usando endpoint: ${endpoint}`);
-  
-  const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/${endpoint}`, {
+  const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -480,7 +453,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
   }
 }
 
-async function postToInstagram(content: string, product_id?: string, supabase?: any, bannerUrl?: string) {
+async function postToInstagram(content: string, product_id?: string, supabase?: any) {
   console.log('🔍 [INSTAGRAM DEBUG] Iniciando postagem...');
   
   // Buscar configurações do banco de dados
