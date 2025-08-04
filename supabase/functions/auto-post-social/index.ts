@@ -181,59 +181,58 @@ HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #Eletronic
   }
 }
 
-// Função para gerar banner do produto
+// Função para gerar banner do produto usando OpenAI
 async function generateProductBanner(productData: any, postType: string, supabase: any) {
   try {
-    // Configurações do banner baseadas no tipo de post
-    const bannerConfig = {
-      width: 1080,
-      height: 1080,
-      background: postType === 'promotional' ? '#E86C00' : '#8B4FA3',
-      textColor: '#FFFFFF',
-      logoEnabled: true
-    };
-
-    // Carregar logo da loja
-    const { data: storeSettings } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'store_info')
-      .single();
-
-    const logoUrl = storeSettings?.value?.logo_url || '';
-
-    // Gerar HTML do banner
-    const bannerHtml = createBannerHtml(productData, bannerConfig, postType, logoUrl);
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     
-    // Para esta implementação server-side, vamos retornar uma URL de placeholder
-    // que pode ser processada pelo cliente ou por um serviço de screenshot
-    const bannerData = {
-      html: bannerHtml,
-      config: bannerConfig,
-      product: productData,
-      type: postType
-    };
-
-    // Salvar dados do banner temporariamente
-    const { data: bannerRecord } = await supabase
-      .from('generated_banners')
-      .insert({
-        product_id: productData.id,
-        banner_data: bannerData,
-        post_type: postType,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (bannerRecord) {
-      // Retornar URL que pode ser usada para gerar a imagem
-      return `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-banner/${bannerRecord.id}`;
+    if (!OPENAI_API_KEY) {
+      console.error('OpenAI API Key não configurada para geração de imagens');
+      return null;
     }
 
-    return null;
+    // Criar prompt para gerar imagem promocional
+    const promoText = postType === 'promotional' ? 'OFERTA ESPECIAL! ' : '';
+    const prompt = `Create a professional product banner for ${productData.name}. 
+    ${promoText}Product: ${productData.name}
+    Price: ${productData.price} AOA
+    Style: Modern, tech-focused, purple and orange gradient background
+    Include: Product name prominently displayed, price clearly visible
+    Brand: SuperLoja Angola
+    Layout: Social media banner format, professional tech store aesthetic
+    Colors: Purple (#8B4FA3) and orange (#E86C00) gradient
+    Text: White text with good contrast
+    Overall: Clean, modern, promotional banner for a tech store`;
+
+    console.log('🎨 [BANNER] Gerando imagem com OpenAI...');
+    
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-1',
+        prompt: prompt,
+        size: '1024x1024',
+        quality: 'high',
+        output_format: 'png'
+      }),
+    });
+
+    const imageData = await response.json();
+    
+    if (imageData.data && imageData.data[0]) {
+      console.log('✅ [BANNER] Imagem gerada com sucesso');
+      // O gpt-image-1 retorna base64, mas vamos retornar a URL da imagem
+      return imageData.data[0].url || `data:image/png;base64,${imageData.data[0].b64_json}`;
+    } else {
+      console.error('❌ [BANNER] Erro na resposta da OpenAI:', imageData);
+      return null;
+    }
   } catch (error) {
-    console.error('Erro ao gerar banner:', error);
+    console.error('❌ [BANNER] Erro ao gerar banner:', error);
     return null;
   }
 }
@@ -414,7 +413,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
   };
 
   // Adicionar banner se disponível  
-  if (bannerUrl && !bannerUrl.includes('supabase.co')) {
+  if (bannerUrl) {
     console.log('🖼️ [FACEBOOK DEBUG] Anexando banner como imagem:', bannerUrl);
     postData.url = bannerUrl;
   }
@@ -461,7 +460,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
   postData.access_token = pageInfo.access_token;
   
   // Se há imagem, usar o endpoint /photos, senão usar /feed
-  const endpoint = (bannerUrl && !bannerUrl.includes('supabase.co')) || (product_id && postData.url) ? 'photos' : 'feed';
+  const endpoint = bannerUrl || (product_id && postData.url) ? 'photos' : 'feed';
   console.log(`🔍 [FACEBOOK DEBUG] Usando endpoint: ${endpoint}`);
   
   const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/${endpoint}`, {
