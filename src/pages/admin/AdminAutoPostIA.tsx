@@ -9,10 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
+import { AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { OpenAIKeySetup } from '@/components/admin/OpenAIKeySetup';
 import { PostPreview } from '@/components/admin/PostPreview';
 import { WeeklyPlanner } from '@/components/admin/WeeklyPlanner';
+import { AutomatedPlansStatus } from '@/components/admin/AutomatedPlansStatus';
 import { 
   Bot, 
   Calendar, 
@@ -487,7 +489,7 @@ const AdminAutoPostIA: React.FC = () => {
       </div>
 
       <Tabs defaultValue="create" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="create" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             Criar Post
@@ -495,6 +497,10 @@ const AdminAutoPostIA: React.FC = () => {
           <TabsTrigger value="weekly" className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
             Planos Semanais
+          </TabsTrigger>
+          <TabsTrigger value="automated" className="flex items-center gap-2">
+            <Bot className="h-4 w-4" />
+            Automático IA
           </TabsTrigger>
           <TabsTrigger value="scheduled" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
@@ -667,6 +673,10 @@ const AdminAutoPostIA: React.FC = () => {
           <WeeklyPlanner />
         </TabsContent>
 
+        <TabsContent value="automated" className="space-y-6">
+          <AutomatedPlansStatus />
+        </TabsContent>
+
         <TabsContent value="scheduled" className="space-y-6">
           <Card>
             <CardHeader>
@@ -712,6 +722,30 @@ const AdminAutoPostIA: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-amber-800 mb-1">Status dos Tokens</p>
+                <p className="text-amber-700 mb-2">
+                  <strong>Facebook:</strong> Token expirou em 03/08/2025 - Precisa renovar
+                </p>
+                <p className="text-amber-700 mb-3">
+                  <strong>Instagram:</strong> Não configurado - Configure access token e business ID
+                </p>
+                <Button 
+                  onClick={() => setShowTokenHelp(true)}
+                  variant="outline"
+                  size="sm"
+                  className="bg-white"
+                >
+                  <HelpCircle className="h-4 w-4 mr-1" />
+                  Ver Guia de Configuração
+                </Button>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Facebook Settings */}
             <Card>
