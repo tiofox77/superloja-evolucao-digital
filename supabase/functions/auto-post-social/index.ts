@@ -460,7 +460,11 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
   // Usar o Page Access Token para postar
   postData.access_token = pageInfo.access_token;
   
-  const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
+  // Se há imagem, usar o endpoint /photos, senão usar /feed
+  const endpoint = (bannerUrl && !bannerUrl.includes('supabase.co')) || (product_id && postData.url) ? 'photos' : 'feed';
+  console.log(`🔍 [FACEBOOK DEBUG] Usando endpoint: ${endpoint}`);
+  
+  const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
