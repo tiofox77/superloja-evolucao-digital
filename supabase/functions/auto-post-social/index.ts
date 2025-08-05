@@ -202,7 +202,7 @@ DESCRIÇÃO: ${productData.description}
 
 DESIGN:
 - Fundo: gradiente ${backgroundStyle}
-- Logo: "SuperLoja Angola" no topo
+- Logo: "SuperLoja" no topo
 - Imagem do produto no centro (baseado na descrição)
 - Preço em destaque com fonte grande e clara
 - ${promoText ? `Tag "${promoText}" inclinada no canto` : ''}
@@ -230,9 +230,10 @@ Ultra high resolution, professional marketing banner`;
 
     const data = await response.json();
     
-    if (data.data && data.data[0] && data.data[0].b64_json) {
+    if (data.data && data.data[0]) {
       console.log('✅ [BANNER] Imagem gerada com sucesso');
-      return data.data[0].b64_json; // Retorna base64 da imagem
+      // Para gpt-image-1, a resposta sempre vem em base64
+      return data.data[0].b64_json || data.data[0]; 
     } else {
       console.error('❌ [BANNER] Erro na resposta da OpenAI:', data);
       return null;
@@ -265,7 +266,7 @@ function createBannerHtml(product: any, config: any, postType: string, logoUrl: 
       </div>
       
       <div style="font-size: 24px; opacity: 0.9; text-align: center;">
-        <div style="font-weight: bold; margin-bottom: 5px;">SuperLoja Angola</div>
+        <div style="font-weight: bold; margin-bottom: 5px;">SuperLoja</div>
         <div>Entrega grátis em Luanda • www.superloja.ao</div>
       </div>
     </div>
