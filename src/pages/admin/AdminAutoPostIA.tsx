@@ -322,13 +322,21 @@ const AdminAutoPostIA: React.FC = () => {
 
     setLoading(true);
     try {
+      // Converter banner do preview para base64 se existir
+      let bannerBase64 = null;
+      if (generatedBanner) {
+        // O generatedBanner já é uma data URL, extrair apenas o base64
+        bannerBase64 = generatedBanner.split(',')[1];
+      }
+
       const response = await supabase.functions.invoke('auto-post-social', {
         body: {
           action: 'post_now',
           platform,
           product_id: selectedProduct || undefined,
           custom_prompt: generatedContent,
-          post_type: postType
+          post_type: postType,
+          banner_base64: bannerBase64
         }
       });
 

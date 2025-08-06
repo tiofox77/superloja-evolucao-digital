@@ -13,6 +13,7 @@ interface AutoPostRequest {
   custom_prompt?: string;
   schedule_time?: string;
   post_type?: 'product' | 'promotional' | 'engagement' | 'custom';
+  banner_base64?: string;
 }
 
 serve(async (req) => {
@@ -27,7 +28,7 @@ serve(async (req) => {
   );
 
   try {
-    const { action, platform, product_id, custom_prompt, schedule_time, post_type }: AutoPostRequest = await req.json();
+    const { action, platform, product_id, custom_prompt, schedule_time, post_type, banner_base64 }: AutoPostRequest = await req.json();
 
     switch (action) {
       case 'generate_content':
@@ -37,7 +38,7 @@ serve(async (req) => {
         return await schedulePost(platform, product_id, custom_prompt, schedule_time, post_type, supabase);
       
       case 'post_now':
-        return await postNow(platform, product_id, custom_prompt, post_type, supabase);
+        return await postNow(platform, product_id, custom_prompt, post_type, supabase, banner_base64);
       
       case 'get_scheduled':
         return await getScheduledPosts(supabase);
@@ -330,15 +331,31 @@ async function schedulePost(platform?: string, product_id?: string, custom_promp
   );
 }
 
-async function postNow(platform?: string, product_id?: string, custom_prompt?: string, post_type?: string, supabase?: any) {
+async function postNow(platform?: string, product_id?: string, custom_prompt?: string, post_type?: string, supabase?: any, banner_base64?: string) {
   try {
     console.log('🚀 Iniciando postagem imediata:', { platform, product_id, post_type });
     
-    // Gerar conteúdo
-    const contentResponse = await generateContent(product_id, post_type, custom_prompt, supabase);
-    const contentData = await contentResponse.json();
+    let content = custom_prompt;
+    let bannerBase64 = banner_base64;
+
+    // Se não há conteúdo custom, gera conteúdo
+    if (!content) {
+      const contentResponse = await generateContent(product_id, post_type, custom_prompt, supabase);
+      const contentData = await contentResponse.json();
+      content = contentData.content;
+      
+      // Se não foi fornecido banner, usar o gerado
+      if (!bannerBase64) {
+        bannerBase64 = contentData.banner_base64;
+      }
+    }
     
-    console.log('📝 Conteúdo gerado:', contentData);
+    console.log('📝 Conteúdo gerado:', {
+      content,
+      product_id,
+      bannerBase64: bannerBase64 ? 'presente' : 'ausente',
+      bannerLength: bannerBase64?.length
+    });
     
     // Postar nas redes sociais
     const results = [];
@@ -346,7 +363,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     if (platform === 'facebook' || platform === 'both') {
       try {
         console.log('📘 Postando no Facebook...');
-        const facebookResult = await postToFacebook(contentData.content, product_id, supabase, contentData.banner_base64);
+        const facebookResult = await postToFacebook(content, product_id, supabase, bannerBase64);
         results.push({ platform: 'facebook', ...facebookResult });
         console.log('✅ Facebook result:', facebookResult);
       } catch (error) {
@@ -358,7 +375,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     if (platform === 'instagram' || platform === 'both') {
       try {
         console.log('📷 Postando no Instagram...');
-        const instagramResult = await postToInstagram(contentData.content, product_id, supabase);
+        const instagramResult = await postToInstagram(content, product_id, supabase);
         results.push({ platform: 'instagram', ...instagramResult });
         console.log('✅ Instagram result:', instagramResult);
       } catch (error) {
@@ -373,7 +390,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
       .from('social_posts_history')
       .insert({
         platform: platform,
-        content: contentData.content,
+        content: content,
         product_id: product_id,
         post_type: post_type,
         results: results,
@@ -389,9 +406,9 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     return new Response(
       JSON.stringify({ 
         success: true,
-        content: contentData.content,
+        content: content,
         results: results,
-        has_banner: !!contentData.banner_base64
+        has_banner: !!bannerBase64
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
