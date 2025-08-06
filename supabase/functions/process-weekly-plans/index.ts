@@ -230,16 +230,30 @@ HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #Eletronic
 
 async function postToSocialMedia(post: any, content: any, supabase: any) {
   try {
-    // Por enquanto, vamos simular o sucesso da postagem
-    // A implementação real seria similar ao auto-post-social
     console.log(`📱 Postando no ${post.platform}: ${content.content.substring(0, 50)}...`);
     
-    // Simular delay de postagem
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // TODO: Implementar postagem real usando tokens do social_media_settings
-    
-    return { success: true };
+    const { data: result, error } = await supabase.functions.invoke('auto-post-social', {
+      body: {
+        action: 'post_now',
+        platform: post.platform,
+        product_id: post.product_id,
+        custom_prompt: content.content,
+        post_type: post.post_type
+      }
+    });
+
+    if (error) {
+      console.error('❌ Erro ao chamar auto-post-social:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (result?.success) {
+      console.log('✅ Post publicado com sucesso no', post.platform);
+      return { success: true };
+    } else {
+      console.error('❌ Falha na publicação:', result?.error);
+      return { success: false, error: result?.error || 'Falha na publicação' };
+    }
   } catch (error) {
     console.error('❌ Erro ao postar nas redes sociais:', error);
     return { success: false, error: error.message };
