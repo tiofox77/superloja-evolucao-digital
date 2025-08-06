@@ -213,7 +213,8 @@ DESIGN:
 
 Ultra high resolution, professional marketing banner`;
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    // Tentar primeiro com gpt-image-1, depois fallback para dall-e-3
+    let response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -228,7 +229,29 @@ Ultra high resolution, professional marketing banner`;
       }),
     });
 
-    const data = await response.json();
+    let data = await response.json();
+    
+    // Se gpt-image-1 falhar, tentar dall-e-3
+    if (data.error) {
+      console.log('⚠️ [BANNER] gpt-image-1 falhou, tentando dall-e-3...');
+      response = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'dall-e-3',
+          prompt: prompt,
+          n: 1,
+          size: '1024x1024',
+          quality: 'hd',
+          response_format: 'b64_json'
+        }),
+      });
+      
+      data = await response.json();
+    }
     
     if (data.data && data.data[0]) {
       console.log('✅ [BANNER] Imagem gerada com sucesso');
