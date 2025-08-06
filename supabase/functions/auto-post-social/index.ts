@@ -473,13 +473,15 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     // Converter base64 para blob
     console.log('🔍 [FACEBOOK DEBUG] Convertendo base64 para blob...');
     
+    let imageBlob;
     try {
       const binaryString = atob(bannerBase64);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      console.log('✅ [FACEBOOK DEBUG] Base64 convertido, tamanho:', bytes.length);
+      imageBlob = new Blob([bytes], { type: 'image/png' });
+      console.log('✅ [FACEBOOK DEBUG] Base64 convertido, tamanho:', bytes.length, 'blob size:', imageBlob.size);
     } catch (error) {
       console.error('❌ [FACEBOOK DEBUG] Erro ao converter base64:', error);
       throw new Error('Erro ao processar imagem gerada: ' + error.message);
@@ -488,7 +490,6 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     // Criar FormData para upload da imagem
     console.log('🔍 [FACEBOOK DEBUG] Criando FormData para upload...');
     const formData = new FormData();
-    const imageBlob = new Blob([bytes], { type: 'image/png' });
     formData.append('source', imageBlob);
     formData.append('message', content);
     formData.append('access_token', pageInfo.access_token);
