@@ -19,7 +19,7 @@ serve(async (req) => {
   try {
     console.log('🔄 Processando planos semanais automáticos...');
 
-    // Buscar posts pendentes que devem ser processados
+    // Buscar posts pendentes e gerados que devem ser processados
     const now = new Date();
     const { data: pendingPosts, error: postsError } = await supabase
       .from('weekly_plan_posts')
@@ -28,7 +28,7 @@ serve(async (req) => {
         weekly_posting_plans!inner(status),
         products(id, name, price, image_url)
       `)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'generated'])
       .eq('weekly_posting_plans.status', 'active')
       .lte('scheduled_for', now.toISOString())
       .order('scheduled_for', { ascending: true })
@@ -45,23 +45,37 @@ serve(async (req) => {
 
     for (const post of pendingPosts || []) {
       try {
-        console.log(`🚀 Processando post ID ${post.id} - ${post.post_type}`);
+        console.log(`🚀 Processando post ID ${post.id} - ${post.post_type} - Status: ${post.status}`);
 
-        // Gerar conteúdo usando IA
-        const contentResult = await generateContent(post, supabase);
+        let contentResult = null;
+        
+        // Se o post já tem conteúdo gerado, usa ele
+        if (post.status === 'generated' && post.generated_content) {
+          contentResult = {
+            content: post.generated_content,
+            banner_url: post.banner_url
+          };
+          console.log('📝 Usando conteúdo já gerado');
+        } else {
+          // Gerar conteúdo usando IA apenas se necessário
+          contentResult = await generateContent(post, supabase);
+          
+          if (contentResult) {
+            // Atualizar status para 'generated'
+            await supabase
+              .from('weekly_plan_posts')
+              .update({
+                status: 'generated',
+                generated_content: contentResult.content,
+                banner_url: contentResult.banner_url,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', post.id);
+            console.log('📝 Conteúdo gerado e salvo');
+          }
+        }
         
         if (contentResult) {
-          // Atualizar status para 'generated'
-          await supabase
-            .from('weekly_plan_posts')
-            .update({
-              status: 'generated',
-              generated_content: contentResult.content,
-              banner_url: contentResult.banner_url,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', post.id);
-
           // Tentar postar automaticamente
           const postResult = await postToSocialMedia(post, contentResult, supabase);
           
@@ -98,6 +112,15 @@ serve(async (req) => {
               error: postResult.error
             });
           }
+        } else {
+          console.error('❌ Falha ao obter conteúdo para o post');
+          results.push({
+            post_id: post.id,
+            status: 'failed',
+            platform: post.platform,
+            success: false,
+            error: 'Falha ao gerar conteúdo'
+          });
         }
       } catch (error) {
         console.error(`❌ Erro ao processar post ${post.id}:`, error);
