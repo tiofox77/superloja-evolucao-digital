@@ -24,6 +24,7 @@ const Checkout = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [bankDetails, setBankDetails] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -41,6 +42,9 @@ const Checkout = () => {
   useEffect(() => {
     // Fechar carrinho quando entrar no checkout
     setIsOpen(false);
+    
+    // Carregar configurações bancárias
+    loadBankDetails();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -65,6 +69,43 @@ const Checkout = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const loadBankDetails = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'payment_bank_details')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data?.value) {
+        setBankDetails(data.value);
+      } else {
+        // Fallback para dados padrão se não houver configuração
+        setBankDetails({
+          bank_name: 'BAI',
+          account_number: '123456789',
+          iban: 'AO06.0001.0000.1234.5678.9012.3',
+          account_holder: 'SuperLoja Lda',
+          swift_code: '',
+          branch: ''
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados bancários:', error);
+      // Usar dados padrão em caso de erro
+      setBankDetails({
+        bank_name: 'BAI',
+        account_number: '123456789',
+        iban: 'AO06.0001.0000.1234.5678.9012.3',
+        account_holder: 'SuperLoja Lda',
+        swift_code: '',
+        branch: ''
+      });
+    }
+  };
 
   const loadUserProfile = async (userId: string) => {
     try {
@@ -427,15 +468,25 @@ const Checkout = () => {
                     </div>
                   </RadioGroup>
 
-                  {formData.paymentMethod === 'transfer' && (
+                  {formData.paymentMethod === 'transfer' && bankDetails && (
                     <div className="mt-4 space-y-4">
                       <div className="p-4 bg-muted rounded-lg">
                         <h4 className="font-semibold mb-2">Dados Bancários:</h4>
                         <p className="text-sm">
-                          <strong>Banco:</strong> BAI<br/>
-                          <strong>Conta:</strong> 123456789<br/>
-                          <strong>IBAN:</strong> AO06.0001.0000.1234.5678.9012.3<br/>
-                          <strong>Titular:</strong> SuperLoja Lda
+                          <strong>Banco:</strong> {bankDetails.bank_name}<br/>
+                          <strong>Conta:</strong> {bankDetails.account_number}<br/>
+                          <strong>IBAN:</strong> {bankDetails.iban}<br/>
+                          <strong>Titular:</strong> {bankDetails.account_holder}
+                          {bankDetails.swift_code && (
+                            <>
+                              <br/><strong>SWIFT:</strong> {bankDetails.swift_code}
+                            </>
+                          )}
+                          {bankDetails.branch && (
+                            <>
+                              <br/><strong>Agência:</strong> {bankDetails.branch}
+                            </>
+                          )}
                         </p>
                       </div>
                       

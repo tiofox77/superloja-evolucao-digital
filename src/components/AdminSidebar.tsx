@@ -20,7 +20,8 @@ import {
   BookOpen,
   FileDown,
   Bot,
-  Sparkles
+  Sparkles,
+  CreditCard
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -153,6 +154,11 @@ const toolsItems = [
     title: 'Páginas Estáticas',
     url: '/admin/paginas-estaticas',
     icon: FileText,
+  },
+  {
+    title: 'Coordenadas Bancárias',
+    url: '/admin/coordenadas-bancarias',
+    icon: CreditCard,
   },
   {
     title: 'Configurações',
