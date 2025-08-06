@@ -98,10 +98,11 @@ PRODUTO:
     }
   }
 
-  const systemPrompt = `Você é um especialista em marketing digital da SuperLoja Angola, criando posts para Facebook e Instagram.
+  const systemPrompt = `Você é um especialista em marketing digital da Superloja, criando posts para Facebook e Instagram.
 
 IDENTIDADE DA MARCA:
-- SuperLoja: Loja online líder em Angola
+- Superloja: Loja online líder em Angola
+- Website: www.superloja.vip
 - Especialidade: Eletrônicos, gadgets, smartphones, acessórios
 - Tom: Profissional mas descontraído, linguagem angolana moderna
 - Público: Jovens e adultos interessados em tecnologia
@@ -114,6 +115,7 @@ DIRETRIZES PARA POSTS:
 5. Inclua hashtags angolanas e de tecnologia
 6. Máximo 280 caracteres para melhor engajamento
 7. ${bannerBase64 ? 'IMPORTANTE: Uma imagem promocional será anexada automaticamente ao post' : 'Crie um texto atrativo e descritivo'}
+8. SEMPRE crie 3 sugestões diferentes
 
 TIPOS DE POST:
 - product: Foco no produto específico
@@ -123,25 +125,25 @@ TIPOS DE POST:
 
 ${productInfo}
 
-HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #EletronicosAngola #EntregaGratis`;
+HASHTAGS SUGERIDAS: #SuperlojaAngola #TecnologiaAngola #GadgetsLuanda #EletronicosAngola #EntregaGratis`;
 
   let userPrompt = '';
   
   switch (post_type) {
     case 'product':
-      userPrompt = `Crie um post atrativo para o produto mencionado. Destaque os benefícios principais e chame para ação de compra.`;
+      userPrompt = `Crie 3 sugestões diferentes de posts atrativos para o produto mencionado. Cada post deve ter abordagem única: 1) Benefícios técnicos, 2) Apelo emocional, 3) Urgência/oferta. Separe cada sugestão com "---".`;
       break;
     case 'promotional':
-      userPrompt = `Crie um post promocional chamativo. Use linguagem de urgência e benefícios irresistíveis.`;
+      userPrompt = `Crie 3 sugestões de posts promocionais chamativos. Varie entre: 1) Desconto/economia, 2) Benefício exclusivo, 3) Oportunidade limitada. Separe cada sugestão com "---".`;
       break;
     case 'engagement':
-      userPrompt = `Crie um post para gerar interação e comentários. Faça uma pergunta interessante relacionada à tecnologia.`;
+      userPrompt = `Crie 3 sugestões de posts para gerar interação. Varie entre: 1) Pergunta sobre preferências, 2) Dica útil, 3) Enquete/comparação. Separe cada sugestão com "---".`;
       break;
     case 'custom':
-      userPrompt = custom_prompt || 'Crie um post criativo para redes sociais.';
+      userPrompt = `${custom_prompt || 'Crie um post criativo para redes sociais'}. Crie 3 variações diferentes do conteúdo. Separe cada sugestão com "---".`;
       break;
     default:
-      userPrompt = 'Crie um post engajante para redes sociais.';
+      userPrompt = 'Crie 3 sugestões de posts engajantes para redes sociais. Separe cada sugestão com "---".';
   }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -156,7 +158,7 @@ HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #Eletronic
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      max_tokens: 200,
+      max_tokens: 500,
       temperature: 0.8,
     }),
   });
@@ -165,10 +167,12 @@ HASHTAGS SUGERIDAS: #SuperLojaAngola #TecnologiaAngola #GadgetsLuanda #Eletronic
   
   if (data.choices && data.choices[0]) {
     const generatedContent = data.choices[0].message.content.trim();
+    const suggestions = generatedContent.split('---').map(s => s.trim()).filter(s => s.length > 0);
     
     return new Response(
       JSON.stringify({ 
-        content: generatedContent,
+        suggestions: suggestions.length >= 3 ? suggestions.slice(0, 3) : suggestions,
+        content: suggestions[0] || generatedContent, // Para compatibilidade
         banner_base64: bannerBase64,
         product_info: productInfo ? 'Produto incluído' : 'Sem produto específico',
         has_banner: !!bannerBase64
@@ -198,6 +202,8 @@ async function generateProductBanner(productData: any, postType: string, supabas
     const prompt = `Criar banner promocional para rede social (1080x1080px) para produto de tecnologia:
     
 PRODUTO: ${productData.name}
+MARCA: Superloja
+WEBSITE: www.superloja.vip
 PREÇO: ${productData.price} AOA
 DESCRIÇÃO: ${productData.description}
 

@@ -32,6 +32,74 @@ import {
 } from 'lucide-react';
 import { TokenHelpDialog } from '@/components/admin/TokenHelpDialog';
 
+interface ContentSuggestionsProps {
+  content: string;
+  onContentChange: (content: string) => void;
+}
+
+const ContentSuggestions: React.FC<ContentSuggestionsProps> = ({ content, onContentChange }) => {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    // Verificar se o conteúdo atual tem sugestões (formatadas como array)
+    if (content && content.includes('---')) {
+      const newSuggestions = content.split('---').map(s => s.trim()).filter(s => s.length > 0);
+      setSuggestions(newSuggestions);
+      if (newSuggestions.length > 0) {
+        onContentChange(newSuggestions[0]);
+      }
+    } else if (content) {
+      setSuggestions([content]);
+    }
+  }, [content]);
+
+  if (suggestions.length <= 1) {
+    return (
+      <Textarea
+        placeholder="Digite aqui seu conteúdo personalizado..."
+        value={content}
+        onChange={(e) => onContentChange(e.target.value)}
+        className="min-h-[120px] resize-none"
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 mb-3">
+        {suggestions.map((_, index) => (
+          <Button
+            key={index}
+            variant={selectedIndex === index ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setSelectedIndex(index);
+              onContentChange(suggestions[index]);
+            }}
+          >
+            Sugestão {index + 1}
+          </Button>
+        ))}
+      </div>
+      <Textarea
+        value={suggestions[selectedIndex] || ''}
+        onChange={(e) => {
+          const newSuggestions = [...suggestions];
+          newSuggestions[selectedIndex] = e.target.value;
+          setSuggestions(newSuggestions);
+          onContentChange(e.target.value);
+        }}
+        className="min-h-[120px] resize-none"
+        placeholder="Edite o conteúdo da sugestão selecionada..."
+      />
+      <div className="text-sm text-muted-foreground">
+        {suggestions.length} sugestões geradas • Selecione uma para editar
+      </div>
+    </div>
+  );
+};
+
 interface Product {
   id: string;
   name: string;
@@ -212,7 +280,16 @@ const AdminAutoPostIA: React.FC = () => {
         }
       });
 
-      if (response.data?.content) {
+      if (response.data?.suggestions) {
+        // Usar a primeira sugestão como padrão
+        setGeneratedContent(response.data.suggestions[0] || response.data.content);
+        toast({
+          title: "3 Sugestões geradas!",
+          description: bannerUrl 
+            ? "Conteúdo criado com banner promocional incluído"
+            : "Conteúdo criado pela IA com sucesso",
+        });
+      } else if (response.data?.content) {
         setGeneratedContent(response.data.content);
         toast({
           title: "Conteúdo gerado!",
@@ -621,6 +698,11 @@ const AdminAutoPostIA: React.FC = () => {
               <CardContent className="space-y-4">
                 {generatedContent ? (
                   <>
+                    <ContentSuggestions 
+                      content={generatedContent}
+                      onContentChange={setGeneratedContent}
+                    />
+                    
                     <PostPreview 
                       content={generatedContent}
                       platform={platform}
