@@ -90,114 +90,103 @@ export class BannerService {
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
       align-items: center;
-      padding: 60px;
+      padding: 40px;
       box-sizing: border-box;
     `;
 
-    // Adicionar padrão de fundo
-    const patternDiv = document.createElement('div');
-    patternDiv.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      opacity: 0.1;
-      background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.3) 40px, transparent 41px),
-                  radial-gradient(circle at 80% 80%, rgba(255,255,255,0.2) 30px, transparent 31px),
-                  radial-gradient(circle at 40% 70%, rgba(255,255,255,0.25) 50px, transparent 51px);
-    `;
-    bannerDiv.appendChild(patternDiv);
-
-    // Container principal
+    // Container principal com layout mais organizado
     const mainContainer = document.createElement('div');
     mainContainer.style.cssText = `
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      z-index: 2;
-      position: relative;
       width: 100%;
       height: 100%;
-      justify-content: space-between;
+      position: relative;
     `;
 
-    // Logo/Header
+    // Logo/Header no topo
     const logoContainer = document.createElement('div');
     logoContainer.style.cssText = `
-      background: rgba(255,255,255,0.15);
-      border-radius: 25px;
-      padding: 20px 40px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 15px 35px;
       backdrop-filter: blur(10px);
-      border: 2px solid rgba(255,255,255,0.2);
-      font-size: 28px;
+      border: 2px solid rgba(255,255,255,0.3);
+      font-size: 24px;
       font-weight: bold;
+      margin-bottom: 40px;
     `;
     logoContainer.textContent = 'Superloja';
     mainContainer.appendChild(logoContainer);
 
-    // Container do produto
-    const productContainer = document.createElement('div');
-    productContainer.style.cssText = `
-      flex: 1;
+    // Container da imagem do produto centralizada
+    const imageContainer = document.createElement('div');
+    imageContainer.style.cssText = `
+      width: 350px;
+      height: 350px;
+      background: rgba(255,255,255,0.9);
+      border-radius: 20px;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
       align-items: center;
-      padding: 40px 0;
+      justify-content: center;
+      margin-bottom: 40px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.3);
     `;
 
-    // Imagem do produto (se houver)
+    // Imagem do produto
     if (product.image_url) {
       const productImage = document.createElement('img');
       productImage.src = product.image_url;
       productImage.crossOrigin = 'anonymous';
       productImage.style.cssText = `
-        max-width: 400px;
-        max-height: 400px;
+        max-width: 300px;
+        max-height: 300px;
         object-fit: contain;
-        border-radius: 20px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        margin-bottom: 40px;
-        background: rgba(255,255,255,0.1);
-        padding: 20px;
+        border-radius: 10px;
       `;
-      productContainer.appendChild(productImage);
+      imageContainer.appendChild(productImage);
     }
+    mainContainer.appendChild(imageContainer);
 
     // Nome do produto
     const productName = document.createElement('h1');
     productName.textContent = product.name;
     productName.style.cssText = `
-      font-size: 64px;
+      font-size: 48px;
       font-weight: bold;
       margin: 0 0 30px 0;
       text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
-      line-height: 1.1;
+      line-height: 1.2;
       max-width: 100%;
       word-wrap: break-word;
+      text-align: center;
     `;
-    productContainer.appendChild(productName);
+    mainContainer.appendChild(productName);
 
-    // Preço
+    // Container do preço com destaque
+    const priceContainer = document.createElement('div');
+    priceContainer.style.cssText = `
+      background: rgba(255,255,255,0.25);
+      border: 3px solid white;
+      border-radius: 25px;
+      padding: 20px 40px;
+      margin-bottom: 40px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    `;
+
     const priceElement = document.createElement('div');
     priceElement.textContent = `${product.price.toLocaleString()} AOA`;
     priceElement.style.cssText = `
-      font-size: 56px;
+      font-size: 52px;
       font-weight: bold;
-      background: rgba(255,255,255,0.2);
-      padding: 25px 50px;
-      border-radius: 30px;
-      margin: 30px 0;
-      border: 4px solid white;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      margin: 0;
+      text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
     `;
-    productContainer.appendChild(priceElement);
-
-    mainContainer.appendChild(productContainer);
+    priceContainer.appendChild(priceElement);
+    mainContainer.appendChild(priceContainer);
 
     // Badge promocional (se for promocional)
     if (postType === 'promotional') {
@@ -206,15 +195,15 @@ export class BannerService {
       promoTag.style.cssText = `
         background: #FF6B35;
         color: white;
-        padding: 15px 30px;
-        border-radius: 25px;
-        font-size: 32px;
+        padding: 12px 25px;
+        border-radius: 20px;
+        font-size: 20px;
         font-weight: bold;
         position: absolute;
-        top: 100px;
-        right: 60px;
-        transform: rotate(15deg);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        top: 80px;
+        right: 40px;
+        transform: rotate(12deg);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.4);
         z-index: 3;
       `;
       bannerDiv.appendChild(promoTag);
@@ -223,17 +212,19 @@ export class BannerService {
     // Informações da loja no rodapé
     const storeInfo = document.createElement('div');
     storeInfo.style.cssText = `
-      font-size: 28px;
-      opacity: 0.9;
+      margin-top: auto;
+      font-size: 18px;
+      opacity: 0.95;
       text-align: center;
-      background: rgba(255,255,255,0.1);
-      padding: 20px 30px;
-      border-radius: 20px;
+      background: rgba(255,255,255,0.15);
+      padding: 15px 25px;
+      border-radius: 15px;
       backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
     `;
     storeInfo.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 8px;">✨ Entrega grátis em Luanda</div>
-      <div style="font-size: 24px;">www.superloja.vip • WhatsApp: +244 900 000 000</div>
+      <div style="font-weight: bold; margin-bottom: 5px;">✨ Entrega grátis em Luanda</div>
+      <div style="font-size: 16px;">www.superloja.vip</div>
     `;
     mainContainer.appendChild(storeInfo);
 
