@@ -46,13 +46,24 @@ const ContentSuggestions: React.FC<ContentSuggestionsProps> = ({ content, onCont
     if (content && content.includes('---')) {
       const newSuggestions = content.split('---').map(s => s.trim()).filter(s => s.length > 0);
       setSuggestions(newSuggestions);
-      if (newSuggestions.length > 0) {
-        onContentChange(newSuggestions[0]);
-      }
+      setSelectedIndex(0);
     } else if (content) {
       setSuggestions([content]);
+      setSelectedIndex(0);
     }
   }, [content]);
+
+  const handleSuggestionSelect = (index: number) => {
+    setSelectedIndex(index);
+    onContentChange(suggestions[index]);
+  };
+
+  const handleContentEdit = (editedContent: string) => {
+    const newSuggestions = [...suggestions];
+    newSuggestions[selectedIndex] = editedContent;
+    setSuggestions(newSuggestions);
+    onContentChange(editedContent);
+  };
 
   if (suggestions.length <= 1) {
     return (
@@ -67,16 +78,13 @@ const ContentSuggestions: React.FC<ContentSuggestionsProps> = ({ content, onCont
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 mb-3">
+      <div className="flex gap-2 flex-wrap mb-3">
         {suggestions.map((_, index) => (
           <Button
             key={index}
             variant={selectedIndex === index ? "default" : "outline"}
             size="sm"
-            onClick={() => {
-              setSelectedIndex(index);
-              onContentChange(suggestions[index]);
-            }}
+            onClick={() => handleSuggestionSelect(index)}
           >
             Sugestão {index + 1}
           </Button>
@@ -84,12 +92,7 @@ const ContentSuggestions: React.FC<ContentSuggestionsProps> = ({ content, onCont
       </div>
       <Textarea
         value={suggestions[selectedIndex] || ''}
-        onChange={(e) => {
-          const newSuggestions = [...suggestions];
-          newSuggestions[selectedIndex] = e.target.value;
-          setSuggestions(newSuggestions);
-          onContentChange(e.target.value);
-        }}
+        onChange={(e) => handleContentEdit(e.target.value)}
         className="min-h-[120px] resize-none"
         placeholder="Edite o conteúdo da sugestão selecionada..."
       />
@@ -280,9 +283,10 @@ const AdminAutoPostIA: React.FC = () => {
         }
       });
 
-      if (response.data?.suggestions) {
-        // Usar a primeira sugestão como padrão
-        setGeneratedContent(response.data.suggestions[0] || response.data.content);
+      if (response.data?.suggestions && response.data.suggestions.length >= 3) {
+        // Formatar as sugestões separadas por ---
+        const formattedContent = response.data.suggestions.join('\n---\n');
+        setGeneratedContent(formattedContent);
         toast({
           title: "3 Sugestões geradas!",
           description: bannerUrl 

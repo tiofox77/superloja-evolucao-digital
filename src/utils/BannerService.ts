@@ -16,9 +16,23 @@ export class BannerService {
     try {
       console.log('Gerando banner para produto:', product.name);
       
-      // Configurações baseadas no tipo de post
-      const bgColor = postType === 'promotional' ? '#E86C00' : '#8B4FA3';
-      const accentColor = postType === 'promotional' ? '#FF6B35' : '#9F4F96';
+      // Configurações baseadas no tipo de post - novos templates
+      const templates = [
+        { bg: '#8B4FA3', accent: '#9F4F96', name: 'Roxo Clássico' },
+        { bg: '#2563EB', accent: '#3B82F6', name: 'Azul Moderno' },
+        { bg: '#DC2626', accent: '#EF4444', name: 'Vermelho Energia' },
+        { bg: '#059669', accent: '#10B981', name: 'Verde Sucesso' },
+        { bg: '#7C3AED', accent: '#8B5CF6', name: 'Violeta Premium' }
+      ];
+      
+      // Selecionar template baseado no hash do produto para consistência
+      const templateIndex = product.id ? 
+        parseInt(product.id.slice(-1), 16) % templates.length : 
+        Math.floor(Math.random() * templates.length);
+      
+      const selectedTemplate = templates[templateIndex];
+      const bgColor = postType === 'promotional' ? '#E86C00' : selectedTemplate.bg;
+      const accentColor = postType === 'promotional' ? '#FF6B35' : selectedTemplate.accent;
       
       // Criar elemento do banner
       const bannerElement = this.createBannerElement(product, bgColor, accentColor, postType);
@@ -122,7 +136,7 @@ export class BannerService {
       font-size: 28px;
       font-weight: bold;
     `;
-    logoContainer.textContent = 'SuperLoja Angola';
+    logoContainer.textContent = 'Superloja';
     mainContainer.appendChild(logoContainer);
 
     // Container do produto
@@ -219,7 +233,7 @@ export class BannerService {
     `;
     storeInfo.innerHTML = `
       <div style="font-weight: bold; margin-bottom: 8px;">✨ Entrega grátis em Luanda</div>
-      <div style="font-size: 24px;">www.superloja.ao • WhatsApp: +244 900 000 000</div>
+      <div style="font-size: 24px;">www.superloja.vip • WhatsApp: +244 900 000 000</div>
     `;
     mainContainer.appendChild(storeInfo);
 
