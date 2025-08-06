@@ -111,13 +111,17 @@ export class BannerService {
     const logoContainer = document.createElement('div');
     logoContainer.style.cssText = `
       background: rgba(255,255,255,0.2);
-      border-radius: 20px;
-      padding: 15px 35px;
+      border-radius: 15px;
+      padding: 12px 30px;
       backdrop-filter: blur(10px);
       border: 2px solid rgba(255,255,255,0.3);
-      font-size: 24px;
+      font-size: 22px;
       font-weight: bold;
       margin-bottom: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 20px;
     `;
     logoContainer.textContent = 'Superloja';
     mainContainer.appendChild(logoContainer);
@@ -155,14 +159,15 @@ export class BannerService {
     const productName = document.createElement('h1');
     productName.textContent = product.name;
     productName.style.cssText = `
-      font-size: 48px;
+      font-size: 42px;
       font-weight: bold;
       margin: 0 0 30px 0;
       text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
-      line-height: 1.2;
+      line-height: 1.1;
       max-width: 100%;
       word-wrap: break-word;
       text-align: center;
+      padding: 0 20px;
     `;
     mainContainer.appendChild(productName);
 
@@ -171,19 +176,24 @@ export class BannerService {
     priceContainer.style.cssText = `
       background: rgba(255,255,255,0.25);
       border: 3px solid white;
-      border-radius: 25px;
-      padding: 20px 40px;
+      border-radius: 20px;
+      padding: 15px 35px;
       margin-bottom: 40px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60px;
     `;
 
     const priceElement = document.createElement('div');
     priceElement.textContent = `${product.price.toLocaleString()} AOA`;
     priceElement.style.cssText = `
-      font-size: 52px;
+      font-size: 44px;
       font-weight: bold;
       margin: 0;
       text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+      white-space: nowrap;
     `;
     priceContainer.appendChild(priceElement);
     mainContainer.appendChild(priceContainer);
