@@ -19,8 +19,12 @@ import {
   Target,
   TrendingUp,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Edit,
+  Send,
+  Eye
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface WeeklyPlan {
   id: string;
@@ -43,6 +47,8 @@ interface WeeklyPlanPost {
   post_type: string;
   scheduled_for: string;
   status: string;
+  generated_content?: string;
+  content?: string;
   product?: {
     name: string;
     image_url?: string;
@@ -55,6 +61,8 @@ export const WeeklyPlanner: React.FC = () => {
   const [planPosts, setPlanPosts] = useState<WeeklyPlanPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingPost, setEditingPost] = useState<WeeklyPlanPost | null>(null);
+  const [viewingPost, setViewingPost] = useState<WeeklyPlanPost | null>(null);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -96,8 +104,9 @@ export const WeeklyPlanner: React.FC = () => {
           *,
           products(name, image_url)
         `)
+        .in('status', ['pending', 'generated', 'posted', 'failed'])
         .order('scheduled_for', { ascending: true })
-        .limit(50);
+        .limit(20);
 
       if (error) throw error;
       setPlanPosts(data || []);
@@ -272,6 +281,84 @@ export const WeeklyPlanner: React.FC = () => {
       case 'failed': return <AlertCircle className="h-4 w-4 text-red-500" />;
       case 'generated': return <Target className="h-4 w-4 text-blue-500" />;
       default: return <Clock className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const processPost = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('process-weekly-plans');
+      
+      if (error) throw error;
+
+      toast({
+        title: "Posts processados!",
+        description: `${data.processed} posts foram processados com sucesso`,
+      });
+
+      loadPlanPosts();
+    } catch (error) {
+      console.error('Erro ao processar posts:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao processar posts",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updatePost = async (postId: string, updates: Partial<WeeklyPlanPost>) => {
+    try {
+      const { error } = await supabase
+        .from('weekly_plan_posts')
+        .update(updates)
+        .eq('id', postId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Post atualizado!",
+        description: "Post foi atualizado com sucesso",
+      });
+
+      setEditingPost(null);
+      loadPlanPosts();
+    } catch (error) {
+      console.error('Erro ao atualizar post:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao atualizar post",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const postNow = async (postId: string) => {
+    try {
+      // Primeiro atualizar o post para status 'generated' se ainda estiver 'pending'
+      const { error: updateError } = await supabase
+        .from('weekly_plan_posts')
+        .update({ 
+          status: 'generated',
+          scheduled_for: new Date().toISOString()
+        })
+        .eq('id', postId);
+
+      if (updateError) throw updateError;
+
+      // Então processar imediatamente
+      await processPost();
+
+      toast({
+        title: "Post enviado!",
+        description: "Post foi enviado imediatamente para as redes sociais",
+      });
+    } catch (error) {
+      console.error('Erro ao postar agora:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao enviar post",
+        variant: "destructive",
+      });
     }
   };
 
@@ -459,29 +546,171 @@ export const WeeklyPlanner: React.FC = () => {
       {planPosts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Próximos Posts Agendados
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Próximos Posts Agendados
+              </CardTitle>
+              <Button onClick={processPost} size="sm">
+                <Play className="mr-2 h-4 w-4" />
+                Executar Agora
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {planPosts.slice(0, 10).map((post) => (
+              {planPosts.map((post) => (
                 <div key={post.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
                     {getPostStatusIcon(post.status)}
-                    <div>
+                    <div className="flex-1">
                       <p className="font-medium text-sm">
                         {post.product?.name || 'Post genérico'}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(post.scheduled_for).toLocaleString()} • {post.platform} • {post.post_type}
                       </p>
+                      {post.generated_content && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                          {post.generated_content.substring(0, 100)}...
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {post.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {post.status}
+                    </Badge>
+                    
+                    {/* Botão Ver */}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" onClick={() => setViewingPost(post)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Visualizar Post</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="font-semibold">Produto:</Label>
+                            <p>{post.product?.name || 'Post genérico'}</p>
+                          </div>
+                          <div>
+                            <Label className="font-semibold">Agendado para:</Label>
+                            <p>{new Date(post.scheduled_for).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <Label className="font-semibold">Plataforma:</Label>
+                            <p>{post.platform}</p>
+                          </div>
+                          <div>
+                            <Label className="font-semibold">Tipo:</Label>
+                            <p>{post.post_type}</p>
+                          </div>
+                          {post.generated_content && (
+                            <div>
+                              <Label className="font-semibold">Conteúdo:</Label>
+                              <div className="p-3 bg-muted rounded-lg whitespace-pre-wrap">
+                                {post.generated_content}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Botão Editar */}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" onClick={() => setEditingPost(post)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Editar Post</DialogTitle>
+                        </DialogHeader>
+                        {editingPost && (
+                          <div className="space-y-4">
+                            <div>
+                              <Label>Data e Hora</Label>
+                              <Input
+                                type="datetime-local"
+                                value={new Date(editingPost.scheduled_for).toISOString().slice(0, 16)}
+                                onChange={(e) => setEditingPost({
+                                  ...editingPost,
+                                  scheduled_for: new Date(e.target.value).toISOString()
+                                })}
+                              />
+                            </div>
+                            <div>
+                              <Label>Plataforma</Label>
+                              <Select 
+                                value={editingPost.platform} 
+                                onValueChange={(value) => setEditingPost({...editingPost, platform: value})}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="facebook">Facebook</SelectItem>
+                                  <SelectItem value="instagram">Instagram</SelectItem>
+                                  <SelectItem value="both">Ambos</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label>Tipo de Post</Label>
+                              <Select 
+                                value={editingPost.post_type} 
+                                onValueChange={(value) => setEditingPost({...editingPost, post_type: value})}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="product">Produto</SelectItem>
+                                  <SelectItem value="promotional">Promocional</SelectItem>
+                                  <SelectItem value="engagement">Engajamento</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {editingPost.generated_content && (
+                              <div>
+                                <Label>Conteúdo</Label>
+                                <Textarea
+                                  value={editingPost.generated_content}
+                                  onChange={(e) => setEditingPost({
+                                    ...editingPost,
+                                    generated_content: e.target.value
+                                  })}
+                                  rows={6}
+                                />
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <Button onClick={() => updatePost(editingPost.id, editingPost)}>
+                                Salvar
+                              </Button>
+                              <Button variant="outline" onClick={() => setEditingPost(null)}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Botão Postar Agora */}
+                    {post.status === 'pending' && (
+                      <Button variant="ghost" size="sm" onClick={() => postNow(post.id)}>
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
