@@ -17,9 +17,38 @@ serve(async (req) => {
   );
 
   try {
-    console.log('🔄 Processando planos semanais automáticos...');
+    // Verificar se há uma ação específica no body da request
+    let action = 'process_all'; // default
+    try {
+      const body = await req.json();
+      action = body.action || 'process_all';
+    } catch {
+      // Se não conseguir fazer parse do JSON, usa a ação padrão
+    }
+    console.log(`🔄 Ação solicitada: ${action}`);
 
-    // Buscar posts pendentes e gerados que devem ser processados
+    let statusFilter = [];
+    let shouldGenerateContent = false;
+    let shouldPostContent = false;
+
+    switch (action) {
+      case 'generate_only':
+        statusFilter = ['pending'];
+        shouldGenerateContent = true;
+        shouldPostContent = false;
+        break;
+      case 'post_generated':
+        statusFilter = ['generated'];
+        shouldGenerateContent = false;
+        shouldPostContent = true;
+        break;
+      default:
+        statusFilter = ['pending', 'generated'];
+        shouldGenerateContent = true;
+        shouldPostContent = true;
+    }
+
+    // Buscar posts para processar baseado na ação
     const now = new Date();
     const { data: pendingPosts, error: postsError } = await supabase
       .from('weekly_plan_posts')
@@ -28,7 +57,7 @@ serve(async (req) => {
         weekly_posting_plans!inner(status),
         products(id, name, price, image_url)
       `)
-      .in('status', ['pending', 'generated'])
+      .in('status', statusFilter)
       .eq('weekly_posting_plans.status', 'active')
       .lte('scheduled_for', now.toISOString())
       .order('scheduled_for', { ascending: true })
@@ -45,19 +74,12 @@ serve(async (req) => {
 
     for (const post of pendingPosts || []) {
       try {
-        console.log(`🚀 Processando post ID ${post.id} - ${post.post_type} - Status: ${post.status}`);
+        console.log(`🚀 Processando post ID ${post.id} - ${post.post_type} - Status: ${post.status} - Ação: ${action}`);
 
         let contentResult = null;
         
-        // Se o post já tem conteúdo gerado, usa ele
-        if (post.status === 'generated' && post.generated_content) {
-          contentResult = {
-            content: post.generated_content,
-            banner_url: post.banner_url
-          };
-          console.log('📝 Usando conteúdo já gerado');
-        } else {
-          // Gerar conteúdo usando IA apenas se necessário
+        // Se deve gerar conteúdo e o post não tem conteúdo ainda
+        if (shouldGenerateContent && (!post.generated_content || post.status === 'pending')) {
           contentResult = await generateContent(post, supabase);
           
           if (contentResult) {
@@ -73,10 +95,17 @@ serve(async (req) => {
               .eq('id', post.id);
             console.log('📝 Conteúdo gerado e salvo');
           }
+        } else if (post.status === 'generated' && post.generated_content) {
+          // Se o post já tem conteúdo gerado, usa ele
+          contentResult = {
+            content: post.generated_content,
+            banner_url: post.banner_url
+          };
+          console.log('📝 Usando conteúdo já gerado');
         }
         
-        if (contentResult) {
-          // Tentar postar automaticamente
+        // Se deve postar e temos conteúdo
+        if (shouldPostContent && contentResult) {
           const postResult = await postToSocialMedia(post, contentResult, supabase);
           
           if (postResult.success) {
@@ -112,6 +141,14 @@ serve(async (req) => {
               error: postResult.error
             });
           }
+        } else if (!shouldPostContent && contentResult) {
+          // Se só estava gerando conteúdo
+          results.push({
+            post_id: post.id,
+            status: 'generated',
+            platform: post.platform,
+            success: true
+          });
         } else {
           console.error('❌ Falha ao obter conteúdo para o post');
           results.push({

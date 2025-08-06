@@ -284,15 +284,41 @@ export const WeeklyPlanner: React.FC = () => {
     }
   };
 
-  const processPost = async () => {
+  const generateContent = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('process-weekly-plans');
+      const { data, error } = await supabase.functions.invoke('process-weekly-plans', {
+        body: { action: 'generate_only' }
+      });
       
       if (error) throw error;
 
       toast({
-        title: "Posts processados!",
-        description: `${data.processed} posts foram processados com sucesso`,
+        title: "Conteúdo gerado!",
+        description: `${data.processed} posts tiveram seu conteúdo gerado`,
+      });
+
+      loadPlanPosts();
+    } catch (error) {
+      console.error('Erro ao gerar conteúdo:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao gerar conteúdo",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const processPost = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('process-weekly-plans', {
+        body: { action: 'post_generated' }
+      });
+      
+      if (error) throw error;
+
+      toast({
+        title: "Posts publicados!",
+        description: `${data.processed} posts foram publicados no Facebook`,
       });
 
       loadPlanPosts();
@@ -551,10 +577,16 @@ export const WeeklyPlanner: React.FC = () => {
                 <TrendingUp className="h-5 w-5" />
                 Próximos Posts Agendados
               </CardTitle>
-              <Button onClick={processPost} size="sm">
-                <Play className="mr-2 h-4 w-4" />
-                Executar Agora
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={generateContent} variant="outline" size="sm">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Gerar Conteúdo
+                </Button>
+                <Button onClick={processPost} size="sm">
+                  <Send className="mr-2 h-4 w-4" />
+                  Publicar Posts
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -704,10 +736,17 @@ export const WeeklyPlanner: React.FC = () => {
                       </DialogContent>
                     </Dialog>
 
-                    {/* Botão Postar Agora */}
-                    {post.status === 'pending' && (
-                      <Button variant="ghost" size="sm" onClick={() => postNow(post.id)}>
+                    {/* Botão Postar Agora - para posts gerados */}
+                    {post.status === 'generated' && (
+                      <Button variant="default" size="sm" onClick={() => postNow(post.id)}>
                         <Send className="h-4 w-4" />
+                      </Button>
+                    )}
+                    
+                    {/* Botão Gerar - para posts pendentes */}
+                    {post.status === 'pending' && (
+                      <Button variant="outline" size="sm" onClick={() => postNow(post.id)}>
+                        <Settings className="h-4 w-4" />
                       </Button>
                     )}
                   </div>
