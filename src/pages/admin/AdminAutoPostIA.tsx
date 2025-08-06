@@ -42,20 +42,34 @@ const ContentSuggestions: React.FC<ContentSuggestionsProps> = ({ content, onCont
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
-    // Verificar se o conteúdo atual tem sugestões (formatadas como array)
-    if (content && content.includes('---')) {
+    console.log('🔍 ContentSuggestions useEffect:', { content, hasTripleDash: content?.includes('---') });
+    
+    // Verificar se o conteúdo atual tem sugestões (formatadas com ---)
+    if (content && typeof content === 'string' && content.includes('---')) {
       const newSuggestions = content.split('---').map(s => s.trim()).filter(s => s.length > 0);
-      setSuggestions(newSuggestions);
-      setSelectedIndex(0);
-    } else if (content) {
+      console.log('📝 Sugestões processadas:', newSuggestions.length, newSuggestions);
+      
+      if (newSuggestions.length >= 2) {
+        setSuggestions(newSuggestions);
+        // Manter o índice atual se válido, senão resetar para 0
+        if (selectedIndex >= newSuggestions.length) {
+          setSelectedIndex(0);
+        }
+        return; 
+      }
+    }
+    
+    // Conteúdo único
+    if (content && typeof content === 'string') {
       setSuggestions([content]);
       setSelectedIndex(0);
     }
-  }, [content]);
+  }, [content, selectedIndex]);
 
   const handleSuggestionSelect = (index: number) => {
+    console.log('📌 Selecionando sugestão:', index, suggestions[index]);
     setSelectedIndex(index);
-    onContentChange(suggestions[index]);
+    onContentChange(suggestions[index] || '');
   };
 
   const handleContentEdit = (editedContent: string) => {
@@ -79,12 +93,16 @@ const ContentSuggestions: React.FC<ContentSuggestionsProps> = ({ content, onCont
   return (
     <div className="space-y-3">
       <div className="flex gap-2 flex-wrap mb-3">
-        {suggestions.map((_, index) => (
+        <div className="text-xs text-muted-foreground w-full mb-2">
+          {suggestions.length} sugestões disponíveis
+        </div>
+        {suggestions.map((suggestion, index) => (
           <Button
-            key={index}
+            key={`suggestion-${index}`}
             variant={selectedIndex === index ? "default" : "outline"}
             size="sm"
             onClick={() => handleSuggestionSelect(index)}
+            className="whitespace-nowrap"
           >
             Sugestão {index + 1}
           </Button>
@@ -283,7 +301,7 @@ const AdminAutoPostIA: React.FC = () => {
         }
       });
 
-      if (response.data?.suggestions && response.data.suggestions.length >= 3) {
+      if (response.data?.suggestions && response.data.suggestions.length >= 2) {
         // Formatar as sugestões separadas por ---
         const formattedContent = response.data.suggestions.join('\n---\n');
         setGeneratedContent(formattedContent);

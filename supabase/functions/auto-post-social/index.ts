@@ -125,7 +125,7 @@ TIPOS DE POST:
 
 ${productInfo}
 
-HASHTAGS SUGERIDAS: #SuperlojaAngola #TecnologiaAngola #GadgetsLuanda #EletronicosAngola #EntregaGratis`;
+HASHTAGS SUGERIDAS: #Superloja #TecnologiaAngola #GadgetsLuanda #EletronicosAngola #EntregaGratis`;
 
   let userPrompt = '';
   
