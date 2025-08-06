@@ -389,6 +389,12 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
 
 async function postToFacebook(content: string, product_id?: string, supabase?: any, bannerBase64?: string) {
   console.log('🔍 [FACEBOOK DEBUG] Iniciando postagem...');
+  console.log('🔍 [FACEBOOK DEBUG] Parâmetros recebidos:', { 
+    content: content ? 'presente' : 'ausente',
+    product_id: product_id || 'não informado',
+    bannerBase64: bannerBase64 ? 'presente' : 'ausente',
+    bannerLength: bannerBase64 ? bannerBase64.length : 0
+  });
   
   // Buscar configurações do banco de dados
   const { data: settings, error: settingsError } = await supabase
@@ -442,19 +448,35 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     console.log('📷 [FACEBOOK DEBUG] Postando imagem gerada...');
     
     // Converter base64 para blob
-    const binaryString = atob(bannerBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    console.log('🔍 [FACEBOOK DEBUG] Convertendo base64 para blob...');
+    
+    try {
+      const binaryString = atob(bannerBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      console.log('✅ [FACEBOOK DEBUG] Base64 convertido, tamanho:', bytes.length);
+    } catch (error) {
+      console.error('❌ [FACEBOOK DEBUG] Erro ao converter base64:', error);
+      throw new Error('Erro ao processar imagem gerada: ' + error.message);
     }
     
     // Criar FormData para upload da imagem
+    console.log('🔍 [FACEBOOK DEBUG] Criando FormData para upload...');
     const formData = new FormData();
     const imageBlob = new Blob([bytes], { type: 'image/png' });
     formData.append('source', imageBlob);
     formData.append('message', content);
     formData.append('access_token', pageInfo.access_token);
     
+    console.log('🔍 [FACEBOOK DEBUG] FormData criado:', {
+      blobSize: imageBlob.size,
+      messageLength: content.length,
+      hasAccessToken: !!pageInfo.access_token
+    });
+    
+    console.log('🔍 [FACEBOOK DEBUG] Enviando para Facebook API...');
     const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/photos`, {
       method: 'POST',
       body: formData
@@ -462,9 +484,15 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
 
     const result = await response.json();
     
+    console.log('🔍 [FACEBOOK DEBUG] Resposta da API:', {
+      status: response.status,
+      ok: response.ok,
+      result: result
+    });
+    
     if (response.ok) {
       console.log('✅ [FACEBOOK DEBUG] Imagem postada com sucesso:', result.id);
-      return { success: true, post_id: result.id };
+      return { success: true, post_id: result.id, used_banner: true };
     } else {
       console.error('❌ [FACEBOOK DEBUG] Erro ao postar imagem:', result);
       throw new Error('Erro no Facebook: ' + JSON.stringify(result));
