@@ -64,71 +64,93 @@ const getDeviceInfo = () => {
   };
 };
 
-// Obter localização via Edge Function (evita CORS)
+// Validar e limpar IP address
+const validateIP = (ip: string | null): string | null => {
+  if (!ip || ip === 'unknown') return null;
+  
+  // Se contém vírgulas, pegar apenas o primeiro IP válido
+  if (ip.includes(',')) {
+    const ips = ip.split(',').map(i => i.trim());
+    for (const singleIP of ips) {
+      if (isValidIP(singleIP)) return singleIP;
+    }
+    return null;
+  }
+  
+  return isValidIP(ip) ? ip : null;
+};
+
+// Verificar se IP é válido (IPv4 ou IPv6)
+const isValidIP = (ip: string): boolean => {
+  // IPv4
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Regex.test(ip)) {
+    const parts = ip.split('.');
+    return parts.every(part => parseInt(part) >= 0 && parseInt(part) <= 255);
+  }
+  
+  // IPv6 simplificado
+  const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+  return ipv6Regex.test(ip);
+};
+
+// Obter localização com cache local
 const getLocationData = async () => {
+  // Verificar cache primeiro (válido por 1 hora)
+  const cached = localStorage.getItem('location_cache');
+  if (cached) {
+    try {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < 3600000) { // 1 hora
+        return data;
+      }
+    } catch (e) {
+      localStorage.removeItem('location_cache');
+    }
+  }
+
   try {
     console.log('📍 Obtendo localização via edge function...');
     
     const response = await supabase.functions.invoke('get-location');
 
     if (response.data?.success && response.data?.data) {
-      console.log('✅ Localização obtida:', response.data.data);
-      return response.data.data;
+      const locationData = {
+        ...response.data.data,
+        ip_address: validateIP(response.data.data.ip_address)
+      };
+      
+      console.log('✅ Localização obtida:', locationData);
+      
+      // Cache da localização
+      localStorage.setItem('location_cache', JSON.stringify({
+        data: locationData,
+        timestamp: Date.now()
+      }));
+      
+      return locationData;
     }
   } catch (error: any) {
     console.info('⚠️ Edge function de localização falhou:', error?.message);
   }
   
-  // Fallback para APIs diretas (com tratamento de CORS)
-  try {
-    const apis = [
-      {
-        url: 'https://ipapi.co/json/',
-        parser: (data: any) => ({
-          country: data.country_name || 'Angola',
-          region: data.region || 'Luanda',
-          city: data.city || 'Luanda',
-          ip_address: data.ip && data.ip !== 'unknown' ? data.ip : null
-        })
-      }
-    ];
-    
-    for (const api of apis) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        
-        const response = await fetch(api.url, { 
-          signal: controller.signal,
-          mode: 'cors',
-          headers: { 'Accept': 'application/json' }
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          const data = await response.json();
-          const parsed = api.parser(data);
-          console.log('📊 Dados de localização obtidos via API direta:', parsed);
-          return parsed;
-        }
-      } catch (apiError: any) {
-        console.info(`📍 API ${api.url} falhou (CORS/Network):`, apiError?.message);
-        continue;
-      }
-    }
-  } catch (error) {
-    console.info('⚠️ Todas as APIs diretas falharam');
-  }
-  
-  // Fallback final para Angola
-  console.info('📍 Usando localização padrão (Angola) - todas as APIs indisponíveis');
-  return {
+  // Fallback final para Angola com cache
+  const fallbackData = {
     country: 'Angola',
-    region: 'Luanda',
+    region: 'Luanda', 
     city: 'Luanda',
-    ip_address: null // NULL para evitar erro de tipo inet
+    ip_address: null
   };
+  
+  console.info('📍 Usando localização padrão (Angola)');
+  
+  // Cache do fallback também
+  localStorage.setItem('location_cache', JSON.stringify({
+    data: fallbackData,
+    timestamp: Date.now()
+  }));
+  
+  return fallbackData;
 };
 
 export const useAnalytics = () => {
