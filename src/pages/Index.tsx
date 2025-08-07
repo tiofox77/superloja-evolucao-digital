@@ -202,6 +202,9 @@ const Index = () => {
           </div>
         </section>
 
+        {/* Featured Products */}
+        <FeaturedProducts />
+        
         {/* Saúde e Bem Estar Section */}
         {healthProducts.length > 0 && (
           <section className="py-20 bg-gradient-to-br from-pink-50/50 via-orange-50/50 to-green-50/50">
@@ -317,9 +320,6 @@ const Index = () => {
             </div>
           </section>
         )}
-        
-        {/* Featured Products */}
-        <FeaturedProducts />
         
         {/* Recent Products */}
         {recentProducts.length > 0 && (
