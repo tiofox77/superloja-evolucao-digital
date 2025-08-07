@@ -60,23 +60,25 @@ const Index = () => {
 
         const subcategoryIds = healthSubcategories?.map(cat => cat.id) || [];
         
-        if (subcategoryIds.length > 0) {
-          const { data: healthProductsData } = await supabase
-            .from('products')
-            .select(`
-              *,
-              categories!inner(name, slug)
-            `)
-            .in('category_id', subcategoryIds)
-            .eq('active', true)
-            .limit(4);
+        // Incluir tanto a categoria principal quanto as subcategorias
+        const categoryIds = [healthCategory.id, ...subcategoryIds];
+        
+        const { data: healthProductsData } = await supabase
+          .from('products')
+          .select(`
+            *,
+            categories!inner(name, slug)
+          `)
+          .in('category_id', categoryIds)
+          .eq('active', true)
+          .eq('in_stock', true)
+          .limit(4);
 
-          setHealthProducts(healthProductsData?.map(product => ({
-            ...product,
-            category_name: product.categories.name,
-            category_slug: product.categories.slug
-          })) || []);
-        }
+        setHealthProducts(healthProductsData?.map(product => ({
+          ...product,
+          category_name: product.categories.name,
+          category_slug: product.categories.slug
+        })) || []);
       }
 
       // Carregar produtos recentes
