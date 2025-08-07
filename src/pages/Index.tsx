@@ -205,6 +205,79 @@ const Index = () => {
         {/* Featured Products */}
         <FeaturedProducts />
         
+        {/* Recent Products */}
+        {recentProducts.length > 0 && (
+          <section className="py-20">
+            <div className="container mx-auto px-4">
+              <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold mb-4">Últimos Lançamentos</h2>
+                <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                  Confira os produtos mais recentes adicionados à nossa loja
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recentProducts.map((product, index) => (
+                  <Card key={product.id} className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+                    <div className="relative">
+                      <div className="aspect-video overflow-hidden bg-gradient-to-br from-muted/50 to-muted/20">
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className="w-12 h-12 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <Badge className="absolute top-3 left-3 bg-green-500 text-white">
+                        <Zap className="w-3 h-3 mr-1" />
+                        Novo
+                      </Badge>
+                    </div>
+
+                    <CardContent className="p-4">
+                      {product.category_name && (
+                        <Badge variant="outline" className="text-xs mb-2">
+                          {product.category_name}
+                        </Badge>
+                      )}
+                      
+                      <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
+                        {product.name}
+                      </h3>
+
+                      <div className="flex items-center justify-between">
+                        <div className="text-lg font-bold text-primary">
+                          R$ {product.price.toFixed(2)}
+                        </div>
+                        <Link to={`/produto/${product.slug}`}>
+                          <Button size="sm" variant="outline">
+                            Ver produto
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              <div className="text-center mt-8">
+                <Link to="/catalogo">
+                  <Button variant="outline" size="lg">
+                    Ver Todos os Produtos
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Saúde e Bem Estar Section */}
         {healthProducts.length > 0 && (
           <section className="py-20 bg-gradient-to-br from-pink-50/50 via-orange-50/50 to-green-50/50">
@@ -316,79 +389,6 @@ const Index = () => {
                     <p className="text-sm font-medium text-gray-700">Dermatologicamente Testado</p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </section>
-        )}
-        
-        {/* Recent Products */}
-        {recentProducts.length > 0 && (
-          <section className="py-20">
-            <div className="container mx-auto px-4">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold mb-4">Últimos Lançamentos</h2>
-                <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                  Confira os produtos mais recentes adicionados à nossa loja
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {recentProducts.map((product, index) => (
-                  <Card key={product.id} className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
-                    <div className="relative">
-                      <div className="aspect-video overflow-hidden bg-gradient-to-br from-muted/50 to-muted/20">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className="w-12 h-12 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      
-                      <Badge className="absolute top-3 left-3 bg-green-500 text-white">
-                        <Zap className="w-3 h-3 mr-1" />
-                        Novo
-                      </Badge>
-                    </div>
-
-                    <CardContent className="p-4">
-                      {product.category_name && (
-                        <Badge variant="outline" className="text-xs mb-2">
-                          {product.category_name}
-                        </Badge>
-                      )}
-                      
-                      <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
-                        {product.name}
-                      </h3>
-
-                      <div className="flex items-center justify-between">
-                        <div className="text-lg font-bold text-primary">
-                          R$ {product.price.toFixed(2)}
-                        </div>
-                        <Link to={`/produto/${product.slug}`}>
-                          <Button size="sm" variant="outline">
-                            Ver produto
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              
-              <div className="text-center mt-8">
-                <Link to="/catalogo">
-                  <Button variant="outline" size="lg">
-                    Ver Todos os Produtos
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </Link>
               </div>
             </div>
           </section>
