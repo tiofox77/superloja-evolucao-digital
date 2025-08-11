@@ -1569,13 +1569,9 @@ async function sendFacebookMessage(
         const normalizedUrl = platform === 'instagram'
           ? (() => {
               try {
-                const m = imageUrl.match(/^(https?:\/\/[^/]+)\/storage\/v1\/object\/public\/([^?]+)(?:\?[^#]*)?/i);
-                if (m) {
-                  const origin = m[1];
-                  const path = m[2];
-                  return `${origin}/storage/v1/render/image/public/${path}?width=1080&height=1350&resize=cover&format=jpeg&quality=85&background=ffffff`;
-                }
-                if (/\.(webp|png)(\?|$)/i.test(imageUrl)) return imageUrl.replace(/\.(webp|png)(\?|$)/i, '.jpg$2');
+                // Preferir URL pública original da Storage (sem render) para evitar 403
+                if (/^https?:\/\/[^/]+\/storage\/v1\/object\/public\//i.test(imageUrl)) return imageUrl;
+                if (/\.webp(\?|$)/i.test(imageUrl)) return imageUrl.replace(/\.webp(\?|$)/i, '.jpg$1');
                 return imageUrl;
               } catch { return imageUrl; }
             })()
@@ -1715,10 +1711,19 @@ async function sendFacebookMessageWithImage(
     const shouldSendTextAfterImage = platform === 'facebook' && !!(text && text.trim());
 
     // Método A: enviar por URL (preferido para Facebook e Instagram)
-    if (originalUrl && !(platform === 'instagram' && /\/storage\/v1\/object\/public\//i.test(originalUrl))) {
-      const safeUrl = platform === 'instagram' ? toInstagramSafe(originalUrl) : originalUrl;
+    if (originalUrl) {
+      const safeUrl = platform === 'instagram'
+        ? (() => {
+            try {
+              // Usar diretamente a URL pública da Storage (sem render)
+              if (/^https?:\/\/[^/]+\/storage\/v1\/object\/public\//i.test(originalUrl)) return originalUrl;
+              if (/\.webp(\?|$)/i.test(originalUrl)) return originalUrl.replace(/\.webp(\?|$)/i, '.jpg$1');
+              return originalUrl;
+            } catch { return originalUrl; }
+          })()
+        : originalUrl;
       if (platform === 'instagram') {
-        console.log('🔁 IG URL normalizada para render/jpeg', { originalUrl, safeUrl });
+        console.log('📸 IG enviando por URL pública', { originalUrl, safeUrl });
       }
       const payload: any = {
         recipient: { id: recipientId },
