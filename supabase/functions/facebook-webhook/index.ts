@@ -390,12 +390,13 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     // 2) Remoção do carrinho (por número ou nome)
     const removalResponse = await tryHandleRemoveFromCart(messageText, senderId, platform, supabase);
     if (removalResponse) {
-      await sendFacebookMessage(senderId, removalResponse, supabase, platform);
+      const msgOut = await humanizeTextResponse(removalResponse, messageText, supabase, platform);
+      await sendFacebookMessage(senderId, msgOut, supabase, platform);
       responded = true;
       await supabase.from('ai_conversations').insert({
         platform: platform,
         user_id: senderId,
-        message: removalResponse,
+        message: msgOut,
         type: 'sent',
         timestamp: new Date().toISOString()
       });
@@ -406,12 +407,13 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     // 3) Seleção por número/nome/preço ou FINALIZAR com base na última lista
     const selectionOrFinalize = await tryHandleSelectionOrFinalize(messageText, senderId, platform, supabase);
     if (selectionOrFinalize) {
-      await sendFacebookMessage(senderId, selectionOrFinalize, supabase, platform);
+      const msgOut = await humanizeTextResponse(selectionOrFinalize, messageText, supabase, platform);
+      await sendFacebookMessage(senderId, msgOut, supabase, platform);
       responded = true;
       await supabase.from('ai_conversations').insert({
         platform: platform,
         user_id: senderId,
-        message: selectionOrFinalize,
+        message: msgOut,
         type: 'sent',
         timestamp: new Date().toISOString()
       });
@@ -419,15 +421,16 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
       return;
     }
 
-    // 3) Intenção de finalizar (fallback geral)
+    // 4) Intenção de finalizar (fallback geral)
     if (detectCheckoutIntent(messageText)) {
       const advice = await buildCheckoutAdvice(messageText, supabase, platform);
-      await sendFacebookMessage(senderId, advice, supabase, platform);
+      const msgOut = await humanizeTextResponse(advice, messageText, supabase, platform);
+      await sendFacebookMessage(senderId, msgOut, supabase, platform);
       responded = true;
       await supabase.from('ai_conversations').insert({
         platform: platform,
         user_id: senderId,
-        message: advice,
+        message: msgOut,
         type: 'sent',
         timestamp: new Date().toISOString()
       });
@@ -2054,6 +2057,42 @@ ${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
 
   } catch (error) {
     console.error('❌ Erro ao notificar admin:', error);
+  }
+}
+
+// Humaniza/varia respostas estáticas mantendo números e links
+async function humanizeTextResponse(text: string, userMessage: string, supabase: any, platform: 'facebook' | 'instagram'): Promise<string> {
+  try {
+    const t = (text || '').trim();
+    if (!t) return t;
+
+    // Evitar reescrever listas estruturadas (mantém formato numerado com links)
+    const listLinks = (t.match(/https?:\/\/superloja\.vip\/produto\//g) || []).length;
+    const numbered = (t.match(/^\d+\./gm) || []).length;
+    if (listLinks >= 2 || numbered >= 3) return t;
+
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) return t; // Sem chave, não tenta humanizar
+
+    const prompt = {
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'Escreve como um vendedor angolano humano (Carlos da SuperLoja), natural e empático. Mantém exatamente os links e números, não removas URLs. Não inventes informação. Sê breve (1-2 frases), adiciona um toque humano e confirma entendimento do pedido. Português de Angola.' },
+        { role: 'user', content: `Mensagem do cliente: "${userMessage}"\nResponda reescrevendo isto de forma natural, mantendo conteúdo e links:\n---\n${t}` }
+      ]
+    };
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(prompt)
+    });
+    if (!res.ok) return t;
+    const data = await res.json();
+    const out = data?.choices?.[0]?.message?.content?.trim();
+    return out?.length ? out : t;
+  } catch (_e) {
+    return text;
   }
 }
 
