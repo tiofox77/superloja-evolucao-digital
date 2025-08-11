@@ -1405,6 +1405,96 @@ function parseSelectionFromMessage(message: string, lastList: any): { product_id
   return picks;
 }
 
+// ===== Seleção com confiança e correspondência por nome =====
+function normalizeText(input: string = ''): string {
+  try { return input.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); } catch { return (input || '').toLowerCase(); }
+}
+
+function diceCoefficient(a: string, b: string): number {
+  const s1 = normalizeText(a);
+  const s2 = normalizeText(b);
+  if (!s1 || !s2) return 0;
+  const bigrams = (s: string) => {
+    const arr: string[] = [];
+    for (let i = 0; i < s.length - 1; i++) arr.push(s.slice(i, i + 2));
+    return arr;
+  };
+  const b1 = bigrams(s1);
+  const b2 = bigrams(s2);
+  const set = new Map<string, number>();
+  b1.forEach(bg => set.set(bg, (set.get(bg) || 0) + 1));
+  let overlap = 0;
+  b2.forEach(bg => {
+    const c = set.get(bg) || 0;
+    if (c > 0) { overlap++; set.set(bg, c - 1); }
+  });
+  return (2 * overlap) / (b1.length + b2.length);
+}
+
+function parseSelectionWithConfidence(message: string, lastList: any): { product_id: string; qty: number; score: number }[] {
+  const tRaw = message || '';
+  const t = normalizeText(tRaw);
+  const items: any[] = Array.isArray(lastList?.items) ? lastList.items : [];
+  if (!items.length) return [];
+
+  const picks: { product_id: string; qty: number; score: number }[] = [];
+
+  // 1) Números da lista = confiança máxima
+  const idxs = Array.from(new Set(((t.match(/\b\d{1,3}\b/g) || []) as string[])
+    .map(n => parseInt(n, 10))
+    .filter(n => n >= 1 && n <= items.length)));
+  idxs.forEach(n => {
+    const it = items[n - 1];
+    if (it) picks.push({ product_id: it.id, qty: 1, score: 1.0 });
+  });
+
+  // 2) Quantidades do tipo "2x nome" ou "nome x2"
+  const qtyBefore = /\b(\d{1,2})\s*x\s*([\p{L}\p{N}][\p{L}\p{N}\- ]{2,})/giu;
+  const qtyAfter = /([\p{L}\p{N}][\p{L}\p{N}\- ]{2,})\s*x\s*(\d{1,2})\b/giu;
+  const addByName = (rawName: string, q: number) => {
+    const name = normalizeText(rawName);
+    let best: { it: any; score: number } | null = null;
+    for (const it of items) {
+      const s = Math.max(
+        diceCoefficient(name, it.name || ''),
+        it.slug ? diceCoefficient(name, it.slug) : 0
+      );
+      if (!best || s > best.score) best = { it, score: s };
+    }
+    if (best && best.score >= 0.5) {
+      if (!picks.find(p => p.product_id === best!.it.id)) picks.push({ product_id: best!.it.id, qty: q || 1, score: Math.min(0.95, best.score) });
+    }
+  };
+  let m: RegExpExecArray | null;
+  while ((m = qtyBefore.exec(tRaw)) !== null) addByName(m[2], parseInt(m[1], 10));
+  while ((m = qtyAfter.exec(tRaw)) !== null) addByName(m[1], parseInt(m[2], 10));
+
+  // 3) Correspondência por nome/palavras-chave
+  const words = Array.from(new Set(t.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 3)));
+  for (const it of items) {
+    const nameN = normalizeText(it.name || '');
+    const slugN = normalizeText(it.slug || '');
+    const tokenHits = words.filter(w => nameN.includes(w) || slugN.includes(w));
+    let score = 0;
+    if (tokenHits.length) {
+      score = Math.min(0.95, 0.6 + 0.1 * Math.min(tokenHits.length, 3));
+    } else {
+      // usar similaridade aproximada com as 2 maiores palavras
+      const top = words.sort((a, b) => b.length - a.length).slice(0, 2);
+      score = Math.max(
+        diceCoefficient(top[0] || '', nameN),
+        diceCoefficient(top[1] || '', nameN),
+        diceCoefficient(top[0] || '', slugN)
+      );
+    }
+    if (score >= 0.55) {
+      if (!picks.find(p => p.product_id === it.id)) picks.push({ product_id: it.id, qty: 1, score });
+    }
+  }
+
+  return picks;
+}
+
 async function addSelectionsToContext(supabase: any, userId: string, platform: string, selections: { product_id: string; qty: number }[]) {
   const existing = await getContextRecord(supabase, userId, platform);
   const selected = Array.isArray(existing?.context_data?.selected_items) ? existing!.context_data.selected_items : [];
@@ -1442,13 +1532,33 @@ async function tryHandleSelectionOrFinalize(message: string, userId: string, pla
   const last = ctx?.context_data?.last_list;
   const recent = !!last && (Date.now() - (last.timestamp || 0) < 2 * 60 * 60 * 1000); // 2h
 
+  // Confirmação de candidatos pendentes
+  const hasPending = Array.isArray(ctx?.context_data?.pending_candidates) && ctx!.context_data.pending_candidates.length > 0;
+  const isConfirm = /(sim|confirmo|correto|isso mesmo|pode ser|pode avançar|pode fechar)/i.test(message || '');
+  if (recent && hasPending && isConfirm) {
+    const cand = ctx!.context_data.pending_candidates as { product_id: string; qty: number }[];
+    await addSelectionsToContext(supabase, userId, platform, cand);
+    await saveContextData(supabase, userId, platform, { pending_candidates: [] });
+    const summary = await buildCartSummary(supabase, userId, platform);
+    try {
+      await supabase.from('ai_learning_insights').insert({
+        insight_type: 'name_selection_confirmed',
+        content: `Confirmação por nome: ${JSON.stringify(cand)}`,
+        effectiveness_score: 0.9,
+        usage_count: 1
+      });
+    } catch {}
+    return `Perfeito! Adicionei ao carrinho.\n${summary.text}\n\nPodes responder com mais itens ou digitar "finalizar" quando estiver pronto.`;
+  }
+
   if (detectFinalizeIntent(message)) {
     // Se o cliente colocou números/nome/preço na mesma frase de finalizar, capturar também
     if (recent) {
-      const inlinePicks = parseSelectionFromMessage(message, last);
-      if (inlinePicks.length) {
-        await addSelectionsToContext(supabase, userId, platform, inlinePicks);
-      }
+      const inlineConf = parseSelectionWithConfidence(message, last);
+      const sure = inlineConf.filter(p => p.score >= 0.6).map(({ product_id, qty }) => ({ product_id, qty }));
+      if (sure.length) await addSelectionsToContext(supabase, userId, platform, sure);
+      const unsure = inlineConf.filter(p => p.score < 0.6).map(({ product_id, qty }) => ({ product_id, qty }));
+      if (unsure.length) await saveContextData(supabase, userId, platform, { pending_candidates: unsure });
     }
     const summary = await buildCartSummary(supabase, userId, platform);
     if (!summary.count) {
@@ -1460,12 +1570,46 @@ async function tryHandleSelectionOrFinalize(message: string, userId: string, pla
   if (!detectSelectionIntent(message, recent)) return null;
   if (!recent) return 'Manda "lista completa" ou o nome da categoria (ex: fones, cabos) para eu te mostrar as opções e poderes escolher por número.';
 
-  const picks = parseSelectionFromMessage(message, last);
-  if (!picks.length) return 'Não consegui identificar os itens. Tenta com os números da lista (ex: 1, 3 e 7) ou o nome exato.';
+  // Nova extração com confiança
+  const picksConf = parseSelectionWithConfidence(message, last);
+  if (!picksConf.length) return 'Não consegui identificar os itens. Tenta com os números da lista (ex: 1, 3 e 7) ou o nome exato.';
 
-  await addSelectionsToContext(supabase, userId, platform, picks);
+  // Logar intenção
+  try {
+    const avg = picksConf.reduce((s, p) => s + (p.score || 0), 0) / picksConf.length;
+    await supabase.from('detected_intentions').insert({
+      user_id: userId,
+      platform,
+      message,
+      detected_intent: 'select_products',
+      confidence_score: avg,
+      entities: picksConf
+    });
+  } catch {}
+
+  const unsure = picksConf.filter(p => (p.score || 0) < 0.6);
+  if (unsure.length) {
+    await saveContextData(supabase, userId, platform, { pending_candidates: unsure });
+    const names = unsure.map(p => {
+      const it = (last.items || []).find((i: any) => i.id === p.product_id);
+      return `${p.qty}x ${it?.name || 'item'}`;
+    }).join(', ');
+    return `Acho que queres: ${names}. Confirma? Responde com "confirmo" ou corrige pelo número/nome.`;
+  }
+
+  const sure = picksConf.filter(p => (p.score || 0) >= 0.6).map(({ product_id, qty }) => ({ product_id, qty }));
+  await addSelectionsToContext(supabase, userId, platform, sure);
+  try {
+    await supabase.from('ai_learning_insights').insert({
+      insight_type: 'name_selection_learned',
+      content: `Seleção por nome bem-sucedida: ${JSON.stringify(sure)} | frase: "${message}"`,
+      effectiveness_score: 0.8,
+      usage_count: 1
+    });
+  } catch {}
+
   const summary = await buildCartSummary(supabase, userId, platform);
-  return `Adicionado ✅\n${summary.text}\n\nPodes responder com mais números para adicionar outros itens, ou digitar "finalizar" quando estiver pronto.`;
+  return `Adicionado ✅\n${summary.text}\n\nPodes responder com mais números ou nomes para adicionar outros itens, ou digitar "finalizar" quando estiver pronto.`;
 }
 
 async function getFallbackResponse(message: string, supabase: any): Promise<string | any> {
