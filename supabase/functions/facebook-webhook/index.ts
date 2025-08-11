@@ -1359,7 +1359,7 @@ ${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
         break;
     }
 
-    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
+    const url = `https://graph.facebook.com/v23.0/me/messages?access_token=${pageAccessToken}`;
     
     const payload = {
       recipient: { id: adminId },
@@ -1431,7 +1431,7 @@ async function sendFacebookMessage(
       return;
     }
 
-    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
+    const url = `https://graph.facebook.com/v23.0/me/messages?access_token=${pageAccessToken}`;
 
     // Sanitização: remover markdown e normalizar
     const normalizeText = (text: string) =>
@@ -1535,7 +1535,7 @@ async function sendFacebookMessage(
           messaging_type: 'RESPONSE'
         };
         if (platform === 'instagram') imagePayload.messaging_product = 'instagram';
-        const imageResponse = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`,
+        const imageResponse = await fetch(`https://graph.facebook.com/v23.0/me/messages?access_token=${pageAccessToken}`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imagePayload) });
         if (!imageResponse.ok) {
           console.error('❌ Erro ao enviar imagem', platform, ':', await imageResponse.text());
@@ -1625,7 +1625,7 @@ async function sendFacebookMessageWithImage(
         message: { attachment: { type: 'image', payload: { url: safeUrl, is_reusable: true } } }
       };
       if (platform === 'instagram') payload.messaging_product = 'instagram';
-      const urlRes = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+      const urlRes = await fetch(`https://graph.facebook.com/v23.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       if (urlRes.ok) {
@@ -1649,12 +1649,12 @@ async function sendFacebookMessageWithImage(
     formData.append('filedata', imageBlob, 'image.jpg');
     if (platform === 'instagram') { formData.append('messaging_product', 'instagram'); }
 
-    const uploadResponse = await fetch(`https://graph.facebook.com/v21.0/me/message_attachments?access_token=${PAGE_ACCESS_TOKEN}`, { method: 'POST', body: formData });
+    const uploadResponse = await fetch(`https://graph.facebook.com/v23.0/me/message_attachments?access_token=${PAGE_ACCESS_TOKEN}`, { method: 'POST', body: formData });
 
     if (uploadResponse.ok) {
       const uploadResult = await uploadResponse.json();
       console.log('✅ Upload ok, attachment_id:', uploadResult.attachment_id);
-      const messageResponse = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+      const messageResponse = await fetch(`https://graph.facebook.com/v23.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipient: { id: recipientId },
