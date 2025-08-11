@@ -401,12 +401,24 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
           console.log('🔎 IG URL Preflight', { url: safeUrl, status: head.status, ct: head.headers.get('content-type'), cl: head.headers.get('content-length') });
         } catch {}
         // Sempre baixar a partir da URL ORIGINAL (evita 403 no render)
-        const downloadUrl = srcUrl;
+        const downloadUrl = platform === 'instagram' ? safeUrl : srcUrl;
+        console.log('📥 Download URL escolhido', { platform, downloadUrl });
         try {
           const headOrig = await fetch(downloadUrl, { method: 'HEAD' });
-          console.log('🔎 Original URL HEAD', { url: downloadUrl, status: headOrig.status, ct: headOrig.headers.get('content-type'), cl: headOrig.headers.get('content-length') });
+          console.log('🔎 Download URL HEAD', { url: downloadUrl, status: headOrig.status, ct: headOrig.headers.get('content-type'), cl: headOrig.headers.get('content-length') });
         } catch {}
-        const imageResponse = await fetch(downloadUrl);
+        const fetchHeaders: Record<string, string> = {};
+        try {
+          const u = new URL(downloadUrl);
+          if (u.hostname.endsWith('.supabase.co')) {
+            const svc = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+            if (svc) {
+              fetchHeaders['apikey'] = svc;
+              fetchHeaders['Authorization'] = `Bearer ${svc}`;
+            }
+          }
+        } catch {}
+        const imageResponse = await fetch(downloadUrl, Object.keys(fetchHeaders).length ? { headers: fetchHeaders } : undefined);
         const imageBlob = await imageResponse.blob();
         const imageBase64 = await blobToBase64(imageBlob);
         
