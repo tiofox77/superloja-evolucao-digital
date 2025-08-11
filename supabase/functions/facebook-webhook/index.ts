@@ -1527,7 +1527,14 @@ async function sendFacebookMessage(
     }
 
     // Enviar imagens como attachments (quando presentes)
-    for (const imageUrl of images) {
+    const IG_TEST_IMAGE = 'https://picsum.photos/seed/ig-dm-test/1080/1350.jpg';
+    const sourceImages = (platform === 'instagram' && images && images.length > 0)
+      ? [IG_TEST_IMAGE]
+      : images;
+    if (platform === 'instagram' && images && images.length > 0) {
+      console.log('🧪 Modo teste IG: substituindo URL(s) por JPEG de teste', IG_TEST_IMAGE);
+    }
+    for (const imageUrl of sourceImages) {
       try {
         const normalizedUrl = platform === 'instagram'
           ? (() => {
@@ -1634,7 +1641,11 @@ async function sendFacebookMessageWithImage(
 
     // Método A: enviar por URL (preferido para Facebook e Instagram)
     if (originalUrl) {
-      const safeUrl = platform === 'instagram' ? toInstagramSafe(originalUrl) : originalUrl;
+      const IG_TEST_IMAGE = 'https://picsum.photos/seed/ig-dm-test/1080/1350.jpg';
+      const safeUrl = platform === 'instagram' ? IG_TEST_IMAGE : originalUrl;
+      if (platform === 'instagram') {
+        console.log('🧪 Modo teste IG: substituindo URL original por JPEG de teste', { originalUrl, safeUrl });
+      }
       const payload: any = {
         recipient: { id: recipientId },
         messaging_type: 'RESPONSE',
