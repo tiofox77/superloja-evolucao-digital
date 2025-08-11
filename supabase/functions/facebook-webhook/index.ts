@@ -1561,6 +1561,7 @@ async function sendFacebookMessage(
         if ((result as any)?.stop) { console.warn('⏹️ Parando envio por política de 24h'); break; }
         if (i < parts.length - 1) await new Promise(r => setTimeout(r, 800));
       }
+      console.log('✅ Texto enviado');
     }
 
     // Enviar imagens como attachments (quando presentes)
@@ -1752,7 +1753,11 @@ async function sendFacebookMessageWithImage(
         let jr: any = null;
         try { jr = await urlRes.json(); } catch {}
         console.log('✅ Imagem enviada via URL', jr);
-        if (shouldSendTextAfterImage) { await new Promise(r => setTimeout(r, 800)); await sendFacebookMessage(recipientId, text, supabase, platform); }
+        if (shouldSendTextAfterImage) {
+          console.log('📝 Enviando texto pós-imagem', { platform });
+          await new Promise(r => setTimeout(r, 1200));
+          await sendFacebookMessage(recipientId, text, supabase, platform);
+        }
         return;
       } else {
         const err = await urlRes.text();
@@ -1786,7 +1791,11 @@ async function sendFacebookMessageWithImage(
       });
       if (messageResponse.ok) {
         console.log('✅ Imagem enviada via Upload API');
-        if (shouldSendTextAfterImage) { await new Promise(r => setTimeout(r, 800)); await sendFacebookMessage(recipientId, text, supabase, platform); }
+        if (shouldSendTextAfterImage) {
+          console.log('📝 Enviando texto pós-imagem', { platform });
+          await new Promise(r => setTimeout(r, 1200));
+          await sendFacebookMessage(recipientId, text, supabase, platform);
+        }
         return;
       } else {
         const errorData = await messageResponse.text();
