@@ -394,12 +394,19 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
             return url;
           } catch { return url; }
         };
-        const fetchUrl = platform === 'instagram' ? toInstagramSafe(srcUrl) : srcUrl;
+        const safeUrl = platform === 'instagram' ? toInstagramSafe(srcUrl) : srcUrl;
+        // Pré-checagem da URL "segura" (pode falhar com 403 em render)
         try {
-          const head = await fetch(fetchUrl, { method: 'HEAD' });
-          console.log('🔎 Pré-checagem imagem IA', { url: fetchUrl, status: head.status, ct: head.headers.get('content-type'), cl: head.headers.get('content-length') });
+          const head = await fetch(safeUrl, { method: 'HEAD' });
+          console.log('🔎 IG URL Preflight', { url: safeUrl, status: head.status, ct: head.headers.get('content-type'), cl: head.headers.get('content-length') });
         } catch {}
-        const imageResponse = await fetch(fetchUrl);
+        // Sempre baixar a partir da URL ORIGINAL (evita 403 no render)
+        const downloadUrl = srcUrl;
+        try {
+          const headOrig = await fetch(downloadUrl, { method: 'HEAD' });
+          console.log('🔎 Original URL HEAD', { url: downloadUrl, status: headOrig.status, ct: headOrig.headers.get('content-type'), cl: headOrig.headers.get('content-length') });
+        } catch {}
+        const imageResponse = await fetch(downloadUrl);
         const imageBlob = await imageResponse.blob();
         const imageBase64 = await blobToBase64(imageBlob);
         
@@ -1696,7 +1703,7 @@ async function sendFacebookMessageWithImage(
     const shouldSendTextAfterImage = platform === 'facebook' && !!(text && text.trim());
 
     // Método A: enviar por URL (preferido para Facebook e Instagram)
-    if (originalUrl) {
+    if (originalUrl && !(platform === 'instagram' && /\/storage\/v1\/object\/public\//i.test(originalUrl))) {
       const safeUrl = platform === 'instagram' ? toInstagramSafe(originalUrl) : originalUrl;
       if (platform === 'instagram') {
         console.log('🔁 IG URL normalizada para render/jpeg', { originalUrl, safeUrl });
