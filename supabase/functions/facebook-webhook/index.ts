@@ -1400,24 +1400,75 @@ async function sendFacebookMessage(recipientId: string, messageText: string, sup
     // Remover markdown de imagem do texto
     const cleanText = messageText.replace(/📸 !\[Imagem\]\([^)]+\)/g, '').trim();
     
-    // Enviar texto primeiro
+    // Enviar texto primeiro (com fragmentação segura)
     if (cleanText) {
-      const textPayload = {
-        recipient: { id: recipientId },
-        message: { text: cleanText },
-        messaging_type: 'RESPONSE'
+      const MAX_LEN = 900; // margem segura abaixo do limite de 1.000
+      const splitIntoChunks = (text: string, maxLen = MAX_LEN): string[] => {
+        const chunks: string[] = [];
+        if (!text) return chunks;
+        const clean = text.replace(/\s+$/g, '').replace(/\n{3,}/g, '\n\n');
+        const sentences = clean.split(/(?<=[.!?])\s+/);
+        let buf = '';
+        for (const s of sentences) {
+          if (s.length > maxLen) {
+            if (buf) { chunks.push(buf); buf = ''; }
+            for (let i = 0; i < s.length; i += maxLen) {
+              chunks.push(s.slice(i, i + maxLen));
+            }
+            continue;
+          }
+          if ((buf + (buf ? ' ' : '') + s).length <= maxLen) {
+            buf = buf ? buf + ' ' + s : s;
+          } else {
+            if (buf) chunks.push(buf);
+            buf = s;
+          }
+        }
+        if (buf) chunks.push(buf);
+        if (chunks.length === 0) {
+          for (let i = 0; i < clean.length; i += maxLen) {
+            chunks.push(clean.slice(i, i + maxLen));
+          }
+        }
+        return chunks;
       };
 
-      const textResponse = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(textPayload),
-      });
+      const parts = splitIntoChunks(cleanText, MAX_LEN);
+      console.log(`✂️ Fragmentando texto em ${parts.length} parte(s)`);
 
-      if (!textResponse.ok) {
-        console.error('❌ Erro ao enviar texto Facebook:', await textResponse.text());
-      } else {
-        console.log('✅ Texto enviado para Facebook');
+      for (let i = 0; i < parts.length; i++) {
+        const prefix = parts.length > 1 ? `(${i + 1}/${parts.length}) ` : '';
+        const textPayload = {
+          recipient: { id: recipientId },
+          message: { text: `${prefix}${parts[i]}` },
+          messaging_type: 'RESPONSE'
+        };
+
+        const textResponse = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(textPayload),
+        });
+
+        if (!textResponse.ok) {
+          const errText = await textResponse.text();
+          console.error('❌ Erro ao enviar texto Facebook:', errText);
+          try {
+            const errJson = JSON.parse(errText);
+            const code = errJson?.error?.code;
+            const subcode = errJson?.error?.error_subcode;
+            if (code === 10 && subcode === 2018278) {
+              console.error('⏱️ Janela de 24h expirada para este usuário. Parando envio de partes.');
+              break;
+            }
+          } catch {}
+        } else {
+          console.log(`✅ Texto enviado (parte ${i + 1}/${parts.length})`);
+        }
+
+        if (i < parts.length - 1) {
+          await new Promise((r) => setTimeout(r, 800));
+        }
       }
     }
     

@@ -636,22 +636,66 @@ async function getFallbackResponse(userMessage: string, userId: string, supabase
 
 async function sendInstagramMessage(recipientId: string, message: string, supabase: any) {
   // Buscar token do Instagram das configurações
-  let PAGE_ACCESS_TOKEN = null;
+  let PAGE_ACCESS_TOKEN: string | null = null;
   let tokenSource = 'none';
-  
+
+  // Utilitário: divide texto em blocos seguros para a API (<= 900 chars)
+  const MAX_LEN = 900; // margem de segurança abaixo do limite de 1.000
+  function splitIntoChunks(text: string, maxLen = MAX_LEN): string[] {
+    const chunks: string[] = [];
+    if (!text) return chunks;
+
+    // Normaliza espaços
+    const clean = text.replace(/\s+$/g, '').replace(/\n{3,}/g, '\n\n');
+
+    // Primeiro tenta por frases
+    const sentences = clean.split(/(?<=[.!?])\s+/);
+    let buf = '';
+    for (const s of sentences) {
+      // Se a frase sozinha já é maior que o limite, quebra por slices
+      if (s.length > maxLen) {
+        // despeja o buffer atual
+        if (buf) {
+          chunks.push(buf);
+          buf = '';
+        }
+        for (let i = 0; i < s.length; i += maxLen) {
+          chunks.push(s.slice(i, i + maxLen));
+        }
+        continue;
+      }
+      if ((buf + (buf ? ' ' : '') + s).length <= maxLen) {
+        buf = buf ? buf + ' ' + s : s;
+      } else {
+        if (buf) chunks.push(buf);
+        buf = s;
+      }
+    }
+    if (buf) chunks.push(buf);
+
+    // Garantia extra caso nada tenha sido gerado
+    if (chunks.length === 0) {
+      for (let i = 0; i < clean.length; i += maxLen) {
+        chunks.push(clean.slice(i, i + maxLen));
+      }
+    }
+
+    return chunks;
+  }
+
   try {
     const { data: aiSettings } = await supabase
       .from('ai_settings')
       .select('value')
       .eq('key', 'instagram_page_token')
       .maybeSingle();
-    
+
     if (aiSettings?.value) {
-      PAGE_ACCESS_TOKEN = aiSettings.value;
+      PAGE_ACCESS_TOKEN = aiSettings.value as string;
       tokenSource = 'ai_settings';
       console.log('✅ Usando token Instagram das configurações AI');
     }
-  } catch (error) {
+  } catch {
     console.log('⚠️ Erro ao buscar token Instagram AI settings');
   }
 
@@ -663,67 +707,85 @@ async function sendInstagramMessage(recipientId: string, message: string, supaba
         .select('access_token')
         .limit(1)
         .maybeSingle();
-      
+
       if (metaSettings?.access_token) {
-        PAGE_ACCESS_TOKEN = metaSettings.access_token;
+        PAGE_ACCESS_TOKEN = metaSettings.access_token as string;
         tokenSource = 'meta_settings';
         console.log('✅ Usando token Instagram das configurações Meta');
       }
-    } catch (error) {
+    } catch {
       console.log('⚠️ Erro ao buscar token Instagram Meta');
     }
   }
-  
+
   // Fallback: Secrets
   if (!PAGE_ACCESS_TOKEN) {
-    PAGE_ACCESS_TOKEN = Deno.env.get('INSTAGRAM_PAGE_ACCESS_TOKEN');
+    PAGE_ACCESS_TOKEN = Deno.env.get('INSTAGRAM_PAGE_ACCESS_TOKEN') || null;
     tokenSource = 'secrets';
     console.log('⚠️ Usando token Instagram das secrets');
   }
-  
+
   if (!PAGE_ACCESS_TOKEN) {
     console.error('❌ Nenhum token Instagram encontrado');
     return;
   }
-  
+
   console.log(`📤 Enviando mensagem Instagram para ${recipientId}`);
   console.log(`🔑 Token source: ${tokenSource}`);
-  console.log(`📝 Mensagem: ${message.substring(0, 50)}...`);
-  
-  try {
-    // Instagram usa a mesma API do Facebook para mensagens
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient: { id: recipientId },
-          message: { text: message }
-        }),
+
+  // Faz o chunking e envia sequencialmente
+  const parts = splitIntoChunks(message, MAX_LEN);
+  console.log(`✂️ Chunking: ${parts.length} parte(s); tamanho 1ª parte: ${parts[0]?.length || 0}`);
+
+  for (let i = 0; i < parts.length; i++) {
+    const prefix = parts.length > 1 ? `(${i + 1}/${parts.length}) ` : '';
+    const text = `${prefix}${parts[i]}`;
+    console.log(`➡️ Enviando parte ${i + 1}/${parts.length} (${text.length} chars)`);
+
+    try {
+      const resp = await fetch(
+        `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipient: { id: recipientId },
+            message: { text }
+          }),
+        }
+      );
+
+      const result = await resp.json();
+
+      if (resp.ok) {
+        console.log('✅ Mensagem Instagram enviada com sucesso!');
+        console.log('📨 Message ID:', result.message_id);
+      } else {
+        console.error('❌ Erro Instagram API:', JSON.stringify(result));
+        const code = result?.error?.code;
+        const subcode = result?.error?.error_subcode;
+        const msg = result?.error?.message || '';
+
+        if (code === 100 || /superior a 1\.000 caracteres|1000 caracteres/i.test(msg)) {
+          console.error('⚠️ Rejeitada por tamanho, mas já enviamos em blocos. Verifique conteúdo.');
+        }
+
+        if (code === 10 && subcode === 2018278) {
+          console.error('⏱️ Janela de 24h expirou para este usuário. Não é possível enviar mensagem padrão.');
+          // Não tenta enviar as próximas partes
+          break;
+        }
       }
-    );
-    
-    const result = await response.json();
-    
-    if (response.ok) {
-      console.log('✅ Mensagem Instagram enviada com sucesso!');
-      console.log('📨 Message ID:', result.message_id);
-      console.log('📊 Dados de resposta Instagram:', JSON.stringify(result, null, 2));
-    } else {
-      console.error('❌ Erro Instagram API (detalhado):', result);
-      console.error('📊 Status da resposta:', response?.status);
-      console.error('📋 Headers da resposta:', response?.headers);
-      console.error('🔧 Debugging Instagram Send:');
-      console.error('- Recipient ID usado:', recipientId);
-      console.error('- Token usado:', pageToken ? `${pageToken.substring(0, 20)}...` : 'NENHUM');
-      console.error('- URL da API:', `https://graph.instagram.com/v18.0/me/messages`);
+
+      // Pequeno delay para manter a ordem e evitar rate limit
+      if (i < parts.length - 1) {
+        await new Promise((r) => setTimeout(r, 800));
+      }
+    } catch (err) {
+      console.error('❌ ERRO COMPLETO ao enviar mensagem Instagram:', err);
+      console.error('👤 Recipient:', recipientId);
+      // Prossegue para a próxima parte, mas loga
     }
-    
-  } catch (error) {
-    console.error('❌ ERRO COMPLETO ao enviar mensagem Instagram:', error);
-    console.error('📝 Mensagem que falhou:', message);
-    console.error('👤 Recipient que falhou:', recipientId);
   }
 }
 
