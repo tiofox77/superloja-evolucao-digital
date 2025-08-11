@@ -381,7 +381,25 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     if (typeof aiResponse === 'object' && aiResponse.attach_image && aiResponse.image_url) {
       try {
         // Baixar imagem e enviar como anexo
-        const imageResponse = await fetch(aiResponse.image_url);
+        const srcUrl = aiResponse.image_url as string;
+        const toInstagramSafe = (url: string) => {
+          try {
+            const m = url.match(/^(https?:\/\/[^/]+)\/storage\/v1\/object\/public\/([^?]+)(?:\?[^#]*)?/i);
+            if (m) {
+              const origin = m[1];
+              const path = m[2];
+              return `${origin}/storage/v1/render/image/public/${path}?width=1080&height=1350&resize=cover&format=jpeg&quality=85&background=ffffff`;
+            }
+            if (/(\.(webp|png))(\?|$)/i.test(url)) return url.replace(/\.(webp|png)(\?|$)/i, '.jpg$2');
+            return url;
+          } catch { return url; }
+        };
+        const fetchUrl = platform === 'instagram' ? toInstagramSafe(srcUrl) : srcUrl;
+        try {
+          const head = await fetch(fetchUrl, { method: 'HEAD' });
+          console.log('🔎 Pré-checagem imagem IA', { url: fetchUrl, status: head.status, ct: head.headers.get('content-type'), cl: head.headers.get('content-length') });
+        } catch {}
+        const imageResponse = await fetch(fetchUrl);
         const imageBlob = await imageResponse.blob();
         const imageBase64 = await blobToBase64(imageBlob);
         
@@ -1527,14 +1545,7 @@ async function sendFacebookMessage(
     }
 
     // Enviar imagens como attachments (quando presentes)
-    const IG_TEST_IMAGE = 'https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/render/image/public/product-images/1751895416280-3mibhwza1ig.png?width=1080&height=1350&resize=cover&format=jpeg&quality=85&background=ffffff';
-    const sourceImages = (platform === 'instagram' && images && images.length > 0)
-      ? [IG_TEST_IMAGE]
-      : images;
-    if (platform === 'instagram' && images && images.length > 0) {
-      console.log('🧪 Modo teste IG: substituindo URL(s) por JPEG de teste', IG_TEST_IMAGE);
-    }
-    for (const imageUrl of sourceImages) {
+    for (const imageUrl of images) {
       try {
         const normalizedUrl = platform === 'instagram'
           ? (() => {
@@ -1573,7 +1584,39 @@ async function sendFacebookMessage(
         const imageResponse = await fetch(`https://graph.facebook.com/v23.0/me/messages?access_token=${pageAccessToken}`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imagePayload) });
         if (!imageResponse.ok) {
-          console.error('❌ Erro ao enviar imagem', platform, ':', await imageResponse.text());
+          const errText = await imageResponse.text();
+          console.error('❌ Erro ao enviar imagem por URL', platform, ':', errText);
+          // Fallback: baixar e enviar via Upload API
+          try {
+            const fetchRes = await fetch(normalizedUrl);
+            const ab = await fetchRes.arrayBuffer();
+            const bytesU = new Uint8Array(ab);
+            const imageBlob = new Blob([bytesU], { type: 'image/jpeg' });
+            const formData = new FormData();
+            formData.append('message', JSON.stringify({ attachment: { type: 'image', payload: { is_reusable: false } } }));
+            formData.append('filedata', imageBlob, 'image.jpg');
+            if (platform === 'instagram') { formData.append('messaging_product', 'instagram'); }
+            const uploadRes = await fetch(`https://graph.facebook.com/v23.0/me/message_attachments?access_token=${pageAccessToken}`, { method: 'POST', body: formData });
+            if (uploadRes.ok) {
+              const uploadJson = await uploadRes.json();
+              console.log('✅ Upload API fallback ok, attachment_id:', uploadJson.attachment_id);
+              const sendRes = await fetch(`https://graph.facebook.com/v23.0/me/messages?access_token=${pageAccessToken}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  recipient: { id: recipientId },
+                  messaging_type: 'RESPONSE',
+                  ...(platform === 'instagram' ? { messaging_product: 'instagram' } : {}),
+                  message: { attachment: { type: 'image', payload: { attachment_id: uploadJson.attachment_id } } }
+                })
+              });
+              if (sendRes.ok) { console.log('✅ Imagem enviada via Upload API fallback'); }
+              else { console.error('❌ Falha no envio pós-upload:', await sendRes.text()); }
+            } else {
+              console.error('❌ Falha no Upload API fallback:', await uploadRes.text());
+            }
+          } catch (e) {
+            console.error('❌ Erro no fallback Upload API:', (e as any)?.message);
+          }
         } else {
           console.log('✅ Imagem enviada');
         }
@@ -1654,10 +1697,9 @@ async function sendFacebookMessageWithImage(
 
     // Método A: enviar por URL (preferido para Facebook e Instagram)
     if (originalUrl) {
-      const IG_TEST_IMAGE = 'https://picsum.photos/seed/ig-dm-test/1080/1350.jpg';
-      const safeUrl = platform === 'instagram' ? IG_TEST_IMAGE : originalUrl;
+      const safeUrl = platform === 'instagram' ? toInstagramSafe(originalUrl) : originalUrl;
       if (platform === 'instagram') {
-        console.log('🧪 Modo teste IG: substituindo URL original por JPEG de teste', { originalUrl, safeUrl });
+        console.log('🔁 IG URL normalizada para render/jpeg', { originalUrl, safeUrl });
       }
       const payload: any = {
         recipient: { id: recipientId },
@@ -1695,22 +1737,7 @@ async function sendFacebookMessageWithImage(
     }
 
     console.log('🖼️ Tentando Upload API');
-    let uploadBase64 = imageBase64;
-    if (platform === 'instagram') {
-      try {
-        const IG_TEST_IMAGE = 'https://picsum.photos/seed/ig-dm-test/1080/1350.jpg';
-        const testRes = await fetch(IG_TEST_IMAGE);
-        const ab = await testRes.arrayBuffer();
-        const bytesU = new Uint8Array(ab);
-        let bin = '';
-        for (let i = 0; i < bytesU.length; i++) bin += String.fromCharCode(bytesU[i]);
-        uploadBase64 = btoa(bin);
-        console.log('🧪 Upload API com JPEG de teste (bytes):', { size: bytesU.length, ct: testRes.headers.get('content-type') });
-      } catch (e) {
-        console.warn('⚠️ Falha ao preparar JPEG de teste para upload', (e as any)?.message);
-      }
-    }
-    const binaryString = atob(uploadBase64);
+    const binaryString = atob(imageBase64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
     const formData = new FormData();
