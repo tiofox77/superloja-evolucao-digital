@@ -342,6 +342,8 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
   
   console.log(`📨 Mensagem de ${senderId}: ${messageText}`);
   
+  let responded = false;
+  
   try {
     // Verificar se o bot está habilitado
     const { data: botSettings } = await supabase
@@ -385,6 +387,7 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
         
         // Enviar texto + imagem (passando plataforma e URL original)
         await sendFacebookMessageWithImage(senderId, aiResponse.message, imageBase64, supabase, platform, aiResponse.image_url);
+        responded = true;
         
         // Salvar resposta enviada
         await supabase.from('ai_conversations').insert({
@@ -412,6 +415,7 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
       // Resposta normal sem imagem
       const responseText = typeof aiResponse === 'object' ? aiResponse.message : aiResponse;
       await sendFacebookMessage(senderId, responseText, supabase, platform);
+      responded = true;
       
       // Salvar resposta enviada
       await supabase.from('ai_conversations').insert({
@@ -428,16 +432,20 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     
   } catch (error) {
     console.error('❌ Erro ao processar mensagem:', error);
-    const fallback = 'Desculpe, tive um problema técnico. Tente novamente!';
-    await sendFacebookMessage(senderId, fallback, supabase, platform);
-    await supabase.from('ai_conversations').insert({
-      platform: platform,
-      user_id: senderId,
-      message: fallback,
-      type: 'sent',
-      timestamp: new Date().toISOString(),
-      metadata: { reason: 'error_fallback' }
-    });
+    if (!responded) {
+      const fallback = 'Desculpe, tive um problema técnico. Tente novamente!';
+      await sendFacebookMessage(senderId, fallback, supabase, platform);
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: senderId,
+        message: fallback,
+        type: 'sent',
+        timestamp: new Date().toISOString(),
+        metadata: { reason: 'error_fallback' }
+      });
+    } else {
+      console.warn('⚠️ Erro após resposta já enviada — sem fallback.');
+    }
   }
 }
 
@@ -1472,11 +1480,12 @@ async function sendFacebookMessage(
 
     // Envio robusto com re-fragmentação caso ocorra erro 100 (comprimento)
     const sendPart = async (text: string, prefix: string) => {
-      const payload = {
+      const payload: any = {
         recipient: { id: recipientId },
         message: { text: `${prefix}${text}` },
         messaging_type: 'RESPONSE',
       };
+      if (platform === 'instagram') payload.messaging_product = 'instagram';
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) {
         const errText = await res.text();
@@ -1520,10 +1529,12 @@ async function sendFacebookMessage(
     // Enviar imagens como attachments (quando presentes)
     for (const imageUrl of images) {
       try {
-        const imagePayload = {
+        const imagePayload: any = {
           recipient: { id: recipientId },
-          message: { attachment: { type: 'image', payload: { url: imageUrl, is_reusable: true } } }
+          message: { attachment: { type: 'image', payload: { url: imageUrl, is_reusable: true } } },
+          messaging_type: 'RESPONSE'
         };
+        if (platform === 'instagram') imagePayload.messaging_product = 'instagram';
         const imageResponse = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imagePayload) });
         if (!imageResponse.ok) {
@@ -1606,7 +1617,7 @@ async function sendFacebookMessageWithImage(
     const shouldSendTextAfterImage = platform === 'facebook' && !!(text && text.trim());
 
     // Método A: enviar por URL (mais simples/robusto)
-    if (originalUrl) {
+    if (originalUrl && platform !== 'instagram') {
       const safeUrl = platform === 'instagram' ? toInstagramSafe(originalUrl) : originalUrl;
       const payload = {
         recipient: { id: recipientId },
@@ -1632,9 +1643,10 @@ async function sendFacebookMessageWithImage(
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
     const formData = new FormData();
-    const imageBlob = new Blob([bytes], { type: 'application/octet-stream' });
+    const imageBlob = new Blob([bytes], { type: 'image/jpeg' });
     formData.append('message', JSON.stringify({ attachment: { type: 'image', payload: { is_reusable: false } } }));
-    formData.append('filedata', imageBlob, 'image');
+    formData.append('filedata', imageBlob, 'image.jpg');
+    if (platform === 'instagram') { formData.append('messaging_product', 'instagram'); }
 
     const uploadResponse = await fetch(`https://graph.facebook.com/v21.0/me/message_attachments?access_token=${PAGE_ACCESS_TOKEN}`, { method: 'POST', body: formData });
 
@@ -1646,6 +1658,7 @@ async function sendFacebookMessageWithImage(
         body: JSON.stringify({
           recipient: { id: recipientId },
           messaging_type: 'RESPONSE',
+          ...(platform === 'instagram' ? { messaging_product: 'instagram' } : {}),
           message: { attachment: { type: 'image', payload: { attachment_id: uploadResult.attachment_id } } }
         })
       });
