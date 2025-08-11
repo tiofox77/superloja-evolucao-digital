@@ -425,6 +425,27 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     console.log(`🤖 Tipo de resposta IA:`, typeof aiResponse);
     console.log(`🤖 Resposta IA completa:`, JSON.stringify(aiResponse, null, 2));
     
+    // Verificar se resposta inclui múltiplas imagens
+    if (typeof aiResponse === 'object' && aiResponse.attach_image && Array.isArray((aiResponse as any).image_urls || (aiResponse as any).images)) {
+      const list = ((aiResponse as any).image_urls || (aiResponse as any).images) as string[];
+      const urls = list.filter(u => typeof u === 'string' && u.startsWith('http')).slice(0, 6);
+      if (urls.length > 0) {
+        const messageWithLink = await buildMessageWithProductLink((aiResponse as any).message || '', urls[0], messageText, supabase);
+        const markers = urls.map(u => `📸 ![Imagem](${u})`).join('\n');
+        const finalText = `${messageWithLink}\n\n${markers}`;
+        await sendFacebookMessage(senderId, finalText, supabase, platform);
+        responded = true;
+        await supabase.from('ai_conversations').insert({
+          platform: platform,
+          user_id: senderId,
+          message: finalText,
+          type: 'sent',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+    }
+
     // Verificar se resposta inclui imagem para anexar
     if (typeof aiResponse === 'object' && aiResponse.attach_image && aiResponse.image_url) {
       try {
@@ -685,6 +706,21 @@ async function processWithEnhancedAI(message: string, senderId: string, supabase
     // Detectar se usuário quer ver fotos
     const photoKeywords = ['fotos', 'foto', 'imagem', 'imagens', 'envie fotos', 'manda imagem', 'manda imagens', 'quero fotos', 'quero ver', 'mostra foto', 'mostra imagem'];
     const wantsPhotos = photoKeywords.some(keyword => message.toLowerCase().includes(keyword));
+
+    // Se pediu fotos de múltiplos produtos, devolve várias imagens sem chamar IA
+    if (wantsPhotos && products && (products as any[]).length > 1) {
+      const urls = (products as any[])
+        .filter((p: any) => p.image_url)
+        .map((p: any) => p.image_url as string)
+        .slice(0, 4);
+      if (urls.length > 1) {
+        return {
+          message: 'Aqui estão as fotos dos modelos que pediste! Queres que eu explique as diferenças rapidinho?',
+          image_urls: urls,
+          attach_image: true
+        };
+      }
+    }
 
     // Construir histórico humanizado
     let conversationHistory = '';
