@@ -387,7 +387,23 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
       return;
     }
 
-    // 2) Seleção por número/nome/preço ou FINALIZAR com base na última lista
+    // 2) Remoção do carrinho (por número ou nome)
+    const removalResponse = await tryHandleRemoveFromCart(messageText, senderId, platform, supabase);
+    if (removalResponse) {
+      await sendFacebookMessage(senderId, removalResponse, supabase, platform);
+      responded = true;
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: senderId,
+        message: removalResponse,
+        type: 'sent',
+        timestamp: new Date().toISOString()
+      });
+      console.log('🧹 Remoção do carrinho processada.');
+      return;
+    }
+
+    // 3) Seleção por número/nome/preço ou FINALIZAR com base na última lista
     const selectionOrFinalize = await tryHandleSelectionOrFinalize(messageText, senderId, platform, supabase);
     if (selectionOrFinalize) {
       await sendFacebookMessage(senderId, selectionOrFinalize, supabase, platform);
@@ -1525,6 +1541,156 @@ async function buildCartSummary(supabase: any, userId: string, platform: string)
   }
   const text = lines.length ? `Carrinho atual:\n- ${lines.join('\n- ')}\nTotal: ${total.toLocaleString('pt-AO')} Kz` : 'Ainda não há itens selecionados.';
   return { text, total, count: lines.length };
+}
+
+// ===== Remoção do carrinho (por número ou nome) =====
+function detectRemoveIntent(text: string): boolean {
+  const t = (text || '').toLowerCase();
+  const patterns = [
+    'remover', 'remove', 'tirar', 'tira', 'retirar', 'retira', 'apagar', 'excluir',
+    'limpar carrinho', 'limpa carrinho', 'deixa só', 'deixa so', 'deixa apenas', 'deixa so o', 'deixa so a'
+  ];
+  return patterns.some(p => t.includes(p));
+}
+
+async function tryHandleRemoveFromCart(message: string, userId: string, platform: string, supabase: any): Promise<string | null> {
+  if (!detectRemoveIntent(message)) return null;
+
+  const ctx = await getContextRecord(supabase, userId, platform);
+  const selected: { product_id: string; qty: number }[] = Array.isArray(ctx?.context_data?.selected_items)
+    ? ctx!.context_data.selected_items
+    : [];
+
+  if (!selected.length) return 'O teu carrinho está vazio neste momento. Queres que eu volte a mostrar a lista para escolheres?';
+
+  const last = ctx?.context_data?.last_list;
+  let items: any[] = Array.isArray(last?.items) ? last.items : [];
+
+  // Se não houver última lista, buscar info dos selecionados para podermos casar por nome
+  if (!items.length) {
+    const ids = selected.map(s => s.product_id);
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, slug, price')
+      .in('id', ids);
+    items = (data || []).map((p: any, idx: number) => ({ index: idx + 1, id: p.id, name: p.name, slug: p.slug, price: Number(p.price) || 0 }));
+  }
+
+  const tRaw = message || '';
+  const t = normalizeText(tRaw);
+
+  // Se pedido de "deixa só ...", manter apenas os citados e remover o resto
+  const keepOnly = /(deixa\s*s[oó]|somente|apenas)/i.test(tRaw);
+  let keepTargets: { product_id: string }[] = [];
+  if (keepOnly) {
+    // Tentar reconhecer por número e nome
+    const idxs = Array.from(new Set(((t.match(/\b\d{1,3}\b/g) || []) as string[])
+      .map(n => parseInt(n, 10))
+      .filter(n => n >= 1 && n <= items.length)));
+    keepTargets.push(...idxs.map(n => ({ product_id: items[n - 1]?.id })).filter(Boolean) as any);
+
+    // Por nome (fuzzy)
+    const words = Array.from(new Set(t.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 3)));
+    for (const it of items) {
+      const nameN = normalizeText(it.name || '');
+      const slugN = normalizeText(it.slug || '');
+      const hit = words.some(w => nameN.includes(w) || slugN.includes(w));
+      if (hit) keepTargets.push({ product_id: it.id });
+    }
+
+    // Aplicar: manter apenas os alvos
+    const keepIds = new Set(keepTargets.map(k => k.product_id));
+    const newSelected = selected.filter(s => keepIds.has(s.product_id));
+    await saveContextData(supabase, userId, platform, { selected_items: newSelected });
+    const summary = await buildCartSummary(supabase, userId, platform);
+
+    try { await supabase.from('ai_learning_insights').insert({ insight_type: 'cart_edit_keep_only', content: tRaw, effectiveness_score: 0.8, usage_count: 1 }); } catch {}
+
+    const variants = [
+      'Certo! Deixei só o que pediste.\n',
+      'Feito! Mantive apenas esses itens.\n',
+      'Perfeito, ficou só o que selecionaste.\n'
+    ];
+    const prefix = variants[Math.floor(Math.random() * variants.length)];
+    return `${prefix}${summary.text}`;
+  }
+
+  // Caso geral: remover itens específicos por número ou nome (com ou sem quantidade)
+  const removals: { product_id: string; qty: number }[] = [];
+
+  // 1) Números da lista
+  const idxs = Array.from(new Set(((t.match(/\b\d{1,3}\b/g) || []) as string[])
+    .map(n => parseInt(n, 10))
+    .filter(n => n >= 1 && n <= items.length)));
+  idxs.forEach(n => { const it = items[n - 1]; if (it) removals.push({ product_id: it.id, qty: 1 }); });
+
+  // 2) Formatos de quantidade: "2x nome" ou "nome x2"
+  const qtyBefore = /\b(\d{1,2})\s*x\s*([\p{L}\p{N}][\p{L}\p{N}\- ]{2,})/giu;
+  const qtyAfter = /([\p{L}\p{N}][\p{L}\p{N}\- ]{2,})\s*x\s*(\d{1,2})\b/giu;
+  const addByName = (rawName: string, q: number) => {
+    const name = normalizeText(rawName);
+    let best: { it: any; score: number } | null = null;
+    for (const it of items) {
+      const s = Math.max(
+        diceCoefficient(name, it.name || ''),
+        it.slug ? diceCoefficient(name, it.slug) : 0
+      );
+      if (!best || s > best.score) best = { it, score: s };
+    }
+    if (best && best.score >= 0.5) removals.push({ product_id: best.it.id, qty: q || 1 });
+  };
+  let m: RegExpExecArray | null;
+  while ((m = qtyBefore.exec(tRaw)) !== null) addByName(m[2], parseInt(m[1], 10));
+  while ((m = qtyAfter.exec(tRaw)) !== null) addByName(m[1], parseInt(m[2], 10));
+
+  // 3) Nome simples (sem quantidade)
+  const words = Array.from(new Set(t.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 3)));
+  for (const it of items) {
+    const nameN = normalizeText(it.name || '');
+    const slugN = normalizeText(it.slug || '');
+    const hit = words.some(w => nameN.includes(w) || slugN.includes(w));
+    if (hit) removals.push({ product_id: it.id, qty: 1 });
+  }
+
+  // Normalizar removals por product_id
+  const mapRem: Record<string, number> = {};
+  removals.forEach(r => { mapRem[r.product_id] = (mapRem[r.product_id] || 0) + (r.qty || 1); });
+
+  // Aplicar remoção no selected_items
+  const mapSel: Record<string, number> = {};
+  selected.forEach(s => { mapSel[s.product_id] = (mapSel[s.product_id] || 0) + (s.qty || 1); });
+  for (const [pid, q] of Object.entries(mapRem)) {
+    if (mapSel[pid] != null) {
+      mapSel[pid] = Math.max(0, mapSel[pid] - q);
+      if (mapSel[pid] === 0) delete mapSel[pid];
+    }
+  }
+  const newSelected = Object.entries(mapSel).map(([product_id, qty]) => ({ product_id, qty }));
+  await saveContextData(supabase, userId, platform, { selected_items: newSelected });
+
+  // Resumo atualizado
+  const summary = await buildCartSummary(supabase, userId, platform);
+  try {
+    await supabase.from('ai_learning_insights').insert({
+      insight_type: 'cart_remove',
+      content: JSON.stringify({ message, removals: mapRem }),
+      effectiveness_score: 0.85,
+      usage_count: 1
+    });
+  } catch {}
+
+  if (!Object.keys(mapRem).length) {
+    return 'Entendi que queres remover, mas não consegui identificar quais itens. Diz por favor o número (ex: "tira o 2 e o 5") ou o nome do produto.';
+  }
+
+  const variants = [
+    'Removi do carrinho.\n',
+    'Prontinho, já tirei.\n',
+    'Feito! Removi esses itens.\n'
+  ];
+  const prefix = variants[Math.floor(Math.random() * variants.length)];
+  const suffix = selected.length && newSelected.length === 0 ? '\nO carrinho ficou vazio.' : '';
+  return `${prefix}${summary.text}${suffix}`;
 }
 
 async function tryHandleSelectionOrFinalize(message: string, userId: string, platform: string, supabase: any): Promise<string | null> {
