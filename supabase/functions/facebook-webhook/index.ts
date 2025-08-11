@@ -735,7 +735,7 @@ FORMATO QUANDO FALAR DE PRODUTOS (MESSENGER/INSTAGRAM):
 - Formato: "• Nome — 💰 PREÇO Kz — 1 benefício curto"
 - Destaque o PREÇO com o emoji 💰 e sufixo "Kz"
 - Seja conciso; evite parágrafos longos
-- Finalize com CTA: "Ver todos: https://superloja.vip/produtos"
+- Finalize com CTA: "Ver todos: https://superloja.vip/catalogo"
 - Tamanho alvo: até 900 caracteres no Facebook e 650 no Instagram (o sistema fragmenta se passar)
 `;
 

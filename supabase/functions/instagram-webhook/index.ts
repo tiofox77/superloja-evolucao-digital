@@ -559,7 +559,7 @@ FORMATO QUANDO FALAR DE PRODUTOS (INSTAGRAM):
 - Liste no máximo 4 itens, cada linha curto e claro
 - Formato de cada linha: "• Nome — 💰 PREÇO Kz — 1 benefício curto"
 - Deixe o PREÇO bem visível com o emoji 💰 e sufixo "Kz"
-- Após a lista, encerre com 1 linha de CTA: "Ver todos: https://superloja.vip/produtos"
+- Após a lista, encerre com 1 linha de CTA: "Ver todos: https://superloja.vip/catalogo"
 - Total da mensagem alvo: até 650 caracteres (para não quebrar em muitas partes)`;
 
   // Só mencionar produtos se o usuário perguntar especificamente sobre eles
@@ -569,7 +569,7 @@ FORMATO QUANDO FALAR DE PRODUTOS (INSTAGRAM):
     contextualInfo = `\n\n📦 PRODUTOS DISPONÍVEIS (mencione APENAS se o usuário perguntar sobre produtos):\n${products.slice(0, 4).map(p => {
   const price = parseFloat(p.price).toLocaleString('pt-AO');
   const stock = p.in_stock ? `✅ Disponível` : `❌ Indisponível`;
-  return `• ${p.name} — 💰 ${price} Kz — ${stock}`;
+  return `• ${p.name} — 💰 ${price} Kz — ${stock} — Ver: https://superloja.vip/produto/${p.slug || p.id}`;
 }).join('\n')}\n\n🌐 Catálogo completo: https://superloja.vip/produtos`;
   }
 
