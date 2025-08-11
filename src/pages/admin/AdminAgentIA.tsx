@@ -152,23 +152,66 @@ const AdminAgentIA = () => {
   // Funções de carregamento de dados
   const loadMetrics = async () => {
     try {
-      const { data: conversations } = await supabase
+      // Intervalo de HOJE (00:00:00 → 23:59:59) em ISO
+      const start = new Date(); start.setHours(0, 0, 0, 0);
+      const end = new Date(); end.setHours(23, 59, 59, 999);
+      const startISO = start.toISOString();
+      const endISO = end.toISOString();
+
+      // Mensagens de hoje
+      const { data: todayMsgs } = await supabase
         .from('ai_conversations')
-        .select('*');
+        .select('user_id, type, timestamp, message')
+        .gte('timestamp', startISO)
+        .lt('timestamp', endISO);
+
+      // Confiança média (média de confidence_score de hoje)
+      const { data: intents } = await supabase
+        .from('detected_intentions')
+        .select('confidence_score, created_at')
+        .gte('created_at', startISO)
+        .lt('created_at', endISO);
+
+      // Leads de hoje (com base no estágio da conversa)
+      const { data: contexts } = await supabase
+        .from('ai_conversation_context')
+        .select('user_id, context_data, last_interaction')
+        .gte('last_interaction', startISO)
+        .lt('last_interaction', endISO);
+
+      const totalMessages = todayMsgs?.length || 0;
+      const uniqueUsers = new Set((todayMsgs || []).map(c => c.user_id)).size;
+      const successfulInteractions = (todayMsgs || []).filter(c => c.type === 'sent').length;
       
-      if (conversations) {
-        const uniqueUsers = new Set(conversations.map(c => c.user_id)).size;
-        const receivedMessages = conversations.filter(c => c.type === 'received');
-        const sentMessages = conversations.filter(c => c.type === 'sent');
-        
-        setMetrics({
-          totalMessages: conversations.length,
-          uniqueUsers,
-          averageRating: 85, // Simulado
-          successfulInteractions: sentMessages.length,
-          leadsGenerated: Math.floor(uniqueUsers * 0.3) // Simulado
-        });
-      }
+      const avgConf = (intents && intents.length)
+        ? Math.round((intents.reduce((s, i) => s + (Number(i.confidence_score) || 0), 0) / intents.length) * 100)
+        : 0;
+
+      // Detectar leads por estágio no contexto e por mensagens de finalização hoje
+      const stageLeadUsers = new Set(
+        (contexts || []).filter(ctx => {
+          const stage = (ctx.context_data as any)?.conversationStage || '';
+          const hasSel = Array.isArray((ctx.context_data as any)?.selected_items) && ((ctx.context_data as any)?.selected_items.length > 0);
+          return ['confirmed_purchase','finalization','strong_interest'].includes(String(stage)) || hasSel;
+        }).map(ctx => ctx.user_id)
+      );
+
+      const finalizeRegex = /(finalizar|fechar pedido|concluir|encerrar|checkout|terminar|confirmar|pode fechar|pode finalizar|quero comprar|pagar)/i;
+      const finalizeLeadUsers = new Set(
+        (todayMsgs || [])
+          .filter(m => m.type === 'received' && finalizeRegex.test(String((m as any).message || '')))
+          .map(m => m.user_id)
+      );
+
+      const leadsGenerated = new Set<string>([...stageLeadUsers, ...finalizeLeadUsers]).size;
+
+      setMetrics({
+        totalMessages,
+        uniqueUsers,
+        averageRating: avgConf,
+        successfulInteractions,
+        leadsGenerated,
+      });
     } catch (error) {
       console.error('Erro ao carregar métricas:', error);
     }
