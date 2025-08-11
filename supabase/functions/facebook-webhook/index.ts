@@ -371,23 +371,7 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     
     console.log(`📨 Processando mensagem: "${messageText}"`);
     
-    // Detectar intenção de finalização de compra e responder com orientação do site
-    if (detectCheckoutIntent(messageText)) {
-      const advice = await buildCheckoutAdvice(messageText, supabase, platform);
-      await sendFacebookMessage(senderId, advice, supabase, platform);
-      responded = true;
-      await supabase.from('ai_conversations').insert({
-        platform: platform,
-        user_id: senderId,
-        message: advice,
-        type: 'sent',
-        timestamp: new Date().toISOString()
-      });
-      console.log('🧭 Intenção de checkout detectada e respondida.');
-      return;
-    }
-
-    // Detectar intenção de listar produtos (todos ou por categoria)
+    // 1) Listas: "ver todos" ou categoria
     const listResponse = await tryBuildProductsListResponse(messageText, senderId, platform, supabase);
     if (listResponse) {
       await sendFacebookMessage(senderId, listResponse, supabase, platform);
@@ -403,7 +387,7 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
       return;
     }
 
-    // Detectar seleção por número/nome/preço ou finalização com base na última lista
+    // 2) Seleção por número/nome/preço ou FINALIZAR com base na última lista
     const selectionOrFinalize = await tryHandleSelectionOrFinalize(messageText, senderId, platform, supabase);
     if (selectionOrFinalize) {
       await sendFacebookMessage(senderId, selectionOrFinalize, supabase, platform);
@@ -416,6 +400,22 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
         timestamp: new Date().toISOString()
       });
       console.log('🧾 Seleção/finalização processada com base na lista recente.');
+      return;
+    }
+
+    // 3) Intenção de finalizar (fallback geral)
+    if (detectCheckoutIntent(messageText)) {
+      const advice = await buildCheckoutAdvice(messageText, supabase, platform);
+      await sendFacebookMessage(senderId, advice, supabase, platform);
+      responded = true;
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: senderId,
+        message: advice,
+        type: 'sent',
+        timestamp: new Date().toISOString()
+      });
+      console.log('🧭 Intenção de checkout detectada (fallback) e respondida.');
       return;
     }
 
@@ -1350,14 +1350,18 @@ function detectSelectionIntent(text: string, hasRecentList: boolean): boolean {
   if (!text) return false;
   const t = text.toLowerCase();
   const hasNumber = /\b\d{1,3}\b/.test(t);
-  const keywords = ['quero', 'adicion', 'ficar', 'leva', 'escolh', 'pegar', 'reserv', 'coloca', 'met', 'por número', 'numero', 'nº', 'preço', 'preco'];
+  const keywords = ['quero', 'adicion', 'ficar', 'fico', 'leva', 'levo', 'escolh', 'pegar', 'reserv', 'coloca', 'met', 'por número', 'numero', 'nº', 'preço', 'preco', 'esses'];
   const byKeyword = keywords.some(k => t.includes(k));
   return hasRecentList && (hasNumber || byKeyword);
 }
 
 function detectFinalizeIntent(text: string): boolean {
   const t = (text || '').toLowerCase();
-  const patterns = ['finalizar', 'fechar pedido', 'concluir', 'encerrar', 'checkout', 'fechar compra'];
+  const patterns = [
+    'finalizar', 'fechar pedido', 'fechar compra', 'concluir', 'encerrar', 'checkout',
+    'terminar', 'confirmar', 'pode fechar', 'pode finalizar', 'vamos fechar', 'vamos finalizar',
+    'quero esses', 'fico com esses', 'levo esses', 'já escolhi', 'já decidi', 'pode avançar', 'avança com'
+  ];
   return patterns.some(p => t.includes(p));
 }
 
@@ -1439,6 +1443,13 @@ async function tryHandleSelectionOrFinalize(message: string, userId: string, pla
   const recent = !!last && (Date.now() - (last.timestamp || 0) < 2 * 60 * 60 * 1000); // 2h
 
   if (detectFinalizeIntent(message)) {
+    // Se o cliente colocou números/nome/preço na mesma frase de finalizar, capturar também
+    if (recent) {
+      const inlinePicks = parseSelectionFromMessage(message, last);
+      if (inlinePicks.length) {
+        await addSelectionsToContext(supabase, userId, platform, inlinePicks);
+      }
+    }
     const summary = await buildCartSummary(supabase, userId, platform);
     if (!summary.count) {
       return 'Para finalizar preciso saber o que queres. Podes responder com os números dos itens (ex: 2 e 5) ou pedir a lista novamente.';
