@@ -880,7 +880,28 @@ async function sendInstagramImage(recipientId: string, imageUrl: string, caption
   }
   
   console.log(`📸 Enviando imagem Instagram para ${recipientId}`);
-  console.log(`🖼️ URL da imagem: ${imageUrl}`);
+  console.log(`🖼️ URL original: ${imageUrl}`);
+  // Converter URLs do Supabase/publico para JPEG via serviço de renderização (IG não aceita .webp)
+  const toInstagramSafe = (url: string) => {
+    try {
+      const m = url.match(/^(https?:\/\/[^/]+)\/storage\/v1\/object\/public\/([^?]+)(?:\?[^#]*)?/i);
+      if (m) {
+        const origin = m[1];
+        const path = m[2];
+        const safe = `${origin}/storage/v1/render/image/public/${path}?width=1200&format=jpeg&quality=85`;
+        console.log('🔁 URL convertida para render JPEG:', safe);
+        return safe;
+      }
+      if (/\.webp(\?|$)/i.test(url)) {
+        const jpg = url.replace(/\.webp(\?|$)/i, '.jpg$1');
+        console.log('🔁 URL .webp ajustada para .jpg (pode não existir):', jpg);
+        return jpg;
+      }
+      return url;
+    } catch { return url; }
+  };
+  const processedUrl = toInstagramSafe(imageUrl);
+  console.log('🖼️ URL usada para envio:', processedUrl);
   
   try {
     const response = await fetch(
@@ -895,7 +916,7 @@ async function sendInstagramImage(recipientId: string, imageUrl: string, caption
             attachment: {
               type: 'image',
               payload: {
-                url: imageUrl,
+                url: processedUrl,
                 is_reusable: true
               }
             }
@@ -915,7 +936,7 @@ async function sendInstagramImage(recipientId: string, imageUrl: string, caption
       // Fallback 1: tentar upload via Attachment Upload API
       try {
         console.log('🖼️ Tentando método alternativo: Attachment Upload API');
-        const imgResp = await fetch(imageUrl);
+        const imgResp = await fetch(processedUrl);
         const imgBlob = await imgResp.blob();
         const form = new FormData();
         form.append('message', JSON.stringify({
