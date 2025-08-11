@@ -308,7 +308,16 @@ async function handleInstagramMessage(messaging: any, supabase: any) {
       timestamp: new Date().toISOString()
     });
     
-    await sendInstagramMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente!', supabase);
+    const fallback = 'Desculpe, tive um problema técnico. Tente novamente!';
+    await sendInstagramMessage(senderId, fallback, supabase);
+    await supabase.from('ai_conversations').insert({
+      platform: 'instagram',
+      user_id: senderId,
+      message: fallback,
+      type: 'sent',
+      timestamp: new Date().toISOString(),
+      metadata: { reason: 'error_fallback' }
+    });
   }
 }
 
@@ -814,7 +823,16 @@ async function handleInstagramImageRequest(senderId: string, messageText: string
     
   } catch (error) {
     console.error('❌ Erro ao enviar imagens Instagram:', error);
-    await sendInstagramMessage(senderId, 'Desculpe, tive um problema ao buscar as imagens. 😔', supabase);
+    const fallback = 'Desculpe, tive um problema ao buscar as imagens. 😔';
+    await sendInstagramMessage(senderId, fallback, supabase);
+    await supabase.from('ai_conversations').insert({
+      platform: 'instagram',
+      user_id: senderId,
+      message: fallback,
+      type: 'sent',
+      timestamp: new Date().toISOString(),
+      metadata: { reason: 'image_send_error' }
+    });
   }
 }
 

@@ -428,7 +428,16 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     
   } catch (error) {
     console.error('❌ Erro ao processar mensagem:', error);
-    await sendFacebookMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente!', supabase, platform);
+    const fallback = 'Desculpe, tive um problema técnico. Tente novamente!';
+    await sendFacebookMessage(senderId, fallback, supabase, platform);
+    await supabase.from('ai_conversations').insert({
+      platform: platform,
+      user_id: senderId,
+      message: fallback,
+      type: 'sent',
+      timestamp: new Date().toISOString(),
+      metadata: { reason: 'error_fallback' }
+    });
   }
 }
 
