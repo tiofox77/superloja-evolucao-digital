@@ -371,6 +371,22 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     
     console.log(`📨 Processando mensagem: "${messageText}"`);
     
+    // Detectar intenção de finalização de compra e responder com orientação do site
+    if (detectCheckoutIntent(messageText)) {
+      const advice = await buildCheckoutAdvice(messageText, supabase, platform);
+      await sendFacebookMessage(senderId, advice, supabase, platform);
+      responded = true;
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: senderId,
+        message: advice,
+        type: 'sent',
+        timestamp: new Date().toISOString()
+      });
+      console.log('🧭 Intenção de checkout detectada e respondida.');
+      return;
+    }
+    
     // Processar com IA humanizada e contextual
     const aiResponse = await processWithEnhancedAI(messageText, senderId, supabase);
     
@@ -1712,6 +1728,31 @@ async function buildMessageWithProductLink(
     console.warn('⚠️ buildMessageWithProductLink falhou:', (e as any)?.message);
   }
   return originalText;
+}
+
+// Detecta intenção de finalizar compra/pedido
+function detectCheckoutIntent(text: string): boolean {
+  const t = (text || '').toLowerCase();
+  const keywords = [
+    'finalizar compra','finalizar pedido','concluir compra','concluir pedido','fechar compra','fechar pedido','quero comprar','comprar agora','quero finalizar','checkout','pagar agora','confirmar pedido','finalizar no site','finalizar aqui','comprar pelo instagram','comprar pelo facebook','quero pagar','fazer o pagamento'
+  ];
+  return keywords.some(k => t.includes(k));
+}
+
+// Mensagem padrão incentivando finalizar no site e oferecendo finalizar pelo chat
+async function buildCheckoutAdvice(
+  userMessage: string,
+  supabase: any,
+  platform: 'facebook' | 'instagram' = 'facebook'
+): Promise<string> {
+  const base = `Perfeito! Vamos finalizar a tua compra.\n\nRecomendo concluir no nosso site para maior segurança e rapidez:\n• Pagamento 100% seguro\n• Acompanhamento do pedido em tempo real\n• Entrega priorizada\n• Promoções e cupões exclusivos\n\nPodes comprar pelo catálogo: https://superloja.vip/catalogo\n\nSe preferires finalizar por aqui, envia por favor:\n1) Nome completo\n2) Telefone/WhatsApp\n3) Endereço (bairro + referência)\n4) Artigo e quantidade\n5) Método de pagamento (Transferência/TPA/Contra-entrega)\n\nAssim que receber, um agente confirma tudo contigo. 🚀`;
+  // Tentar acrescentar link direto do produto, quando identificável
+  try {
+    const enriched = await buildMessageWithProductLink(base, '', userMessage, supabase);
+    return enriched;
+  } catch {
+    return base;
+  }
 }
 
 // Função para enviar mensagem com imagem como anexo via Upload API
