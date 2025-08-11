@@ -1529,9 +1529,24 @@ async function sendFacebookMessage(
     // Enviar imagens como attachments (quando presentes)
     for (const imageUrl of images) {
       try {
+        const normalizedUrl = platform === 'instagram'
+          ? (() => {
+              try {
+                const m = imageUrl.match(/^(https?:\/\/[^/]+)\/storage\/v1\/object\/public\/([^?]+)(?:\?[^#]*)?/i);
+                if (m) {
+                  const origin = m[1];
+                  const path = m[2];
+                  return `${origin}/storage/v1/render/image/public/${path}?width=1080&height=1350&resize=cover&format=jpeg&quality=85&background=ffffff`;
+                }
+                if (/\.(webp|png)(\?|$)/i.test(imageUrl)) return imageUrl.replace(/\.(webp|png)(\?|$)/i, '.jpg$2');
+                return imageUrl;
+              } catch { return imageUrl; }
+            })()
+          : imageUrl;
+
         const imagePayload: any = {
           recipient: { id: recipientId },
-          message: { attachment: { type: 'image', payload: { url: imageUrl, is_reusable: true } } },
+          message: { attachment: { type: 'image', payload: { url: normalizedUrl, is_reusable: true } } },
           messaging_type: 'RESPONSE'
         };
         if (platform === 'instagram') imagePayload.messaging_product = 'instagram';
@@ -1599,16 +1614,17 @@ async function sendFacebookMessageWithImage(
       return;
     }
 
-    // Normalizar URL p/ Instagram (evitar .webp)
+    // Normalizar URL p/ Instagram (forçar JPEG sRGB sem alpha)
     const toInstagramSafe = (url: string) => {
       try {
         const m = url.match(/^(https?:\/\/[^/]+)\/storage\/v1\/object\/public\/([^?]+)(?:\?[^#]*)?/i);
         if (m) {
           const origin = m[1];
           const path = m[2];
-          return `${origin}/storage/v1/render/image/public/${path}?width=1200&format=jpeg&quality=85`;
+          // Usa o render da Storage para converter para JPEG, cobrindo 1080x1350 e fundo branco
+          return `${origin}/storage/v1/render/image/public/${path}?width=1080&height=1350&resize=cover&format=jpeg&quality=85&background=ffffff`;
         }
-        if (/\.webp(\?|$)/i.test(url)) return url.replace(/\.webp(\?|$)/i, '.jpg$1');
+        if (/\.(webp|png)(\?|$)/i.test(url)) return url.replace(/\.(webp|png)(\?|$)/i, '.jpg$2');
         return url;
       } catch { return url; }
     };
