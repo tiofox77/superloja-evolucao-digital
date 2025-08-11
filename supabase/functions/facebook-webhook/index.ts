@@ -386,7 +386,23 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
       console.log('🧭 Intenção de checkout detectada e respondida.');
       return;
     }
-    
+
+    // Detectar intenção de listar produtos (todos ou por categoria)
+    const listResponse = await tryBuildProductsListResponse(messageText, supabase);
+    if (listResponse) {
+      await sendFacebookMessage(senderId, listResponse, supabase, platform);
+      responded = true;
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: senderId,
+        message: listResponse,
+        type: 'sent',
+        timestamp: new Date().toISOString()
+      });
+      console.log('🧾 Lista de produtos enviada (detecção automática).');
+      return;
+    }
+
     // Processar com IA humanizada e contextual
     const aiResponse = await processWithEnhancedAI(messageText, senderId, supabase);
     
@@ -1170,6 +1186,71 @@ async function performIntelligentProductSearch(message: string, context: any, su
   }
 
   return { products, productsInfo };
+}
+
+function detectListAllIntent(text: string): boolean {
+  const t = (text || '').toLowerCase();
+  const patterns = [
+    'lista completa', 'enviar lista completa', 'manda lista completa',
+    'pode enviar lista', 'ver todos', 'todos os produtos', 'catálogo completo',
+    'ver tudo', 'lista de tudo', 'mostrar tudo'
+  ];
+  return patterns.some(p => t.includes(p));
+}
+
+function detectCategoryRequest(text: string): { label: string; keywords: string[] } | null {
+  const t = (text || '').toLowerCase();
+  const categories: Record<string, string[]> = {
+    'Fones/Auriculares': ['fone', 'fones', 'auricular', 'auriculares', 'bluetooth', 'sem fio', 'wireless', 'tws'],
+    'Cabos': ['cabo', 'cabos', 'usb', 'type-c', 'type c', 'lightning', 'micro usb'],
+    'Carregadores/Fontes': ['carregador', 'carregadores', 'fonte', 'adaptador', 'charger'],
+    'Power Banks': ['powerbank', 'power bank', 'bateria externa'],
+    'Suportes/Tripés': ['suporte', 'tripé', 'tripe'],
+    'Periféricos': ['mouse', 'rato', 'teclado', 'keyboard'],
+    'Proteções': ['película', 'pelicula', 'capa', 'capas']
+  };
+  for (const [label, keywords] of Object.entries(categories)) {
+    if (keywords.some(k => t.includes(k))) {
+      return { label, keywords };
+    }
+  }
+  return null;
+}
+
+async function tryBuildProductsListResponse(message: string, supabase: any): Promise<string | null> {
+  const listAll = detectListAllIntent(message);
+  const categoryReq = detectCategoryRequest(message);
+  if (!listAll && !categoryReq) return null;
+
+  let header = '';
+  let query = supabase
+    .from('products')
+    .select('name, slug, price')
+    .eq('active', true)
+    .eq('in_stock', true)
+    .order('name', { ascending: true });
+
+  if (listAll) {
+    header = '🛍️ Lista completa de produtos';
+    query = query.limit(100);
+  } else if (categoryReq) {
+    header = `🛍️ Produtos de ${categoryReq.label}`;
+    const orCond = categoryReq.keywords.map(k => `name.ilike.%${k}%`).join(',');
+    query = query.or(orCond).limit(100);
+  }
+
+  const { data: products } = await query;
+  if (!products || products.length === 0) return 'Não encontrei itens para essa busca agora. Queres que eu verifique no site e te envie opções?';
+
+  let text = `${header} (total: ${products.length})\n\n`;
+  products.forEach((p: any, idx: number) => {
+    const price = parseFloat(p.price).toLocaleString('pt-AO');
+    text += `${idx + 1}. ${p.name} — ${price} Kz\n`;
+    text += `   Link: https://superloja.vip/produto/${p.slug}\n\n`;
+  });
+
+  text += 'Dica: clica nos links para ver fotos e detalhes. Para finalizar com segurança e rapidez, podes usar o site: https://superloja.vip/catalogo. Se quiseres, posso enviar imagens de algum específico.';
+  return text;
 }
 
 async function getFallbackResponse(message: string, supabase: any): Promise<string | any> {
