@@ -388,7 +388,7 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     }
 
     // Detectar intenção de listar produtos (todos ou por categoria)
-    const listResponse = await tryBuildProductsListResponse(messageText, supabase);
+    const listResponse = await tryBuildProductsListResponse(messageText, senderId, platform, supabase);
     if (listResponse) {
       await sendFacebookMessage(senderId, listResponse, supabase, platform);
       responded = true;
@@ -400,6 +400,22 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
         timestamp: new Date().toISOString()
       });
       console.log('🧾 Lista de produtos enviada (detecção automática).');
+      return;
+    }
+
+    // Detectar seleção por número/nome/preço ou finalização com base na última lista
+    const selectionOrFinalize = await tryHandleSelectionOrFinalize(messageText, senderId, platform, supabase);
+    if (selectionOrFinalize) {
+      await sendFacebookMessage(senderId, selectionOrFinalize, supabase, platform);
+      responded = true;
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: senderId,
+        message: selectionOrFinalize,
+        type: 'sent',
+        timestamp: new Date().toISOString()
+      });
+      console.log('🧾 Seleção/finalização processada com base na lista recente.');
       return;
     }
 
@@ -1217,7 +1233,7 @@ function detectCategoryRequest(text: string): { label: string; keywords: string[
   return null;
 }
 
-async function tryBuildProductsListResponse(message: string, supabase: any): Promise<string | null> {
+async function tryBuildProductsListResponse(message: string, userId: string, platform: string, supabase: any): Promise<string | null> {
   const listAll = detectListAllIntent(message);
   const categoryReq = detectCategoryRequest(message);
   if (!listAll && !categoryReq) return null;
@@ -1225,7 +1241,7 @@ async function tryBuildProductsListResponse(message: string, supabase: any): Pro
   let header = '';
   let query = supabase
     .from('products')
-    .select('name, slug, price')
+    .select('id, name, slug, price')
     .eq('active', true)
     .eq('in_stock', true)
     .order('name', { ascending: true });
@@ -1242,6 +1258,9 @@ async function tryBuildProductsListResponse(message: string, supabase: any): Pro
   const { data: products } = await query;
   if (!products || products.length === 0) return 'Não encontrei itens para essa busca agora. Queres que eu verifique no site e te envie opções?';
 
+  // Guardar lista no contexto do utilizador para permitir seleção por número/nome/preço
+  await saveLastListInContext(supabase, userId, platform, products);
+
   let text = `${header} (total: ${products.length})\n\n`;
   products.forEach((p: any, idx: number) => {
     const price = parseFloat(p.price).toLocaleString('pt-AO');
@@ -1249,8 +1268,157 @@ async function tryBuildProductsListResponse(message: string, supabase: any): Pro
     text += `   Link: https://superloja.vip/produto/${p.slug}\n\n`;
   });
 
-  text += 'Dica: clica nos links para ver fotos e detalhes. Para finalizar com segurança e rapidez, podes usar o site: https://superloja.vip/catalogo. Se quiseres, posso enviar imagens de algum específico.';
+  text += 'Como escolher: responda com o número (ex: 2 e 5), nome (ex: fone pro6) ou preço (ex: 3500 kz). Pode pedir vários. Para concluir diga "finalizar".\n\nDica: clica nos links para ver fotos e detalhes. Para finalizar com segurança e rapidez, podes usar o site: https://superloja.vip/catalogo.';
   return text;
+}
+
+// ===== Contexto de seleção no chat =====
+async function getContextRecord(supabase: any, userId: string, platform: string) {
+  const { data } = await supabase
+    .from('ai_conversation_context')
+    .select('id, context_data')
+    .eq('user_id', userId)
+    .eq('platform', platform)
+    .maybeSingle();
+  return data || null;
+}
+
+async function saveContextData(supabase: any, userId: string, platform: string, partial: any) {
+  const existing = await getContextRecord(supabase, userId, platform);
+  const now = new Date().toISOString();
+  const context = { ...(existing?.context_data || {}), ...partial, updatedAt: now };
+  if (existing?.id) {
+    await supabase
+      .from('ai_conversation_context')
+      .update({ context_data: context, last_interaction: now })
+      .eq('id', existing.id);
+  } else {
+    await supabase
+      .from('ai_conversation_context')
+      .insert({ user_id: userId, platform, context_data: context, last_interaction: now, message_count: 0 });
+  }
+}
+
+async function saveLastListInContext(supabase: any, userId: string, platform: string, products: any[]) {
+  const items = products.map((p: any, idx: number) => ({
+    index: idx + 1,
+    id: p.id,
+    name: p.name,
+    price: Number(p.price) || 0,
+    slug: p.slug
+  }));
+  await saveContextData(supabase, userId, platform, { last_list: { timestamp: Date.now(), items } });
+}
+
+function detectSelectionIntent(text: string, hasRecentList: boolean): boolean {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  const hasNumber = /\b\d{1,3}\b/.test(t);
+  const keywords = ['quero', 'adicion', 'ficar', 'leva', 'escolh', 'pegar', 'reserv', 'coloca', 'met', 'por número', 'numero', 'nº', 'preço', 'preco'];
+  const byKeyword = keywords.some(k => t.includes(k));
+  return hasRecentList && (hasNumber || byKeyword);
+}
+
+function detectFinalizeIntent(text: string): boolean {
+  const t = (text || '').toLowerCase();
+  const patterns = ['finalizar', 'fechar pedido', 'concluir', 'encerrar', 'checkout', 'fechar compra'];
+  return patterns.some(p => t.includes(p));
+}
+
+function parseSelectionFromMessage(message: string, lastList: any): { product_id: string; qty: number }[] {
+  const t = (message || '').toLowerCase();
+  const picks: { product_id: string; qty: number }[] = [];
+  const items = Array.isArray(lastList?.items) ? lastList.items : [];
+  if (!items.length) return picks;
+
+  // Seleção por número (ex: "2 e 5")
+  const idxs = Array.from(new Set(((t.match(/\b\d{1,3}\b/g) || []) as string[])
+    .map(n => parseInt(n, 10))
+    .filter(n => n >= 1 && n <= items.length)));
+  idxs.forEach(n => {
+    const it = items[n - 1];
+    if (it) picks.push({ product_id: it.id, qty: 1 });
+  });
+
+  // Seleção por nome (palavras com 4+ letras contidas no nome)
+  const words = t.split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 4);
+  items.forEach((it: any) => {
+    const name = (it.name || '').toLowerCase();
+    if (words.some(w => name.includes(w))) {
+      if (!picks.find(p => p.product_id === it.id)) picks.push({ product_id: it.id, qty: 1 });
+    }
+  });
+
+  // Seleção por preço aproximado (ex: 3500, 3.500)
+  const priceNums = (t.match(/\b\d{1,3}(?:[\.\s]?\d{3})+\b|\b\d{3,}\b/g) || []).map((s: string) => Number(s.replace(/\D/g, '')));
+  priceNums.forEach(val => {
+    let best: any = null;
+    items.forEach((it: any) => {
+      const diff = Math.abs((it.price || 0) - val);
+      if (best === null || diff < best.diff) best = { it, diff };
+    });
+    if (best && best.diff / Math.max(1, best.it.price || 1) <= 0.1) { // até 10% de diferença
+      if (!picks.find(p => p.product_id === best.it.id)) picks.push({ product_id: best.it.id, qty: 1 });
+    }
+  });
+
+  return picks;
+}
+
+async function addSelectionsToContext(supabase: any, userId: string, platform: string, selections: { product_id: string; qty: number }[]) {
+  const existing = await getContextRecord(supabase, userId, platform);
+  const selected = Array.isArray(existing?.context_data?.selected_items) ? existing!.context_data.selected_items : [];
+  const map: Record<string, number> = {};
+  selected.forEach((s: any) => { map[s.product_id] = (map[s.product_id] || 0) + (s.qty || 1); });
+  selections.forEach(s => { map[s.product_id] = (map[s.product_id] || 0) + (s.qty || 1); });
+  const merged = Object.entries(map).map(([product_id, qty]) => ({ product_id, qty }));
+  await saveContextData(supabase, userId, platform, { selected_items: merged });
+}
+
+async function buildCartSummary(supabase: any, userId: string, platform: string): Promise<{ text: string; total: number; count: number }> {
+  const ctx = await getContextRecord(supabase, userId, platform);
+  const itemsSel: any[] = Array.isArray(ctx?.context_data?.selected_items) ? ctx!.context_data.selected_items : [];
+  const last: any = ctx?.context_data?.last_list || { items: [] };
+  let total = 0;
+  let lines: string[] = [];
+  for (const s of itemsSel) {
+    let item = (last.items || []).find((it: any) => it.id === s.product_id);
+    if (!item) {
+      const { data } = await supabase.from('products').select('id,name,price,slug').eq('id', s.product_id).maybeSingle();
+      if (data) item = { id: data.id, name: data.name, price: Number(data.price)||0, slug: data.slug };
+    }
+    if (item) {
+      const lineTotal = (s.qty || 1) * (item.price || 0);
+      total += lineTotal;
+      lines.push(`${s.qty || 1}x ${item.name} — ${(lineTotal).toLocaleString('pt-AO')} Kz`);
+    }
+  }
+  const text = lines.length ? `Carrinho atual:\n- ${lines.join('\n- ')}\nTotal: ${total.toLocaleString('pt-AO')} Kz` : 'Ainda não há itens selecionados.';
+  return { text, total, count: lines.length };
+}
+
+async function tryHandleSelectionOrFinalize(message: string, userId: string, platform: string, supabase: any): Promise<string | null> {
+  const ctx = await getContextRecord(supabase, userId, platform);
+  const last = ctx?.context_data?.last_list;
+  const recent = !!last && (Date.now() - (last.timestamp || 0) < 2 * 60 * 60 * 1000); // 2h
+
+  if (detectFinalizeIntent(message)) {
+    const summary = await buildCartSummary(supabase, userId, platform);
+    if (!summary.count) {
+      return 'Para finalizar preciso saber o que queres. Podes responder com os números dos itens (ex: 2 e 5) ou pedir a lista novamente.';
+    }
+    return `${summary.text}\n\nPerfeito! Acabei de notificar e vou acompanhar o teu pedido por aqui. Se preferires concluir com mais rapidez e segurança, podes finalizar no site: https://superloja.vip/catalogo (pagamento seguro, mais opções de entrega, histórico do pedido).`;
+  }
+
+  if (!detectSelectionIntent(message, recent)) return null;
+  if (!recent) return 'Manda "lista completa" ou o nome da categoria (ex: fones, cabos) para eu te mostrar as opções e poderes escolher por número.';
+
+  const picks = parseSelectionFromMessage(message, last);
+  if (!picks.length) return 'Não consegui identificar os itens. Tenta com os números da lista (ex: 1, 3 e 7) ou o nome exato.';
+
+  await addSelectionsToContext(supabase, userId, platform, picks);
+  const summary = await buildCartSummary(supabase, userId, platform);
+  return `Adicionado ✅\n${summary.text}\n\nPodes responder com mais números para adicionar outros itens, ou digitar "finalizar" quando estiver pronto.`;
 }
 
 async function getFallbackResponse(message: string, supabase: any): Promise<string | any> {
