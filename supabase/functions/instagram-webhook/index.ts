@@ -911,8 +911,56 @@ async function sendInstagramImage(recipientId: string, imageUrl: string, caption
       console.log('📨 Message ID:', result.message_id);
       await sendInstagramMessage(recipientId, caption, supabase);
     } else {
-      console.error('❌ Erro ao enviar imagem Instagram:', result);
-      await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Imagem: ${imageUrl}`, supabase);
+      console.error('❌ Erro ao enviar imagem Instagram (método URL direto):', result);
+      // Fallback 1: tentar upload via Attachment Upload API
+      try {
+        console.log('🖼️ Tentando método alternativo: Attachment Upload API');
+        const imgResp = await fetch(imageUrl);
+        const imgBlob = await imgResp.blob();
+        const form = new FormData();
+        form.append('message', JSON.stringify({
+          attachment: { type: 'image', payload: { is_reusable: true } }
+        }));
+        form.append('filedata', imgBlob, 'image.jpg');
+
+        const uploadRes = await fetch(`https://graph.facebook.com/v21.0/me/message_attachments?access_token=${PAGE_ACCESS_TOKEN}`, {
+          method: 'POST',
+          body: form
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          console.log('✅ Upload ok, attachment_id:', uploadData.attachment_id);
+
+          const msgRes = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipient: { id: recipientId },
+              messaging_type: 'RESPONSE',
+              message: {
+                attachment: { type: 'image', payload: { attachment_id: uploadData.attachment_id } }
+              }
+            })
+          });
+
+          if (msgRes.ok) {
+            console.log('✅ Imagem enviada via attachment_id');
+            await sendInstagramMessage(recipientId, caption, supabase);
+          } else {
+            const msgErr = await msgRes.text();
+            console.error('❌ Erro ao enviar mensagem com attachment_id:', msgErr);
+            await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Imagem: ${imageUrl}`, supabase);
+          }
+        } else {
+          const upErr = await uploadRes.text();
+          console.error('❌ Erro no upload de imagem:', upErr);
+          await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Imagem: ${imageUrl}`, supabase);
+        }
+      } catch (fallbackErr) {
+        console.error('❌ Falha no método alternativo (Attachment Upload):', fallbackErr);
+        await sendInstagramMessage(recipientId, `${caption}\n\n🖼️ Link da imagem: ${imageUrl}`, supabase);
+      }
     }
     
   } catch (error) {
