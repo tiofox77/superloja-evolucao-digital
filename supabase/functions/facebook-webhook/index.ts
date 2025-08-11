@@ -398,7 +398,7 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
         console.error('Erro ao processar imagem:', imageError);
         // Se falhar, enviar apenas texto
         const responseText = aiResponse.message;
-        await sendFacebookMessage(senderId, responseText, supabase);
+        await sendFacebookMessage(senderId, responseText, supabase, platform);
         
         await supabase.from('ai_conversations').insert({
           platform: platform,
@@ -411,7 +411,7 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     } else {
       // Resposta normal sem imagem
       const responseText = typeof aiResponse === 'object' ? aiResponse.message : aiResponse;
-      await sendFacebookMessage(senderId, responseText, supabase);
+      await sendFacebookMessage(senderId, responseText, supabase, platform);
       
       // Salvar resposta enviada
       await supabase.from('ai_conversations').insert({
@@ -428,7 +428,7 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     
   } catch (error) {
     console.error('❌ Erro ao processar mensagem:', error);
-    await sendFacebookMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente!', supabase);
+    await sendFacebookMessage(senderId, 'Desculpe, tive um problema técnico. Tente novamente!', supabase, platform);
   }
 }
 
@@ -1371,138 +1371,148 @@ ${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
   }
 }
 
-async function sendFacebookMessage(recipientId: string, messageText: string, supabase: any) {
+async function sendFacebookMessage(
+  recipientId: string,
+  messageText: string,
+  supabase: any,
+  platform: 'facebook' | 'instagram' = 'facebook'
+) {
   try {
-    const { data: pageTokenData } = await supabase
-      .from('ai_settings')
-      .select('value')
-      .eq('key', 'facebook_page_token')
-      .single();
+    // Escolha de token por plataforma com fallbacks
+    let pageAccessToken: string | null = null;
+    if (platform === 'instagram') {
+      const { data: igToken } = await supabase
+        .from('ai_settings')
+        .select('value')
+        .eq('key', 'instagram_page_token')
+        .maybeSingle();
+      pageAccessToken = igToken?.value || null;
+    }
 
-    const pageAccessToken = pageTokenData?.value || Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
-    
     if (!pageAccessToken) {
-      console.error('❌ Facebook Page Access Token não encontrado');
+      const { data: fbToken } = await supabase
+        .from('ai_settings')
+        .select('value')
+        .eq('key', 'facebook_page_token')
+        .maybeSingle();
+      pageAccessToken = fbToken?.value || Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN') || null;
+    }
+
+    if (!pageAccessToken) {
+      console.error('❌ Page Access Token não encontrado para', platform);
       return;
     }
 
     const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`;
-    
-    // Verificar se a mensagem contém imagens
+
+    // Sanitização: remover markdown e normalizar
+    const normalizeText = (text: string) =>
+      (text || '')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1: $2') // [txt](url) -> txt: url
+        .replace(/\s+$/g, '')
+        .replace(/\n{3,}/g, '\n\n');
+
+    // Detectar marcações de imagem específicas do nosso formato
     const imageRegex = /📸 !\[Imagem\]\(([^)]+)\)/g;
-    const images = [];
-    let match;
-    
+    const images: string[] = [];
+    let match: RegExpExecArray | null;
     while ((match = imageRegex.exec(messageText)) !== null) {
       images.push(match[1]);
     }
-    
-    // Remover markdown de imagem do texto
-    const cleanText = messageText.replace(/📸 !\[Imagem\]\([^)]+\)/g, '').trim();
-    
-    // Enviar texto primeiro (com fragmentação segura)
-    if (cleanText) {
-      const MAX_LEN = 900; // margem segura abaixo do limite de 1.000
-      const splitIntoChunks = (text: string, maxLen = MAX_LEN): string[] => {
-        const chunks: string[] = [];
-        if (!text) return chunks;
-        const clean = text.replace(/\s+$/g, '').replace(/\n{3,}/g, '\n\n');
-        const sentences = clean.split(/(?<=[.!?])\s+/);
-        let buf = '';
-        for (const s of sentences) {
-          if (s.length > maxLen) {
-            if (buf) { chunks.push(buf); buf = ''; }
-            for (let i = 0; i < s.length; i += maxLen) {
-              chunks.push(s.slice(i, i + maxLen));
-            }
-            continue;
+
+    // Texto limpo sem marcações de imagem
+    const cleanText = normalizeText(messageText.replace(/📸 !\[Imagem\]\([^)]+\)/g, '').trim());
+
+    // Fragmentação segura (limites mais conservadores no Instagram)
+    const BASE_MAX = platform === 'instagram' ? 700 : 900;
+
+    const splitIntoChunks = (text: string, maxLen = BASE_MAX): string[] => {
+      const chunks: string[] = [];
+      if (!text) return chunks;
+      const clean = normalizeText(text);
+      const sentences = clean.split(/(?<=[.!?])\s+/);
+      let buf = '';
+      for (const s of sentences) {
+        if (s.length > maxLen) {
+          if (buf) { chunks.push(buf); buf = ''; }
+          for (let i = 0; i < s.length; i += maxLen) {
+            chunks.push(s.slice(i, i + maxLen));
           }
-          if ((buf + (buf ? ' ' : '') + s).length <= maxLen) {
-            buf = buf ? buf + ' ' + s : s;
-          } else {
-            if (buf) chunks.push(buf);
-            buf = s;
-          }
+          continue;
         }
-        if (buf) chunks.push(buf);
-        if (chunks.length === 0) {
-          for (let i = 0; i < clean.length; i += maxLen) {
-            chunks.push(clean.slice(i, i + maxLen));
-          }
-        }
-        return chunks;
+        const candidate = buf ? `${buf} ${s}` : s;
+        if (candidate.length <= maxLen) buf = candidate; else { if (buf) chunks.push(buf); buf = s; }
+      }
+      if (buf) chunks.push(buf);
+      if (chunks.length === 0) {
+        for (let i = 0; i < clean.length; i += maxLen) chunks.push(clean.slice(i, i + maxLen));
+      }
+      return chunks;
+    };
+
+    // Envio robusto com re-fragmentação caso ocorra erro 100 (comprimento)
+    const sendPart = async (text: string, prefix: string) => {
+      const payload = {
+        recipient: { id: recipientId },
+        message: { text: `${prefix}${text}` },
+        messaging_type: 'RESPONSE',
       };
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('❌ Erro ao enviar texto', platform, ':', errText);
+        try {
+          const errJson = JSON.parse(errText);
+          const code = errJson?.error?.code;
+          const subcode = errJson?.error?.error_subcode;
+          const msg = errJson?.error?.message || '';
+          // Janela de 24h expirada → parar
+          if (code === 10 && subcode === 2018278) return { stop: true } as const;
+          // Comprimento acima do permitido → tentar com limite menor
+          if (code === 100 || /1000 caracteres|1,000 caracteres|length/i.test(msg)) {
+            console.warn('⚠️ Comprimento rejeitado. Tentando com limite menor...');
+            const smallerChunks = splitIntoChunks(text, Math.max(450, Math.floor(BASE_MAX / 2)));
+            for (let i = 0; i < smallerChunks.length; i++) {
+              const r = await sendPart(smallerChunks[i], smallerChunks.length > 1 ? `(cont ${i + 1}/${smallerChunks.length}) ` : '');
+              if ((r as any)?.stop) return { stop: true } as const;
+              if (i < smallerChunks.length - 1) await new Promise(r => setTimeout(r, 800));
+            }
+            return { ok: true } as const;
+          }
+        } catch {}
+        return { ok: false } as const;
+      }
+      return { ok: true } as const;
+    };
 
-      const parts = splitIntoChunks(cleanText, MAX_LEN);
-      console.log(`✂️ Fragmentando texto em ${parts.length} parte(s)`);
-
+    // Enviar texto em partes
+    if (cleanText) {
+      const parts = splitIntoChunks(cleanText, BASE_MAX);
+      console.log(`✂️ Fragmentando (${platform}) em ${parts.length} parte(s)`);
       for (let i = 0; i < parts.length; i++) {
         const prefix = parts.length > 1 ? `(${i + 1}/${parts.length}) ` : '';
-        const textPayload = {
-          recipient: { id: recipientId },
-          message: { text: `${prefix}${parts[i]}` },
-          messaging_type: 'RESPONSE'
-        };
-
-        const textResponse = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(textPayload),
-        });
-
-        if (!textResponse.ok) {
-          const errText = await textResponse.text();
-          console.error('❌ Erro ao enviar texto Facebook:', errText);
-          try {
-            const errJson = JSON.parse(errText);
-            const code = errJson?.error?.code;
-            const subcode = errJson?.error?.error_subcode;
-            if (code === 10 && subcode === 2018278) {
-              console.error('⏱️ Janela de 24h expirada para este usuário. Parando envio de partes.');
-              break;
-            }
-          } catch {}
-        } else {
-          console.log(`✅ Texto enviado (parte ${i + 1}/${parts.length})`);
-        }
-
-        if (i < parts.length - 1) {
-          await new Promise((r) => setTimeout(r, 800));
-        }
+        const result = await sendPart(parts[i], prefix);
+        if ((result as any)?.stop) { console.warn('⏹️ Parando envio por política de 24h'); break; }
+        if (i < parts.length - 1) await new Promise(r => setTimeout(r, 800));
       }
     }
-    
-    // Enviar imagens como attachments
+
+    // Enviar imagens como attachments (quando presentes)
     for (const imageUrl of images) {
       try {
         const imagePayload = {
           recipient: { id: recipientId },
-          message: {
-            attachment: {
-              type: 'image',
-              payload: {
-                url: imageUrl,
-                is_reusable: true
-              }
-            }
-          }
+          message: { attachment: { type: 'image', payload: { url: imageUrl, is_reusable: true } } }
         };
-
-        const imageResponse = await fetch(`https://graph.facebook.com/v18.0/me/messages?access_token=${FACEBOOK_PAGE_ACCESS_TOKEN}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(imagePayload)
-        });
-
+        const imageResponse = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${pageAccessToken}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(imagePayload) });
         if (!imageResponse.ok) {
-          console.error('❌ Erro ao enviar imagem Facebook:', await imageResponse.text());
+          console.error('❌ Erro ao enviar imagem', platform, ':', await imageResponse.text());
         } else {
-          console.log('✅ Imagem enviada para Facebook');
+          console.log('✅ Imagem enviada');
         }
-      } catch (error) {
-        console.error('❌ Erro ao enviar imagem via URL:', error);
+      } catch (err) {
+        console.error('❌ Erro ao enviar imagem via URL:', err);
       }
     }
   } catch (error) {

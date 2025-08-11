@@ -639,45 +639,35 @@ async function sendInstagramMessage(recipientId: string, message: string, supaba
   let PAGE_ACCESS_TOKEN: string | null = null;
   let tokenSource = 'none';
 
-  // Utilitário: divide texto em blocos seguros para a API (<= 900 chars)
-  const MAX_LEN = 900; // margem de segurança abaixo do limite de 1.000
-  function splitIntoChunks(text: string, maxLen = MAX_LEN): string[] {
+  // Normalizador para evitar rejeições por formatação/links
+  const normalizeText = (text: string) =>
+    (text || '')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1: $2') // [txt](url) -> txt: url
+      .replace(/\s+$/g, '')
+      .replace(/\n{3,}/g, '\n\n');
+
+  // Utilitário: divide texto em blocos seguros (limite conservador p/ Instagram)
+  const BASE_MAX = 700; // abaixo de 1.000 e com margem extra para headers/encoding
+  function splitIntoChunks(text: string, maxLen = BASE_MAX): string[] {
     const chunks: string[] = [];
     if (!text) return chunks;
 
-    // Normaliza espaços
-    const clean = text.replace(/\s+$/g, '').replace(/\n{3,}/g, '\n\n');
-
-    // Primeiro tenta por frases
+    const clean = normalizeText(text);
     const sentences = clean.split(/(?<=[.!?])\s+/);
     let buf = '';
     for (const s of sentences) {
-      // Se a frase sozinha já é maior que o limite, quebra por slices
       if (s.length > maxLen) {
-        // despeja o buffer atual
-        if (buf) {
-          chunks.push(buf);
-          buf = '';
-        }
-        for (let i = 0; i < s.length; i += maxLen) {
-          chunks.push(s.slice(i, i + maxLen));
-        }
+        if (buf) { chunks.push(buf); buf = ''; }
+        for (let i = 0; i < s.length; i += maxLen) chunks.push(s.slice(i, i + maxLen));
         continue;
       }
-      if ((buf + (buf ? ' ' : '') + s).length <= maxLen) {
-        buf = buf ? buf + ' ' + s : s;
-      } else {
-        if (buf) chunks.push(buf);
-        buf = s;
-      }
+      const candidate = buf ? `${buf} ${s}` : s;
+      if (candidate.length <= maxLen) buf = candidate; else { if (buf) chunks.push(buf); buf = s; }
     }
     if (buf) chunks.push(buf);
 
-    // Garantia extra caso nada tenha sido gerado
     if (chunks.length === 0) {
-      for (let i = 0; i < clean.length; i += maxLen) {
-        chunks.push(clean.slice(i, i + maxLen));
-      }
+      for (let i = 0; i < clean.length; i += maxLen) chunks.push(clean.slice(i, i + maxLen));
     }
 
     return chunks;
@@ -733,59 +723,54 @@ async function sendInstagramMessage(recipientId: string, message: string, supaba
   console.log(`📤 Enviando mensagem Instagram para ${recipientId}`);
   console.log(`🔑 Token source: ${tokenSource}`);
 
+  // Envio robusto com fallback automático
+  const sendPart = async (text: string, prefix: string) => {
+    const payload = {
+      recipient: { id: recipientId },
+      message: { text: `${prefix}${text}` }
+    };
+    const resp = await fetch(
+      `https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+    );
+
+    const result = await resp.json();
+    if (!resp.ok) {
+      console.error('❌ Erro Instagram API:', JSON.stringify(result));
+      const code = result?.error?.code;
+      const subcode = result?.error?.error_subcode;
+      const msg = result?.error?.message || '';
+
+      if (code === 10 && subcode === 2018278) {
+        console.error('⏱️ Janela de 24h expirou. Parando.');
+        return { stop: true } as const;
+      }
+      // Tamanho excessivo: re-fragmentar com limite menor
+      if (code === 100 || /1000 caracteres|1,000 caracteres|comprimento/i.test(msg)) {
+        console.warn('⚠️ Rejeitada por comprimento. Tentando com chunks menores...');
+        const smaller = splitIntoChunks(text, Math.max(400, Math.floor(BASE_MAX / 2)));
+        for (let i = 0; i < smaller.length; i++) {
+          const r = await sendPart(smaller[i], smaller.length > 1 ? `(cont ${i + 1}/${smaller.length}) ` : '');
+          if ((r as any)?.stop) return { stop: true } as const;
+          if (i < smaller.length - 1) await new Promise(r => setTimeout(r, 800));
+        }
+        return { ok: true } as const;
+      }
+      return { ok: false } as const;
+    }
+    console.log('✅ Mensagem Instagram enviada');
+    return { ok: true } as const;
+  };
+
   // Faz o chunking e envia sequencialmente
-  const parts = splitIntoChunks(message, MAX_LEN);
+  const parts = splitIntoChunks(message, BASE_MAX);
   console.log(`✂️ Chunking: ${parts.length} parte(s); tamanho 1ª parte: ${parts[0]?.length || 0}`);
 
   for (let i = 0; i < parts.length; i++) {
     const prefix = parts.length > 1 ? `(${i + 1}/${parts.length}) ` : '';
-    const text = `${prefix}${parts[i]}`;
-    console.log(`➡️ Enviando parte ${i + 1}/${parts.length} (${text.length} chars)`);
-
-    try {
-      const resp = await fetch(
-        `https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipient: { id: recipientId },
-            message: { text }
-          }),
-        }
-      );
-
-      const result = await resp.json();
-
-      if (resp.ok) {
-        console.log('✅ Mensagem Instagram enviada com sucesso!');
-        console.log('📨 Message ID:', result.message_id);
-      } else {
-        console.error('❌ Erro Instagram API:', JSON.stringify(result));
-        const code = result?.error?.code;
-        const subcode = result?.error?.error_subcode;
-        const msg = result?.error?.message || '';
-
-        if (code === 100 || /superior a 1\.000 caracteres|1000 caracteres/i.test(msg)) {
-          console.error('⚠️ Rejeitada por tamanho, mas já enviamos em blocos. Verifique conteúdo.');
-        }
-
-        if (code === 10 && subcode === 2018278) {
-          console.error('⏱️ Janela de 24h expirou para este usuário. Não é possível enviar mensagem padrão.');
-          // Não tenta enviar as próximas partes
-          break;
-        }
-      }
-
-      // Pequeno delay para manter a ordem e evitar rate limit
-      if (i < parts.length - 1) {
-        await new Promise((r) => setTimeout(r, 800));
-      }
-    } catch (err) {
-      console.error('❌ ERRO COMPLETO ao enviar mensagem Instagram:', err);
-      console.error('👤 Recipient:', recipientId);
-      // Prossegue para a próxima parte, mas loga
-    }
+    const r = await sendPart(parts[i], prefix);
+    if ((r as any)?.stop) break;
+    if (i < parts.length - 1) await new Promise((rr) => setTimeout(rr, 800));
   }
 }
 
