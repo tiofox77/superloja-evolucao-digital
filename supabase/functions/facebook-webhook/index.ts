@@ -1396,7 +1396,7 @@ async function sendFacebookMessage(
   platform: 'facebook' | 'instagram' = 'facebook'
 ) {
   try {
-    // Escolha de token por plataforma com fallbacks
+    // Escolha de token por plataforma (sem fallback cruzado)
     let pageAccessToken: string | null = null;
     if (platform === 'instagram') {
       const { data: igToken } = await supabase
@@ -1405,9 +1405,11 @@ async function sendFacebookMessage(
         .eq('key', 'instagram_page_token')
         .maybeSingle();
       pageAccessToken = igToken?.value || null;
-    }
-
-    if (!pageAccessToken) {
+      if (!pageAccessToken) {
+        console.error('❌ Instagram Page Access Token não configurado');
+        return;
+      }
+    } else {
       const { data: fbToken } = await supabase
         .from('ai_settings')
         .select('value')
@@ -1559,7 +1561,7 @@ async function sendFacebookMessageWithImage(
   originalUrl?: string
 ) {
   try {
-    // Obter token conforme a plataforma
+    // Obter token conforme a plataforma (sem fallback cruzado)
     let PAGE_ACCESS_TOKEN: string | null = null;
     if (platform === 'instagram') {
       const { data: igToken } = await supabase
@@ -1568,8 +1570,11 @@ async function sendFacebookMessageWithImage(
         .eq('key', 'instagram_page_token')
         .maybeSingle();
       PAGE_ACCESS_TOKEN = igToken?.value || null;
-    }
-    if (!PAGE_ACCESS_TOKEN) {
+      if (!PAGE_ACCESS_TOKEN) {
+        console.error('❌ Instagram Page Access Token não configurado');
+        return;
+      }
+    } else {
       const { data: fbToken } = await supabase
         .from('ai_settings')
         .select('value')
@@ -1597,6 +1602,9 @@ async function sendFacebookMessageWithImage(
       } catch { return url; }
     };
 
+    // Decidir se devemos enviar texto após imagem (apenas Facebook)
+    const shouldSendTextAfterImage = platform === 'facebook' && !!(text && text.trim());
+
     // Método A: enviar por URL (mais simples/robusto)
     if (originalUrl) {
       const safeUrl = platform === 'instagram' ? toInstagramSafe(originalUrl) : originalUrl;
@@ -1610,7 +1618,7 @@ async function sendFacebookMessageWithImage(
       });
       if (urlRes.ok) {
         console.log('✅ Imagem enviada via URL');
-        if (text?.trim()) { await new Promise(r => setTimeout(r, 800)); await sendFacebookMessage(recipientId, text, supabase, platform); }
+        if (shouldSendTextAfterImage) { await new Promise(r => setTimeout(r, 800)); await sendFacebookMessage(recipientId, text, supabase, platform); }
         return;
       } else {
         const err = await urlRes.text();
@@ -1643,7 +1651,7 @@ async function sendFacebookMessageWithImage(
       });
       if (messageResponse.ok) {
         console.log('✅ Imagem enviada via Upload API');
-        if (text?.trim()) { await new Promise(r => setTimeout(r, 800)); await sendFacebookMessage(recipientId, text, supabase, platform); }
+        if (shouldSendTextAfterImage) { await new Promise(r => setTimeout(r, 800)); await sendFacebookMessage(recipientId, text, supabase, platform); }
         return;
       } else {
         const errorData = await messageResponse.text();
