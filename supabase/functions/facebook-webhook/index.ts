@@ -1707,8 +1707,8 @@ async function sendFacebookMessageWithImage(
       } catch { return url; }
     };
 
-    // Decidir se devemos enviar texto após imagem (apenas Facebook)
-    const shouldSendTextAfterImage = platform === 'facebook' && !!(text && text.trim());
+    // Decidir se devemos enviar texto após imagem (todas plataformas)
+    const shouldSendTextAfterImage = !!(text && text.trim());
 
     // Método A: enviar por URL (preferido para Facebook e Instagram)
     if (originalUrl) {
