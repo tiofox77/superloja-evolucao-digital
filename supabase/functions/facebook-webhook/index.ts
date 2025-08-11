@@ -423,21 +423,22 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
         const imageBase64 = await blobToBase64(imageBlob);
         
         // Enviar texto + imagem (passando plataforma e URL original)
-        await sendFacebookMessageWithImage(senderId, aiResponse.message, imageBase64, supabase, platform, aiResponse.image_url);
+        const messageWithLink = await buildMessageWithProductLink(aiResponse.message, aiResponse.image_url, messageText, supabase);
+        await sendFacebookMessageWithImage(senderId, messageWithLink, imageBase64, supabase, platform, aiResponse.image_url);
         responded = true;
         
         // Salvar resposta enviada
         await supabase.from('ai_conversations').insert({
           platform: platform,
           user_id: senderId,
-          message: aiResponse.message,
+          message: messageWithLink,
           type: 'sent',
           timestamp: new Date().toISOString()
         });
       } catch (imageError) {
         console.error('Erro ao processar imagem:', imageError);
         // Se falhar, enviar apenas texto
-        const responseText = aiResponse.message;
+        const responseText = await buildMessageWithProductLink(aiResponse.message, aiResponse.image_url, messageText, supabase);
         await sendFacebookMessage(senderId, responseText, supabase, platform);
         
         await supabase.from('ai_conversations').insert({
@@ -1654,6 +1655,63 @@ async function blobToBase64(blob: Blob): Promise<string> {
     binary += String.fromCharCode(uint8Array[i]);
   }
   return btoa(binary);
+}
+
+// Helper: acrescenta link do produto ao texto quando possível
+async function buildMessageWithProductLink(
+  originalText: string,
+  imageUrl: string,
+  userMessage: string,
+  supabase: any
+): Promise<string> {
+  try {
+    if (!originalText) return originalText;
+    if (/superloja\.vip/i.test(originalText)) return originalText; // já contém link
+
+    // Tentar mapear pelo nome do ficheiro da imagem principal
+    let filename = '';
+    try {
+      const u = new URL(imageUrl);
+      const pathParts = u.pathname.split('/');
+      filename = (pathParts[pathParts.length - 1] || '').split('?')[0];
+    } catch {}
+
+    let slug: string | null = null;
+    if (filename) {
+      const { data: matchByImage } = await supabase
+        .from('products')
+        .select('slug, image_url')
+        .ilike('image_url', `%${filename}%`)
+        .limit(1);
+      if (matchByImage && matchByImage.length > 0) slug = matchByImage[0].slug;
+    }
+
+    // Se não encontrou por imagem, tentar por palavra-chave da mensagem do usuário
+    if (!slug && userMessage) {
+      const lower = (userMessage || '').toLowerCase();
+      const specific: Record<string, string[]> = {
+        't19': ['t19', 't 19', 'disney'],
+        'x83': ['x83', 'x 83'],
+        'pro6': ['pro6', 'pro 6', 'tws']
+      };
+      const key = Object.keys(specific).find(k => specific[k].some(v => lower.includes(v)));
+      if (key) {
+        const { data: byName } = await supabase
+          .from('products')
+          .select('slug')
+          .ilike('name', `%${key}%`)
+          .limit(1);
+        if (byName && byName.length > 0) slug = byName[0].slug;
+      }
+    }
+
+    if (slug) {
+      return `${originalText}\n\nLink do produto: https://superloja.vip/produto/${slug}`;
+    }
+  } catch (e) {
+    console.warn('⚠️ buildMessageWithProductLink falhou:', (e as any)?.message);
+  }
+  return originalText;
 }
 
 // Função para enviar mensagem com imagem como anexo via Upload API
