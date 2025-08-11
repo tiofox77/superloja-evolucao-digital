@@ -1616,14 +1616,15 @@ async function sendFacebookMessageWithImage(
     // Decidir se devemos enviar texto após imagem (apenas Facebook)
     const shouldSendTextAfterImage = platform === 'facebook' && !!(text && text.trim());
 
-    // Método A: enviar por URL (mais simples/robusto)
-    if (originalUrl && platform !== 'instagram') {
+    // Método A: enviar por URL (preferido para Facebook e Instagram)
+    if (originalUrl) {
       const safeUrl = platform === 'instagram' ? toInstagramSafe(originalUrl) : originalUrl;
-      const payload = {
+      const payload: any = {
         recipient: { id: recipientId },
         messaging_type: 'RESPONSE',
         message: { attachment: { type: 'image', payload: { url: safeUrl, is_reusable: true } } }
       };
+      if (platform === 'instagram') payload.messaging_product = 'instagram';
       const urlRes = await fetch(`https://graph.facebook.com/v21.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
@@ -1676,36 +1677,43 @@ async function sendFacebookMessageWithImage(
     }
 
     // Fallback final
-    if (text?.trim()) await sendFacebookMessage(recipientId, text + ' (imagem indisponível)', supabase, platform);
+    if (text?.trim()) {
+      const fallbackText = platform === 'instagram' ? text : text + ' (imagem indisponível)';
+      await sendFacebookMessage(recipientId, fallbackText, supabase, platform);
+    }
 
   } catch (error) {
     console.error('❌ Erro no envio de imagem:', error);
-    if (text?.trim()) await sendFacebookMessage(recipientId, text + ' (erro ao anexar imagem)', supabase, platform);
+    if (text?.trim()) {
+      const fallbackText = platform === 'instagram' ? text : text + ' (erro ao anexar imagem)';
+      await sendFacebookMessage(recipientId, fallbackText, supabase, platform);
+    }
   }
 }
-async function checkAndNotifyAdmin(userMessage: string, aiResponse: string, userId: string, supabase: any) {
+async function checkAndNotifyAdmin(userMessage: string, aiResponse: any, userId: string, supabase: any) {
   const triggers = [
     'entrega fora', 'entrega provincia', 'entrega nas provincia',
     'não sei', 'não tenho certeza', 'deixa-me contactar',
     'equipa especializada', 'informações mais precisas', 'orçamento',
     'problema técnico', 'não funciona'
   ];
-  
+  const aiText = typeof aiResponse === 'string'
+    ? aiResponse
+    : (aiResponse && typeof aiResponse.message === 'string')
+      ? aiResponse.message
+      : '';
   const shouldNotify = triggers.some(trigger => 
-    userMessage.toLowerCase().includes(trigger) || 
-    aiResponse.toLowerCase().includes(trigger)
+    (userMessage || '').toLowerCase().includes(trigger) || 
+    (aiText || '').toLowerCase().includes(trigger)
   );
-  
   if (shouldNotify) {
     console.log('🔔 Notificando admin - necessita ajuda especializada');
-    
     try {
       await supabase.from('admin_notifications').insert({
         admin_user_id: 'admin',
         notification_type: 'user_needs_help',
-        message: `Usuário ${userId} precisa de ajuda especializada. Mensagem: "${userMessage}". Resposta IA: "${aiResponse.substring(0, 200)}..."`
+        message: `Usuário ${userId} precisa de ajuda especializada. Mensagem: "${userMessage}". Resposta IA: "${(aiText || '').substring(0, 200)}..."`
       });
-      
       console.log('✅ Admin notificado - ajuda especializada');
     } catch (error) {
       console.error('❌ Erro ao notificar admin:', error);
