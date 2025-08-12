@@ -494,6 +494,28 @@ para verificar se os serviços estão rodando`);
     }
   };
 
+  const listOpenAIModels = async () => {
+    try {
+      toast.info('Listando modelos da OpenAI...');
+      const { data, error } = await supabase.functions.invoke('test-openai', {
+        body: { mode: 'list' }
+      });
+      if (error) throw error;
+      if (data?.success) {
+        const featured = Array.isArray(data.featured) ? data.featured.join(', ') : '—';
+        const sample = Array.isArray(data.models) ? data.models.slice(0, 10).map((m: any) => m.id).join(', ') : '';
+        alert(`Modelos em destaque: ${featured}\nTotal: ${data.total}${sample ? `\nEx.: ${sample}` : ''}`);
+        toast.success(`Encontrados ${data.total} modelos`);
+      } else {
+        toast.error('Falha ao listar modelos');
+        console.error('Resposta da função:', data);
+      }
+    } catch (error: any) {
+      console.error('Erro ao listar modelos:', error);
+      toast.error(error.message || 'Erro ao listar modelos');
+    }
+  };
+
   const handleKnowledgeBaseToggle = async (enabled: boolean) => {
     setKnowledgeBaseEnabled(enabled);
     
@@ -1338,6 +1360,13 @@ para verificar se os serviços estão rodando`);
                     <div className="text-center">
                       <Bot className="h-6 w-6 mx-auto mb-1" />
                       <div className="text-sm font-medium">Testar OpenAI</div>
+                    </div>
+                  </Button>
+
+                  <Button variant="outline" className="h-16" onClick={listOpenAIModels}>
+                    <div className="text-center">
+                      <Bot className="h-6 w-6 mx-auto mb-1" />
+                      <div className="text-sm font-medium">Listar Modelos OpenAI</div>
                     </div>
                   </Button>
                   
