@@ -13,10 +13,16 @@ serve(async (req) => {
   }
 
   try {
-    const { api_key, model = 'gpt-4o-mini' } = await req.json();
+    const { api_key, model = 'gpt-4o-mini', mode = 'test' } = await req.json();
 
-    if (!api_key) {
+    const apiKey = api_key || Deno.env.get('OPENAI_API_KEY');
+    if (!apiKey) {
       throw new Error('API key é obrigatória');
+    }
+
+    if (mode === 'list') {
+      const list = await listOpenAIModels(apiKey);
+      return new Response(JSON.stringify({ success: true, ...list }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     console.log(`🧪 Testando modelo OpenAI: ${model}`);
@@ -25,7 +31,7 @@ serve(async (req) => {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${api_key}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -120,4 +126,28 @@ function getModelInfo(model: string) {
     pricing: 'Variável',
     recommended_for: 'Verificar documentação OpenAI'
   };
+}
+
+async function listOpenAIModels(apiKey: string) {
+  const res = await fetch('https://api.openai.com/v1/models', {
+    headers: { 'Authorization': `Bearer ${apiKey}` }
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    console.error('❌ Erro ao listar modelos:', data);
+    throw new Error(data.error?.message || 'Erro ao listar modelos');
+  }
+  const entries = (data.data || [])
+    .map((m: any) => ({ id: m.id, owned_by: m.owned_by }))
+    .sort((a: any, b: any) => a.id.localeCompare(b.id));
+  const featuredSet = new Set([
+    'gpt-4.1-2025-04-14',
+    'gpt-4o',
+    'gpt-4o-mini',
+    'o3-2025-04-16',
+    'o4-mini-2025-04-16',
+    'gpt-image-1'
+  ]);
+  const featured = entries.filter((m: any) => featuredSet.has(m.id)).map((m: any) => m.id);
+  return { mode: 'list', total: entries.length, models: entries, featured };
 }
