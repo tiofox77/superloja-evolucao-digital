@@ -374,12 +374,13 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     // 1) Listas: "ver todos" ou categoria
     const listResponse = await tryBuildProductsListResponse(messageText, senderId, platform, supabase);
     if (listResponse) {
-      await sendFacebookMessage(senderId, listResponse, supabase, platform);
+      const msgOut = await humanizeTextResponse(listResponse, messageText, supabase, platform);
+      await sendFacebookMessage(senderId, msgOut, supabase, platform);
       responded = true;
       await supabase.from('ai_conversations').insert({
         platform: platform,
         user_id: senderId,
-        message: listResponse,
+        message: msgOut,
         type: 'sent',
         timestamp: new Date().toISOString()
       });
@@ -540,14 +541,15 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     } else {
       // Resposta normal sem imagem
       const responseText = typeof aiResponse === 'object' ? aiResponse.message : aiResponse;
-      await sendFacebookMessage(senderId, responseText, supabase, platform);
+      const msgOut = await humanizeTextResponse(responseText, messageText, supabase, platform);
+      await sendFacebookMessage(senderId, msgOut, supabase, platform);
       responded = true;
       
       // Salvar resposta enviada
       await supabase.from('ai_conversations').insert({
         platform: platform,
         user_id: senderId,
-        message: responseText,
+        message: msgOut,
         type: 'sent',
         timestamp: new Date().toISOString()
       });
@@ -559,12 +561,13 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
   } catch (error) {
     console.error('❌ Erro ao processar mensagem:', error);
     if (!responded) {
-      const fallback = 'Desculpe, tive um problema técnico. Tente novamente!';
-      await sendFacebookMessage(senderId, fallback, supabase, platform);
+      const clarify = 'Tive um probleminha técnico. Queres que eu mostre a lista, remover algo do carrinho, comparar opções ou finalizar? Ex.: "ver fones", "tirar 2", "comparar x83 e pro6" ou "finalizar".';
+      const msgOut = await humanizeTextResponse(clarify, messageText, supabase, platform);
+      await sendFacebookMessage(senderId, msgOut, supabase, platform);
       await supabase.from('ai_conversations').insert({
         platform: platform,
         user_id: senderId,
-        message: fallback,
+        message: msgOut,
         type: 'sent',
         timestamp: new Date().toISOString(),
         metadata: { reason: 'error_fallback' }
@@ -1886,15 +1889,13 @@ async function getFallbackResponse(message: string, supabase: any): Promise<stri
     console.error('❌ Erro buscar produtos populares:', error);
   }
 
-  // Fallback padrão humanizado
-  const fallbackResponses = [
-    `${greeting}! Carlos aqui da SuperLoja! 😊 Como posso ajudar hoje?`,
-    `Olá! Bem-vindo à SuperLoja! Sou o Carlos e estou aqui para encontrar o produto perfeito para você.`,
-    `${greeting}! É um prazer ter você aqui na SuperLoja! Em que posso ser útil?`
+  // Fallback de esclarecimento (pergunta aberta + exemplos de resposta)
+  const clarifyOptions = [
+    `${greeting}! Só para te atender certinho: quer ver fotos, remover algo do carrinho, comparar opções ou finalizar a compra?`,
+    `${greeting}! Diz-me, preferes que eu mostre a lista, retire algum item do carrinho, explique diferenças ou já finalize?`
   ];
-
-  return fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)] + 
-         `\n\nVisite nosso site: https://superloja.vip\nWhatsApp: 939729902`;
+  const examples = `Exemplos: "foto do pro6", "tirar 2", "comparar x83 e pro6", "finalizar".`;
+  return `${clarifyOptions[Math.floor(Math.random()*clarifyOptions.length)]}\n${examples}`;
 }
 
 function detectPurchaseIntent(customerMessage: string, aiResponse: string): string | null {

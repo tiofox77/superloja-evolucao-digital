@@ -381,17 +381,13 @@ function getFallbackResponse(message: string, context: any): any {
     }
   }
   
-  // Saudações variadas padrão
-  const greetings = [
-    "Meu estimado! Como posso auxiliá-lo na SuperLoja hoje?",
-    "Bem-vindo à SuperLoja! À sua disposição para ajudar",
-    "Prezado cliente, sou o SuperBot! Em que posso ser útil?",
-    "Boa! Recomendo vivamente conhecer nossos produtos. Como posso ajudar?",
-    "Companheiro, sempre às ordens! O que procura hoje?",
-    "Excelente! Está no lugar certo para tecnologia. Como posso auxiliar?"
+  // Fallback de esclarecimento: fazer pergunta e dar exemplos
+  const clarify = [
+    'Para eu te ajudar certinho: quer ver fotos, remover algo do carrinho, comparar opções ou finalizar?',
+    'Preferes que eu mostre a lista, retire algum item, explique diferenças ou finalize a compra?'
   ];
-  
-  return greetings[Math.floor(Math.random() * greetings.length)] + " 🛍️";
+  const examples = 'Exemplos: "ver fones", "tirar 2", "comparar x83 e pro6", "finalizar".';
+  return `${clarify[Math.floor(Math.random()*clarify.length)]}\n${examples}`;
 }
 
 // Função para analisar padrões de resposta
