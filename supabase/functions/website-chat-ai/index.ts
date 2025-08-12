@@ -122,6 +122,29 @@ async function processWebsiteChat(
   // 6. Salvar conversa
   await saveConversation(userId, message, 'user', supabase);
   
+  // 6.1. Atalho inteligente: pedido de foto/imagem
+  if (isImageRequest(message) && products && products.length > 0) {
+    const product = products.find((p: any) => p.image_url) || products[0];
+    if (product?.image_url) {
+      const isAvailable = (product.in_stock === true) && ((product.stock_quantity ?? 0) > 0);
+      const stockInfo = isAvailable ? 'disponível' : 'atualmente sem stock';
+      const imageResponses = [
+        'Aqui está a imagem que solicitou, meu estimado!',
+        'Prezado cliente, confira a foto do produto:',
+        'Veja só que maravilha!',
+        'Olhe que produto incrível!'
+      ];
+      const randomResponse = imageResponses[Math.floor(Math.random() * imageResponses.length)];
+      const directAiResponse = {
+        message: `${randomResponse} ${product.name} por ${product.price} AOA (${stockInfo}) 🛍️`,
+        image_url: product.image_url,
+        attach_image: true
+      };
+      await saveConversation(userId, directAiResponse.message, 'assistant', supabase);
+      return directAiResponse;
+    }
+  }
+  
   // 7. Processar com IA
   const aiResponse = await callOpenAI(message, {
     products,
@@ -141,8 +164,8 @@ async function processWebsiteChat(
 async function searchRelevantProducts(query: string, supabase: any) {
   const { data: products } = await supabase
     .from('products')
-    .select('id, name, price, description, category, image_url, stock')
-    .or(`name.ilike.%${query}%,description.ilike.%${query}%,category.ilike.%${query}%`)
+    .select('id, name, price, description, image_url, in_stock, stock_quantity, slug')
+    .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
     .eq('active', true)
     .limit(5);
     
@@ -192,7 +215,7 @@ INFORMAÇÕES DA EMPRESA:
 
 PRODUTOS DISPONÍVEIS:
 ${context.products.map(p => 
-  `• ${p.name} - ${p.price} AOA - ${p.description} (Stock: ${p.stock || 0}) - Imagem: ${p.image_url || 'sem imagem'}`
+  `• ${p.name} - ${p.price} AOA - ${p.description || ''} (Stock: ${typeof p.stock_quantity === 'number' ? p.stock_quantity : (p.in_stock ? 'disponível' : 'indisponível')}) - Imagem: ${p.image_url || 'sem imagem'}`
 ).join('\n')}
 
 HISTÓRICO DA CONVERSA:
@@ -207,7 +230,7 @@ LOCALIZAÇÃO DO USUÁRIO:
 ${context.userLocation || 'Não identificada'}
 
 INSTRUÇÕES CRÍTICAS PARA IMAGENS:
-- Quando o cliente pedir "imagem", "foto", "mostrar", "ver foto", "quero ver" de um produto
+- Quando o cliente pedir "imagem", "foto", "mostrar", "ver foto", "quero ver", "manda", "mandar", "envia", "enviar"
 - RESPONDA EXATAMENTE neste formato JSON:
 {"message": "Sua resposta em português angolano", "image_url": "url_da_imagem_do_produto", "attach_image": true}
 - Use APENAS produtos da lista acima que tenham image_url
@@ -285,50 +308,65 @@ PADRÃO ANTI-REPETIÇÃO:
 function getFallbackResponse(message: string, context: any): any {
   const lowerMessage = message.toLowerCase();
   
-  // Respostas para solicitação de imagens
-  if (lowerMessage.includes('imagem') || lowerMessage.includes('foto') || lowerMessage.includes('ver foto') || lowerMessage.includes('mostrar')) {
-    if (context.products.length > 0) {
-      const product = context.products[0];
-      const stockInfo = product.stock > 0 ? "disponível" : "atualmente sem stock";
+  // Respostas para solicitação de imagens (mais abrangente)
+  if (
+    lowerMessage.includes('imagem') ||
+    lowerMessage.includes('foto') ||
+    lowerMessage.includes('ver foto') ||
+    lowerMessage.includes('ver imagem') ||
+    lowerMessage.includes('mostrar') ||
+    lowerMessage.includes('mostra') ||
+    lowerMessage.includes('manda') ||
+    lowerMessage.includes('mandar') ||
+    lowerMessage.includes('envia') ||
+    lowerMessage.includes('enviar')
+  ) {
+    if (context.products && context.products.length > 0) {
+      const product = context.products.find((p: any) => p.image_url) || context.products[0];
+      const isAvailable = (product?.in_stock === true) && ((product?.stock_quantity ?? 0) > 0);
+      const stockInfo = isAvailable ? 'disponível' : 'atualmente sem stock';
       
       const imageResponses = [
-        "Aqui está a imagem que solicitou, meu estimado! ",
-        "Prezado cliente, confira a foto do produto: ",
-        "Veja só que maravilha! ",
-        "Olhe que produto incrível! "
+        'Aqui está a imagem que solicitou, meu estimado! ',
+        'Prezado cliente, confira a foto do produto: ',
+        'Veja só que maravilha! ',
+        'Olhe que produto incrível! '
       ];
       
       const randomResponse = imageResponses[Math.floor(Math.random() * imageResponses.length)];
       
       // Retorna com formato especial para anexar imagem
-      return {
-        message: `${randomResponse}${product.name} por ${product.price} AOA (${stockInfo}) 🛍️`,
-        image_url: product.image_url,
-        attach_image: true
-      };
+      if (product?.image_url) {
+        return {
+          message: `${randomResponse}${product.name} por ${product.price} AOA (${stockInfo}) 🛍️`,
+          image_url: product.image_url,
+          attach_image: true
+        };
+      }
     }
   }
 
   // Respostas variadas para produtos
   if (lowerMessage.includes('produto') || lowerMessage.includes('comprar')) {
     const productResponses = [
-      "Meu estimado, temos produtos incríveis! ",
-      "Prezado cliente, recomendo vivamente nossos ",
-      "Companheiro, vai adorar nossos ",
-      "Excelente escolha! Temos "
+      'Meu estimado, temos produtos incríveis! ',
+      'Prezado cliente, recomendo vivamente nossos ',
+      'Companheiro, vai adorar nossos ',
+      'Excelente escolha! Temos '
     ];
     
-    if (context.products.length > 0) {
+    if (context.products && context.products.length > 0) {
       const product = context.products[0];
-      const stockInfo = product.stock > 0 ? "disponível" : "atualmente sem stock";
+      const isAvailable = (product?.in_stock === true) && ((product?.stock_quantity ?? 0) > 0);
+      const stockInfo = isAvailable ? 'disponível' : 'atualmente sem stock';
       const randomResponse = productResponses[Math.floor(Math.random() * productResponses.length)];
       return `${randomResponse}${product.name} por ${product.price} AOA (${stockInfo}) 🛍️`;
     }
     
     const catalogResponses = [
-      "Meu estimado, veja nosso catálogo em https://superloja.vip! Eletrônicos de qualidade com entrega rápida 📱",
-      "Prezado cliente, recomendo visitar https://superloja.vip! Produtos tecnológicos à sua disposição 🔥",
-      "Companheiro, não vai se arrepender! Catálogo completo em https://superloja.vip 📲"
+      'Meu estimado, veja nosso catálogo em https://superloja.vip! Eletrônicos de qualidade com entrega rápida 📱',
+      'Prezado cliente, recomendo visitar https://superloja.vip! Produtos tecnológicos à sua disposição 🔥',
+      'Companheiro, não vai se arrepender! Catálogo completo em https://superloja.vip 📲'
     ];
     return catalogResponses[Math.floor(Math.random() * catalogResponses.length)];
   }
@@ -336,9 +374,9 @@ function getFallbackResponse(message: string, context: any): any {
   // Respostas variadas para conta
   if (lowerMessage.includes('conta') || lowerMessage.includes('registro')) {
     const accountResponses = [
-      "Meu estimado, crie conta grátis e ganhe 10% desconto! Sempre às ordens → https://superloja.vip/register 👤",
-      "Prezado cliente, recomendo vivamente criar conta! Ofertas exclusivas esperando → https://superloja.vip/register ✨",
-      "Excelente ideia! Conta grátis + descontos especiais → https://superloja.vip/register 🎯"
+      'Meu estimado, crie conta grátis e ganhe 10% desconto! Sempre às ordens → https://superloja.vip/register 👤',
+      'Prezado cliente, recomendo vivamente criar conta! Ofertas exclusivas esperando → https://superloja.vip/register ✨',
+      'Excelente ideia! Conta grátis + descontos especiais → https://superloja.vip/register 🎯'
     ];
     return accountResponses[Math.floor(Math.random() * accountResponses.length)];
   }
@@ -346,9 +384,9 @@ function getFallbackResponse(message: string, context: any): any {
   // Respostas variadas para entrega
   if (lowerMessage.includes('entrega') || lowerMessage.includes('envio')) {
     const deliveryResponses = [
-      "Com todo o prazer! Entregamos em todo Angola: 1-3 dias Luanda, 3-7 dias províncias 🚚",
-      "À sua disposição! Entrega rápida em Angola toda. Frete grátis acima de 15.000 AOA 📦",
-      "Sempre às ordens! Cobrimos Angola inteiro com entrega express 🚛"
+      'Com todo o prazer! Entregamos em todo Angola: 1-3 dias Luanda, 3-7 dias províncias 🚚',
+      'À sua disposição! Entrega rápida em Angola toda. Frete grátis acima de 15.000 AOA 📦',
+      'Sempre às ordens! Cobrimos Angola inteiro com entrega express 🚛'
     ];
     return deliveryResponses[Math.floor(Math.random() * deliveryResponses.length)];
   }
@@ -356,9 +394,9 @@ function getFallbackResponse(message: string, context: any): any {
   // Respostas variadas para pagamento
   if (lowerMessage.includes('pagamento')) {
     const paymentResponses = [
-      "Meu estimado, aceitamos: Transferência, Multicaixa, TPA, Visa/Mastercard. Pagamento 100% seguro 💳",
-      "Prezado cliente, várias opções: Banco, Multicaixa Express, cartões. Tudo protegido 🔒",
-      "Fixe mesmo! Multicaixa, transferência, TPA na entrega, cartões internacionais 💰"
+      'Meu estimado, aceitamos: Transferência, Multicaixa, TPA, Visa/Mastercard. Pagamento 100% seguro 💳',
+      'Prezado cliente, várias opções: Banco, Multicaixa Express, cartões. Tudo protegido 🔒',
+      'Fixe mesmo! Multicaixa, transferência, TPA na entrega, cartões internacionais 💰'
     ];
     return paymentResponses[Math.floor(Math.random() * paymentResponses.length)];
   }
@@ -366,17 +404,17 @@ function getFallbackResponse(message: string, context: any): any {
   // Respostas variadas para ajuda
   if (lowerMessage.includes('ajuda') || lowerMessage.includes('problema')) {
     const helpResponses = [
-      "Com todo o prazer! Nossa equipe está à disposição: WhatsApp +244 923 456 789 📞",
-      "Sempre às ordens! Suporte direto: https://superloja.vip/suporte ou WhatsApp +244 923 456 789 🆘",
-      "Meu estimado, estamos aqui para ajudar! Contacte-nos já 💬"
+      'Com todo o prazer! Nossa equipe está à disposição: WhatsApp +244 923 456 789 📞',
+      'Sempre às ordens! Suporte direto: https://superloja.vip/suporte ou WhatsApp +244 923 456 789 🆘',
+      'Meu estimado, estamos aqui para ajudar! Contacte-nos já 💬'
     ];
     return helpResponses[Math.floor(Math.random() * helpResponses.length)];
   }
   
-  // Respostas variadas para publicidade
+  // Respostas para publicidade
   if (lowerMessage.includes('publicidade') || lowerMessage.includes('produtos') || lowerMessage.includes('ver mais')) {
-    if (context.products.length > 0) {
-      const resumo = context.products.slice(0, 3).map(p => `• ${p.name} - ${p.price} AOA`).join('\n');
+    if (context.products && context.products.length > 0) {
+      const resumo = context.products.slice(0, 3).map((p: any) => `• ${p.name} - ${p.price} AOA`).join('\n');
       return `Meu estimado, aqui estão algumas opções:\n${resumo}\n\nQuer ver lista completa? À sua disposição! 🛍️`;
     }
   }
@@ -388,6 +426,16 @@ function getFallbackResponse(message: string, context: any): any {
   ];
   const examples = 'Exemplos: "ver fones", "tirar 2", "comparar x83 e pro6", "finalizar".';
   return `${clarify[Math.floor(Math.random()*clarify.length)]}\n${examples}`;
+}
+
+// Detector simples de intenção de imagem
+function isImageRequest(text: string): boolean {
+  const t = text.toLowerCase();
+  const keywords = [
+    'imagem', 'foto', 'ver foto', 'ver imagem', 'mostrar', 'mostra',
+    'manda', 'mandar', 'envia', 'enviar', 'foto do', 'foto da', 'quero ver'
+  ];
+  return keywords.some(k => t.includes(k));
 }
 
 // Função para analisar padrões de resposta
