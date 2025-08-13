@@ -65,74 +65,44 @@ function App() {
       <SettingsProvider>
         <LayoutProvider>
           <CartProvider>
-        <Router>
-          <ScrollToTop />
-          <div className="min-h-screen bg-background pb-16 md:pb-0">
-            <SEOHead />
-            <AnalyticsTracker />
-            <PWAInstallPrompt />
-            <Suspense fallback={<div>Loading...</div>}>
-              <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/catalogo" element={<Catalogo />} />
-              <Route path="/produto/:slug" element={<Produto />} />
-              <Route path="/categorias" element={<Categorias />} />
-              <Route path="/saude-bem-estar" element={<SaudeBemEstar />} />
-              <Route path="/sobre" element={<Sobre />} />
-              <Route path="/contato" element={<Contato />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/termos-uso" element={<TermosUso />} />
-              <Route path="/politica-privacidade" element={<PoliticaPrivacidade />} />
-              <Route path="/politica-devolucao" element={<PoliticaDevolucao />} />
-              <Route path="/solicitar-produto" element={<SolicitarProduto />} />
-              <Route path="/leiloes" element={<Leiloes />} />
-              <Route path="/leilao/:slug" element={<LeilaoDetalhes />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/cliente" element={<Cliente />} />
-              <Route path="/fatura/:orderId" element={<Fatura />} />
-              
-              {/* Admin Routes */}
-              <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<Admin />} />
-                <Route path="produtos" element={<AdminProdutos />} />
-                <Route path="categorias" element={<AdminCategorias />} />
-                <Route path="pedidos" element={<AdminPedidos />} />
-                <Route path="usuarios" element={<AdminUsuarios />} />
-                <Route path="perfil" element={<AdminPerfil />} />
-                <Route path="upload" element={<AdminUpload />} />
-                <Route path="pos" element={<AdminPOS />} />
-                <Route path="configuracoes" element={<AdminConfiguracoes />} />
-                <Route path="promocoes" element={<AdminPromocoes />} />
-                <Route path="relatorios" element={<AdminRelatorios />} />
-                <Route path="relatorios-produtos" element={<AdminRelatoriosProdutos />} />
-                <Route path="layout" element={<AdminLayoutEditor />} />
-                <Route path="pwa" element={<AdminPWA />} />
-                <Route path="meta" element={<AdminMeta />} />
-                <Route path="leiloes" element={<AdminLeiloes />} />
-                <Route path="leiloes-bids" element={<AdminLeiloesBids />} />
-                <Route path="criar-leilao" element={<AdminCriarLeilao />} />
-                <Route path="solicitacoes" element={<AdminSolicitacoes />} />
-                <Route path="paginas-estaticas" element={<AdminPaginasEstaticas />} />
-                <Route path="logs" element={<AdminLogs />} />
-                <Route path="banner-gerador" element={<AdminBannerGerador />} />
-                <Route path="catalogo-produtos" element={<AdminCatalogoProdutos />} />
-                <Route path="analytics" element={<AdminAnalytics />} />
-                <Route path="catalogo-gerado" element={<CatalogPage />} />
-                <Route path="agente-ia" element={<AdminAgentIA />} />
-                <Route path="auto-post-ia" element={<AdminAutoPostIA />} />
-                <Route path="coordenadas-bancarias" element={<BankSettings />} />
-              </Route>
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            </Suspense>
-            <MobileNavbar />
-          </div>
-          <Toaster />
-        </Router>
-      </CartProvider>
-      </LayoutProvider>
+            <Router>
+              <ScrollToTop />
+              <div className="min-h-screen bg-background pb-16 md:pb-0">
+                <SEOHead />
+                <AnalyticsTracker />
+                <PWAInstallPrompt />
+                <Suspense fallback={<div>Loading...</div>}>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/catalogo" element={<Catalogo />} />
+                    <Route path="/produto/:slug" element={<Produto />} />
+                    <Route path="/categorias" element={<Categorias />} />
+                    <Route path="/sobre" element={<Sobre />} />
+                    <Route path="/checkout" element={<Checkout />} />
+                    <Route path="/contato" element={<Contato />} />
+                    <Route path="/saude-bem-estar" element={<SaudeBemEstar />} />
+                    <Route path="/admin" element={<AdminLayout />}>
+                      <Route index element={<Admin />} />
+                      <Route path="produtos" element={<AdminProdutos />} />
+                      <Route path="categorias" element={<AdminCategorias />} />
+                      <Route path="configuracoes" element={<AdminConfiguracoes />} />
+                      <Route path="agente-ia" element={<AdminAgentIA />} />
+                      <Route path="analytics" element={<AdminAnalytics />} />
+                      <Route path="pwa" element={<AdminPWA />} />
+                      <Route path="usuarios" element={<AdminUsuarios />} />
+                      <Route path="pedidos" element={<AdminPedidos />} />
+                      <Route path="relatorios" element={<AdminRelatorios />} />
+                      <Route path="logs" element={<AdminLogs />} />
+                    </Route>
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+                <MobileNavbar />
+              </div>
+              <Toaster />
+            </Router>
+          </CartProvider>
+        </LayoutProvider>
       </SettingsProvider>
     </HelmetProvider>
   );
