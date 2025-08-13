@@ -19,7 +19,13 @@ const LayoutContext = createContext<LayoutContextType>({
   getLayoutSetting: () => null
 });
 
-export const useLayout = () => useContext(LayoutContext);
+export const useLayout = () => {
+  const context = useContext(LayoutContext);
+  if (!context) {
+    throw new Error('useLayout deve ser usado dentro de um LayoutProvider');
+  }
+  return context;
+};
 
 export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [layoutSettings, setLayoutSettings] = useState<LayoutSettings>({});
