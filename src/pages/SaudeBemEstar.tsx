@@ -11,7 +11,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useCart } from '@/contexts/CartContext';
 import { 
   Heart, 
   User, 
@@ -73,15 +72,7 @@ const SaudeBemEstar = () => {
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
   const [sortBy, setSortBy] = useState('name');
-const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  const { addToCart, isLoading, setIsOpen } = useCart();
-
-  const handleAddToCart = (productId: string) => {
-    console.log('Clicou no carrinho - Product ID:', productId);
-    addToCart(productId);
-    setIsOpen(true);
-  };
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -606,18 +597,10 @@ const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
                           {/* Actions */}
                           <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                             <div className="flex gap-2">
-                              <Button size="sm" variant="secondary" className="h-8 w-8 p-0" asChild>
-                                <Link to={`/produto/${product.slug}`} aria-label="Ver detalhes">
-                                  <Eye className="w-4 h-4" />
-                                </Link>
+                              <Button size="sm" variant="secondary" className="h-8 w-8 p-0">
+                                <Eye className="w-4 h-4" />
                               </Button>
-                              <Button
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => handleAddToCart(product.id)}
-                                disabled={isLoading || !product.in_stock}
-                                aria-label="Adicionar ao carrinho"
-                              >
+                              <Button size="sm" className="h-8 w-8 p-0">
                                 <ShoppingCart className="w-4 h-4" />
                               </Button>
                             </div>
@@ -661,11 +644,11 @@ const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
                               )}
                             </div>
                             
-                             <Link to={`/produto/${product.slug}`} aria-label="Ver detalhes do produto">
-                               <Button size="sm" variant="outline">
-                                 Ver mais
-                               </Button>
-                             </Link>
+                            <Link to={`/produto/${product.slug}`}>
+                              <Button size="sm" variant="outline">
+                                Ver mais
+                              </Button>
+                            </Link>
                           </div>
                         </CardContent>
                       </Card>
@@ -732,17 +715,11 @@ const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
                                   )}
                                   
                                   <div className="flex gap-2 mt-2">
-                                   <Button size="sm" variant="outline" asChild>
-                                      <Link to={`/produto/${product.slug}`}>
-                                        <Eye className="w-4 h-4 mr-1" />
-                                        Ver
-                                      </Link>
+                                    <Button size="sm" variant="outline">
+                                      <Eye className="w-4 h-4 mr-1" />
+                                      Ver
                                     </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleAddToCart(product.id)}
-                                      disabled={isLoading || !product.in_stock}
-                                    >
+                                    <Button size="sm">
                                       <ShoppingCart className="w-4 h-4 mr-1" />
                                       Comprar
                                     </Button>
