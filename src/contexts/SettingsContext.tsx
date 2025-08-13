@@ -41,7 +41,13 @@ const SettingsContext = createContext<SettingsContextType>({
   refreshSettings: async () => {}
 });
 
-export const useSettings = () => useContext(SettingsContext);
+export const useSettings = () => {
+  const context = useContext(SettingsContext);
+  if (!context) {
+    throw new Error('useSettings deve ser usado dentro de um SettingsProvider');
+  }
+  return context;
+};
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
