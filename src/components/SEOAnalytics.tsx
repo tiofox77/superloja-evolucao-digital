@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import * as React from 'react';
 import { useLocation } from 'react-router-dom';
 
 interface SEOAnalyticsProps {
@@ -9,7 +9,7 @@ interface SEOAnalyticsProps {
 export const SEOAnalytics: React.FC<SEOAnalyticsProps> = ({ pageTitle, pageType }) => {
   const location = useLocation();
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Notificar motores de busca sobre mudanças de página
     const notifySearchEngines = async () => {
       try {
@@ -55,7 +55,7 @@ export const SEOAnalytics: React.FC<SEOAnalyticsProps> = ({ pageTitle, pageType 
     return () => clearTimeout(timer);
   }, [location.pathname, pageTitle, pageType]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Atualizar breadcrumb estruturado
     const updateBreadcrumb = () => {
       const breadcrumbScript = document.getElementById('breadcrumb-schema');
