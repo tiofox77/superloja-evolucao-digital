@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LayoutSettings {
@@ -12,24 +12,18 @@ interface LayoutContextType {
   getLayoutSetting: (sectionName: string) => any;
 }
 
-const LayoutContext = React.createContext<LayoutContextType>({
+const LayoutContext = createContext<LayoutContextType>({
   layoutSettings: {},
   loading: true,
   refreshLayout: async () => {},
   getLayoutSetting: () => null
 });
 
-export const useLayout = () => {
-  const context = React.useContext(LayoutContext);
-  if (!context) {
-    throw new Error('useLayout deve ser usado dentro de um LayoutProvider');
-  }
-  return context;
-};
+export const useLayout = () => useContext(LayoutContext);
 
 export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [layoutSettings, setLayoutSettings] = React.useState<LayoutSettings>({});
-  const [loading, setLoading] = React.useState(true);
+  const [layoutSettings, setLayoutSettings] = useState<LayoutSettings>({});
+  const [loading, setLoading] = useState(true);
 
   const refreshLayout = async () => {
     try {
@@ -57,7 +51,7 @@ export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return layoutSettings[sectionName] || null;
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     refreshLayout();
   }, []);
 

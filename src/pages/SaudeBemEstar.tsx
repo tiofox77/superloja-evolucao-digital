@@ -78,7 +78,6 @@ const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const { addToCart, isLoading, setIsOpen } = useCart();
 
   const handleAddToCart = (productId: string) => {
-    console.log('Clicou no carrinho - Product ID:', productId);
     addToCart(productId);
     setIsOpen(true);
   };

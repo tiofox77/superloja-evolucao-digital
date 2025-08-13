@@ -1,4 +1,4 @@
-import * as React from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Settings {
@@ -35,23 +35,17 @@ const defaultSettings: Settings = {
   whatsapp: ''
 };
 
-const SettingsContext = React.createContext<SettingsContextType>({
+const SettingsContext = createContext<SettingsContextType>({
   settings: defaultSettings,
   loading: true,
   refreshSettings: async () => {}
 });
 
-export const useSettings = () => {
-  const context = React.useContext(SettingsContext);
-  if (!context) {
-    throw new Error('useSettings deve ser usado dentro de um SettingsProvider');
-  }
-  return context;
-};
+export const useSettings = () => useContext(SettingsContext);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = React.useState<Settings>(defaultSettings);
-  const [loading, setLoading] = React.useState(true);
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [loading, setLoading] = useState(true);
 
   const refreshSettings = async () => {
     try {
@@ -89,7 +83,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     refreshSettings();
   }, []);
 
