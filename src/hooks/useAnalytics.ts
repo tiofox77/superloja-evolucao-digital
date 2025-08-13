@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AnalyticsData {
@@ -154,7 +154,7 @@ const getLocationData = async () => {
 };
 
 export const useAnalytics = () => {
-  const startTimeRef = useRef<number>(Date.now());
+  const startTimeRef = React.useRef<number>(Date.now());
   const visitorId = getVisitorId();
   const sessionId = getSessionId();
 
@@ -240,7 +240,7 @@ export const useAnalytics = () => {
   };
 
   // Auto-rastrear quando componente monta
-  useEffect(() => {
+  React.useEffect(() => {
     trackPageView({
       page_url: window.location.href,
       page_title: document.title,

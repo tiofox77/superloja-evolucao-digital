@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { X, Download, Smartphone } from 'lucide-react';
@@ -11,9 +11,9 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export const PWAInstallPrompt: React.FC = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [pwaSettings, setPWASettings] = useState({
+  const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null);
+  const [showPrompt, setShowPrompt] = React.useState(false);
+  const [pwaSettings, setPWASettings] = React.useState({
     install_prompt_enabled: true,
     install_prompt_delay: 3000,
     name: 'SuperLoja'
@@ -21,7 +21,7 @@ export const PWAInstallPrompt: React.FC = () => {
   
   const isMobile = useIsMobile();
 
-  useEffect(() => {
+  React.useEffect(() => {
     loadPWASettings();
   }, []);
 
@@ -51,7 +51,7 @@ export const PWAInstallPrompt: React.FC = () => {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!pwaSettings.install_prompt_enabled) return;
 
     // Check if we should show the prompt (not dismissed in last 7 days)
