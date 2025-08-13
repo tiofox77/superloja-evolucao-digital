@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import * as React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
@@ -71,7 +71,7 @@ function App() {
                 <SEOHead />
                 <AnalyticsTracker />
                 <PWAInstallPrompt />
-                <Suspense fallback={<div>Loading...</div>}>
+                <React.Suspense fallback={<div>Loading...</div>}>
                   <Routes>
                     <Route path="/" element={<Index />} />
                     <Route path="/catalogo" element={<Catalogo />} />
@@ -96,7 +96,7 @@ function App() {
                     </Route>
                     <Route path="*" element={<NotFound />} />
                   </Routes>
-                </Suspense>
+                </React.Suspense>
                 <MobileNavbar />
               </div>
               <Toaster />
