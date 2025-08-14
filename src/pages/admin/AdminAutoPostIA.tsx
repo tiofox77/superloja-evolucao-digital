@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { OpenAIKeySetup } from '@/components/admin/OpenAIKeySetup';
@@ -28,7 +29,8 @@ import {
   Image,
   Zap,
   CalendarDays,
-  HelpCircle
+  HelpCircle,
+  Eye
 } from 'lucide-react';
 import { TokenHelpDialog } from '@/components/admin/TokenHelpDialog';
 
@@ -796,11 +798,22 @@ const AdminAutoPostIA: React.FC = () => {
                 <Calendar className="h-5 w-5" />
                 Posts Agendados
               </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Items pendentes aparecem primeiro • Clique no preview para ver detalhes
+              </p>
             </CardHeader>
             <CardContent>
               {scheduledPosts.length > 0 ? (
                 <div className="space-y-4">
-                  {scheduledPosts.map((post) => (
+                  {scheduledPosts
+                    .sort((a, b) => {
+                      // Priorizar pendentes primeiro
+                      if (a.status === 'pending' && b.status !== 'pending') return -1;
+                      if (b.status === 'pending' && a.status !== 'pending') return 1;
+                      // Depois ordenar por data mais próxima
+                      return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
+                    })
+                    .map((post) => (
                     <div key={post.id} className="border rounded-lg p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -809,12 +822,71 @@ const AdminAutoPostIA: React.FC = () => {
                             {post.platform}
                           </Badge>
                           <Badge variant="outline">{post.post_type}</Badge>
+                          <Badge variant={post.status === 'pending' ? 'default' : 'secondary'}>
+                            {post.status === 'pending' ? '⏳ Pendente' : 
+                             post.status === 'posted' ? '✅ Publicado' : 
+                             post.status === 'failed' ? '❌ Falhou' : post.status}
+                          </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(post.scheduled_for).toLocaleString()}
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(post.scheduled_for).toLocaleString()}
+                          </div>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4 mr-1" />
+                                Preview
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                  <Image className="h-5 w-5" />
+                                  Preview do Post Agendado
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <strong>Plataforma:</strong> {post.platform}
+                                  </div>
+                                  <div>
+                                    <strong>Tipo:</strong> {post.post_type}
+                                  </div>
+                                  <div>
+                                    <strong>Status:</strong> {post.status}
+                                  </div>
+                                  <div>
+                                    <strong>Agendado para:</strong> {new Date(post.scheduled_for).toLocaleString()}
+                                  </div>
+                                </div>
+                                <Separator />
+                                <PostPreview 
+                                  content={post.content}
+                                  platform={post.platform}
+                                  postType={post.post_type}
+                                  productData={post.products ? {
+                                    name: post.products.name,
+                                    price: post.products.price,
+                                    image_url: post.products.image_url
+                                  } : undefined}
+                                  hasBanner={!!post.products}
+                                />
+                                {post.products && (
+                                  <div className="bg-muted p-3 rounded-lg">
+                                    <p className="text-sm font-medium mb-1">Produto Associado:</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {post.products.name} - {post.products.price.toLocaleString()} AOA
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       </div>
-                      <p className="text-sm bg-muted p-3 rounded">{post.content}</p>
+                      <p className="text-sm bg-muted p-3 rounded line-clamp-3">{post.content}</p>
                       {post.products && (
                         <div className="text-xs text-muted-foreground">
                           Produto: {post.products.name}
