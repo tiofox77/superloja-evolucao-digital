@@ -102,7 +102,7 @@ PRODUTO:
 
 IDENTIDADE DA MARCA:
 - Superloja: Loja online líder em Angola
-- Website: www.superloja.vip
+- Website: www.superloja.ao
 - Especialidade: Eletrônicos, gadgets, smartphones, acessórios
 - Tom: Profissional mas descontraído, linguagem angolana moderna
 - Público: Jovens e adultos interessados em tecnologia
@@ -203,7 +203,7 @@ async function generateProductBanner(productData: any, postType: string, supabas
     
 PRODUTO: ${productData.name}
 MARCA: Superloja
-WEBSITE: www.superloja.vip
+WEBSITE: www.superloja.ao
 PREÇO: ${productData.price} AOA
 DESCRIÇÃO: ${productData.description}
 
