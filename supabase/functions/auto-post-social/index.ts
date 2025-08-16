@@ -14,6 +14,7 @@ interface AutoPostRequest {
   schedule_time?: string;
   post_type?: 'product' | 'promotional' | 'engagement' | 'custom';
   banner_base64?: string;
+  banner_url?: string;
 }
 
 serve(async (req) => {
@@ -28,7 +29,7 @@ serve(async (req) => {
   );
 
   try {
-    const { action, platform, product_id, custom_prompt, schedule_time, post_type, banner_base64 }: AutoPostRequest = await req.json();
+    const { action, platform, product_id, custom_prompt, schedule_time, post_type, banner_base64, banner_url }: AutoPostRequest = await req.json();
 
     switch (action) {
       case 'generate_content':
@@ -38,7 +39,7 @@ serve(async (req) => {
         return await schedulePost(platform, product_id, custom_prompt, schedule_time, post_type, supabase);
       
       case 'post_now':
-        return await postNow(platform, product_id, custom_prompt, post_type, supabase, banner_base64);
+        return await postNow(platform, product_id, custom_prompt, post_type, supabase, banner_base64, banner_url);
       
       case 'get_scheduled':
         return await getScheduledPosts(supabase);
@@ -337,7 +338,7 @@ async function schedulePost(platform?: string, product_id?: string, custom_promp
   );
 }
 
-async function postNow(platform?: string, product_id?: string, custom_prompt?: string, post_type?: string, supabase?: any, banner_base64?: string) {
+async function postNow(platform?: string, product_id?: string, custom_prompt?: string, post_type?: string, supabase?: any, banner_base64?: string, banner_url?: string) {
   try {
     console.log('🚀 Iniciando postagem imediata:', { platform, product_id, post_type });
     
@@ -353,6 +354,20 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
       // Se não foi fornecido banner, usar o gerado
       if (!bannerBase64) {
         bannerBase64 = contentData.banner_base64;
+      }
+    }
+
+    // Se ainda não temos base64 mas recebemos uma URL de banner (ex.: dos planos semanais), converter para base64 para o Facebook
+    if (!bannerBase64 && banner_url) {
+      try {
+        console.log('🖼️ Convertendo banner_url para base64...');
+        const imgResp = await fetch(banner_url);
+        const buf = await imgResp.arrayBuffer();
+        const binary = Array.from(new Uint8Array(buf)).map(b => String.fromCharCode(b)).join('');
+        bannerBase64 = btoa(binary);
+        console.log('✅ Conversão concluída, tamanho:', bannerBase64.length);
+      } catch (e) {
+        console.warn('⚠️ Falha ao converter banner_url para base64:', e);
       }
     }
     
@@ -381,7 +396,7 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
     if (platform === 'instagram' || platform === 'both') {
       try {
         console.log('📷 Postando no Instagram...');
-        const instagramResult = await postToInstagram(content, product_id, supabase);
+        const instagramResult = await postToInstagram(content, product_id, supabase, banner_url);
         results.push({ platform: 'instagram', ...instagramResult });
         console.log('✅ Instagram result:', instagramResult);
       } catch (error) {
@@ -553,18 +568,9 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
       access_token: pageInfo.access_token
     };
 
-    // Adicionar imagem do produto se houver
-    if (product_id) {
-      const { data: product } = await supabase
-        .from('products')
-        .select('image_url')
-        .eq('id', product_id)
-        .single();
-      
-      if (product?.image_url) {
-        postData.link = product.image_url;
-      }
-    }
+    // Não anexar link de imagem do produto para evitar exibir URL do Supabase
+    // Mantemos somente a mensagem. Caso necessário, futuramente anexar link do site (www.superloja.ao)
+
     
     const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
       method: 'POST',
@@ -584,7 +590,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
   }
 }
 
-async function postToInstagram(content: string, product_id?: string, supabase?: any) {
+async function postToInstagram(content: string, product_id?: string, supabase?: any, banner_url?: string) {
   console.log('🔍 [INSTAGRAM DEBUG] Iniciando postagem...');
   
   // Buscar configurações do banco de dados
@@ -612,9 +618,15 @@ async function postToInstagram(content: string, product_id?: string, supabase?: 
   const INSTAGRAM_BUSINESS_ID = settings.settings.business_id;
 
   // Instagram requer imagem para posts
-  let imageUrl = 'https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/product-images/default-post.jpg';
+  let imageUrl: string | null = null;
+
+  // Priorizar banner_url (banners gerados pelo sistema)
+  if (banner_url) {
+    imageUrl = banner_url;
+  }
   
-  if (product_id) {
+  // Se não houver banner_url, tentar imagem do produto
+  if (!imageUrl && product_id) {
     const { data: product } = await supabase
       .from('products')
       .select('image_url')
@@ -624,6 +636,11 @@ async function postToInstagram(content: string, product_id?: string, supabase?: 
     if (product?.image_url) {
       imageUrl = product.image_url;
     }
+  }
+
+  // Fallback (manter anterior se ainda não houver)
+  if (!imageUrl) {
+    imageUrl = 'https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/product-images/default-post.jpg';
   }
 
   // Criar container de mídia
