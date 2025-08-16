@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,10 +47,12 @@ const AdminChatInterface = ({ customerData, onClose }: AdminChatInterfaceProps) 
   const [adminMessage, setAdminMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isInitialLoadRef = useRef(true);
 
   // Carregar conversa do cliente
   const loadConversation = async () => {
-    setLoading(true);
+    if (isInitialLoadRef.current) setLoading(true);
     try {
       const { data, error } = await supabase
         .from('ai_conversations')
@@ -60,22 +62,36 @@ const AdminChatInterface = ({ customerData, onClose }: AdminChatInterfaceProps) 
 
       if (error) throw error;
 
-      setMessages((data || []) as ChatMessage[]);
+      const fetched = (data || []) as ChatMessage[];
+      setMessages(prev => {
+        if (prev.length === 0) return fetched;
+        const existingIds = new Set(prev.map(m => m.id));
+        const newOnes = fetched.filter(m => !existingIds.has(m.id));
+        return newOnes.length ? [...prev, ...newOnes] : prev;
+      });
     } catch (error) {
       console.error('Erro ao carregar conversa:', error);
       toast.error('Erro ao carregar conversa');
     } finally {
-      setLoading(false);
+      if (isInitialLoadRef.current) {
+        setLoading(false);
+        isInitialLoadRef.current = false;
+      }
     }
   };
 
   useEffect(() => {
     loadConversation();
     
-    // Polling para novas mensagens a cada 5 segundos
+    // Polling para novas mensagens a cada 5 segundos (sem mostrar loading)
     const interval = setInterval(loadConversation, 5000);
     return () => clearInterval(interval);
   }, [customerData.customer_id]);
+
+  // Auto-scroll para a última mensagem
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length]);
 
   // Enviar resposta do admin
   const sendAdminResponse = async () => {
@@ -233,6 +249,7 @@ const AdminChatInterface = ({ customerData, onClose }: AdminChatInterfaceProps) 
                       )}
                     </div>
                   ))}
+                  <div ref={messagesEndRef} />
                 </div>
               )}
             </ScrollArea>
