@@ -119,7 +119,10 @@ async function processWebsiteChat(
   // 5. Verificar localização do usuário
   const userLocation = await detectUserLocation(message, conversationHistory);
   
-  // 6. Salvar conversa
+  // 6. Verificar carrinho existente
+  const cartItems = await getCartItems(sessionId, supabase);
+  
+  // 7. Salvar conversa
   await saveConversation(userId, message, 'user', supabase);
   
   // 6.1. Atalho inteligente: pedido de foto/imagem
@@ -145,13 +148,30 @@ async function processWebsiteChat(
     }
   }
   
+  // 7.1. Verificar solicitação de entrega com carrinho existente
+  if (isDeliveryRequest(message) && cartItems && cartItems.length > 0) {
+    const cartSummary = cartItems.map(item => 
+      `${item.product.name} (${item.quantity}x) - ${item.product.price} AOA`
+    ).join('\n');
+    
+    const totalValue = cartItems.reduce((sum, item) => 
+      sum + (item.product.price * item.quantity), 0
+    );
+
+    const deliveryResponse = `Perfeito, meu estimado! Vejo que já tem produtos no carrinho:\n\n${cartSummary}\n\nTotal: ${totalValue} AOA\n\n${userLocation === 'luanda' ? 'Entrega grátis em Luanda (1-3 dias)!' : 'Vou verificar o valor da entrega para sua região (3-7 dias).'}\n\nPara finalizar, preciso apenas do seu contacto e endereço de entrega. Pode fornecer?`;
+    
+    await saveConversation(userId, deliveryResponse, 'assistant', supabase);
+    return deliveryResponse;
+  }
+  
   // 7. Processar com IA
   const aiResponse = await callOpenAI(message, {
     products,
     conversationHistory,
     userInfo,
     responsePatterns,
-    userLocation
+    userLocation,
+    cartItems
   });
   
   // 8. Salvar resposta da IA
@@ -229,6 +249,12 @@ ${context.responsePatterns ? `Evite repetir: ${context.responsePatterns.repeated
 LOCALIZAÇÃO DO USUÁRIO:
 ${context.userLocation || 'Não identificada'}
 
+CARRINHO ATUAL:
+${context.cartItems && context.cartItems.length > 0 ? 
+  context.cartItems.map(item => `• ${item.product.name} (${item.quantity}x) - ${item.product.price} AOA`).join('\n') + 
+  `\nTotal: ${context.cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)} AOA` :
+  'Carrinho vazio'}
+
 INSTRUÇÕES CRÍTICAS PARA IMAGENS:
 - Quando o cliente pedir "imagem", "foto", "mostrar", "ver foto", "quero ver", "manda", "mandar", "envia", "enviar"
 - RESPONDA EXATAMENTE neste formato JSON:
@@ -250,6 +276,12 @@ INSTRUÇÕES ESPECIAIS:
 5. Para usuários fora de Luanda: explique processo de encomenda passo-a-passo
 6. Use linguagem comercial angolana respeitosa
 7. Analise o contexto completo da mensagem, não apenas palavras-chave
+8. CARRINHO INTELIGENTE: Se usuário pede entrega e JÁ TEM itens no carrinho, prossiga automaticamente:
+   - Mostre resumo do carrinho
+   - Calcule total
+   - Confirme localização/entrega
+   - Peça dados de contacto/endereço para finalizar
+   - NÃO pergunte "quer adicionar mais produtos" se já demonstrou intenção de entrega
 
 LOCALIZAÇÃO E ENTREGA:
 - Luanda: Entrega grátis, 1-3 dias
@@ -477,6 +509,61 @@ async function detectUserLocation(message: string, history: any[]) {
   }
 
   return null;
+}
+
+// Função para obter itens do carrinho
+async function getCartItems(sessionId: string, supabase: any) {
+  try {
+    const { data, error } = await supabase
+      .from('cart_items')
+      .select(`
+        id,
+        product_id,
+        quantity,
+        products:product_id (
+          name,
+          price,
+          image_url,
+          slug
+        )
+      `)
+      .eq('session_id', sessionId);
+
+    if (error) throw error;
+
+    const formattedItems = data?.map(item => ({
+      id: item.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      product: {
+        name: item.products.name,
+        price: item.products.price,
+        image_url: item.products.image_url,
+        slug: item.products.slug,
+      }
+    })) || [];
+
+    return formattedItems;
+  } catch (error) {
+    console.error('Erro ao carregar carrinho:', error);
+    return [];
+  }
+}
+
+// Função para detectar solicitação de entrega
+function isDeliveryRequest(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  const deliveryKeywords = [
+    'entrega', 'entregar', 'entrego', 'entreguem',
+    'envio', 'enviar', 'enviem', 'mandar', 'mandem',
+    'levar', 'levem', 'buscar', 'ir buscar',
+    'finalizar', 'finalizo', 'fechar', 'comprar',
+    'quero comprar', 'vou comprar', 'quero levar',
+    'pode entregar', 'podem entregar', 'como faço',
+    'como é que', 'como é a entrega'
+  ];
+  
+  return deliveryKeywords.some(keyword => lowerText.includes(keyword));
 }
 
 // Função para salvar conversas
