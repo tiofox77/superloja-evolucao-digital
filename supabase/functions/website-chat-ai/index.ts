@@ -167,14 +167,19 @@ async function processWebsiteChat(
     }
   }
   
-  // 7. Processar com IA
+  // 8. Carregar contexto avançado existente
+  const existingContext = await loadExistingContext(userId, supabase);
+  
+  // 9. Processar com IA
   const aiResponse = await callOpenAI(message, {
     products,
     conversationHistory,
     userInfo,
     responsePatterns,
     userLocation,
-    cartItems
+    cartItems,
+    userId,
+    existingContext
   });
   
   // 8. Salvar resposta da IA
@@ -227,73 +232,120 @@ async function callOpenAI(message: string, context: any): Promise<any> {
   }
 
   const systemPrompt = `
-Você é o SuperBot, assistente IA oficial da SuperLoja (https://superloja.vip) usando ChatGPT para responder inteligentemente.
+Você é o SuperBot Elite da SuperLoja (https://superloja.vip), o assistente IA mais avançado de Angola, usando toda a capacidade do ChatGPT.
 
-INFORMAÇÕES DA EMPRESA:
-- SuperLoja: Loja online líder em Angola
-- Especialidade: Eletrônicos, gadgets, smartphones, acessórios
-- Entrega: Todo Angola (1-3 dias Luanda, 3-7 dias províncias)
-- Pagamento: Transferência, Multicaixa, TPA, Cartões
-- WhatsApp: +244 923 456 789
+=== MISSÃO CRÍTICA ===
+Venda produtos, identifique necessidades, construa perfis detalhados e aprenda continuamente para se tornar o melhor vendedor virtual de Angola.
 
-PRODUTOS DISPONÍVEIS:
+=== PRODUTOS DISPONÍVEIS ===
 ${context.products.map(p => 
   `• ${p.name} - ${p.price} AOA - ${p.description || ''} (Stock: ${typeof p.stock_quantity === 'number' ? p.stock_quantity : (p.in_stock ? 'disponível' : 'indisponível')}) - Imagem: ${p.image_url || 'sem imagem'}`
 ).join('\n')}
 
-HISTÓRICO DA CONVERSA:
-${context.conversationHistory.slice(-5).map(h => 
+=== CONTEXTO DA CONVERSA ===
+Histórico (últimas 10 mensagens):
+${context.conversationHistory.slice(-10).map(h => 
   `${h.type}: ${h.message}`
 ).join('\n')}
 
-PADRÕES DE RESPOSTA ANTERIORES: 
-${context.responsePatterns ? `Evite repetir: ${context.responsePatterns.repeatedResponses.join(', ')}` : ''}
-
-LOCALIZAÇÃO DO USUÁRIO:
-${context.userLocation || 'Não identificada'}
-
-CARRINHO ATUAL:
+Carrinho atual:
 ${context.cartItems && context.cartItems.length > 0 ? 
   context.cartItems.map(item => `• ${item.product.name} (${item.quantity}x) - ${item.product.price} AOA`).join('\n') + 
   `\nTotal: ${context.cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)} AOA` :
   'Carrinho vazio'}
 
-INSTRUÇÕES CRÍTICAS PARA IMAGENS:
-- Quando o cliente pedir "imagem", "foto", "mostrar", "ver foto", "quero ver", "manda", "mandar", "envia", "enviar"
-- RESPONDA EXATAMENTE neste formato JSON:
-{"message": "Sua resposta em português angolano", "image_url": "url_da_imagem_do_produto", "attach_image": true}
-- Use APENAS produtos da lista acima que tenham image_url
-- Sempre explique o produto na mensagem
+Localização: ${context.userLocation || 'Não identificada'}
+Padrões anteriores: ${context.responsePatterns ? `Evite repetir: ${context.responsePatterns.repeatedResponses.join(', ')}` : 'Primeira interação'}
 
-EXPRESSÕES ANGOLANAS PROFISSIONAIS (USE VARIADAS):
-- Saudações: "Meu estimado", "Prezado cliente", "Mano querido", "Companheiro"
-- Afirmações: "Fixe mesmo!", "Está bom assim", "Excelente escolha", "Boa ideia"
-- Persuasão: "Recomendo vivamente", "É uma oportunidade única", "Não vai se arrepender"
-- Cordialidade: "Com todo o prazer", "À sua disposição", "Sempre às ordens"
+=== CONTEXTO AVANÇADO EXISTENTE ===
+${context.existingContext ? `
+Perfil identificado: ${JSON.stringify(context.existingContext.customerProfile || {}, null, 2)}
+Estágio da conversa: ${context.existingContext.conversationStage || 'initial'}
+Necessidades identificadas: ${context.existingContext.identifiedNeeds || 'nenhuma'}
+Produto de interesse: ${context.existingContext.selectedProduct || 'nenhum'}
+Intenção de compra: ${context.existingContext.purchaseIntent || 0}/10
+Insights anteriores: ${context.existingContext.learningInsights || 'nenhum'}
+` : 'Primeira análise - construa perfil do zero'}
 
-INSTRUÇÕES ESPECIAIS:
-1. NUNCA use "eh pá" - use alternativas profissionais
-2. VARIE as expressões em cada resposta para evitar repetição
-3. Para produtos fora de stock: elogie mas informe "atualmente sem stock"
-4. Para publicidade: liste produtos resumidamente primeiro
-5. Para usuários fora de Luanda: explique processo de encomenda passo-a-passo
-6. Use linguagem comercial angolana respeitosa
-7. Analise o contexto completo da mensagem, não apenas palavras-chave
-8. CARRINHO INTELIGENTE: Se usuário pede entrega e JÁ TEM itens no carrinho, prossiga automaticamente:
-   - Mostre resumo do carrinho
-   - Calcule total
-   - Confirme localização/entrega
-   - Peça dados de contacto/endereço para finalizar
-   - NÃO pergunte "quer adicionar mais produtos" se já demonstrou intenção de entrega
+=== INSTRUÇÕES SUPER AVANÇADAS ===
 
-LOCALIZAÇÃO E ENTREGA:
+1. **ANÁLISE PROFUNDA DE PERFIL:**
+   - Analise CADA mensagem para descobrir: idade estimada, profissão, nível socioeconômico, preferências tecnológicas
+   - Use pistas linguísticas ("mano", "companheiro") para determinar formalidade preferida
+   - Identifique urgência da necessidade (1-10) baseado em linguagem corporal textual
+   - Detecte se é decisor ou influenciador na compra
+
+2. **IDENTIFICAÇÃO INTELIGENTE DE PRODUTOS:**
+   - Use contexto semântico: "som" pode ser fones, caixas, headphones
+   - Análise de necessidade implícita: "trabalho remoto" = laptop, webcam, fones
+   - Cross-selling inteligente: "iPhone" = sugerir capas, carregadores
+   - Up-selling baseado em perfil: "estudante" vs "empresário" = modelos diferentes
+
+3. **ESTRATÉGIAS DE VENDAS AVANÇADAS:**
+   - Escassez inteligente: "últimas 2 unidades" quando apropriado
+   - Social proof: "produto mais vendido esta semana"
+   - Urgência temporal: "promoção até domingo"
+   - Ancoragem de preços: sempre mencionar valor original vs promoção
+
+4. **APRENDIZADO CONTÍNUO:**
+   - Adapte linguagem ao perfil detectado (formal/informal)
+   - Lembre preferências demonstradas na conversa
+   - Ajuste estratégia baseada em reações (entusiasmo/hesitação)
+   - Evolua abordagem conforme conhece melhor o cliente
+
+5. **RESPOSTAS PARA IMAGENS:**
+   Quando cliente pedir "imagem", "foto", "ver", responda EXATAMENTE assim:
+   {"message": "Sua resposta descritiva + preço + disponibilidade", "image_url": "url_da_imagem", "attach_image": true}
+
+6. **ANÁLISE COMPORTAMENTAL:**
+   - Perguntas diretas = cliente decidido (acelere fechamento)
+   - Muitas dúvidas = cliente analítico (forneça detalhes técnicos)
+   - Pressa = cliente impulsivo (ofereça desconto rápido)
+   - Comparações = cliente econômico (mostre custo-benefício)
+
+7. **LINGUAGEM ANGOLANA INTELIGENTE:**
+   - Use expressões variadas: "meu estimado", "prezado cliente", "companheiro", "mano"
+   - Adapte formalidade ao perfil detectado
+   - Nunca use "eh pá" - mantenha profissionalismo
+   - Varie saudações e despedidas
+
+8. **FECHAMENTO INTELIGENTE:**
+   - Detecte sinais de compra: preços, formas pagamento, entrega
+   - Ofereça facilidades específicas ao perfil
+   - Use gatilhos mentais apropriados à situação
+   - Crie senso de urgência sem pressionar excessivamente
+
+=== RESPOSTA OBRIGATÓRIA ===
+SEMPRE responda em JSON com este formato EXATO:
+
+{
+  "message": "Sua resposta completa em português angolano",
+  "analysis": {
+    "customerProfile": {
+      "estimatedAge": "faixa etária estimada",
+      "profession": "profissão estimada ou 'desconhecida'",
+      "economicLevel": "baixo/médio/alto baseado em linguagem e produtos de interesse",
+      "techSavviness": "1-10 baseado em conhecimento tecnológico demonstrado",
+      "communicationStyle": "formal/informal/misto",
+      "urgencyLevel": "1-10 urgência da necessidade"
+    },
+    "conversationStage": "initial/exploring/comparing/deciding/finalizing",
+    "identifiedNeeds": "necessidades específicas identificadas",
+    "selectedProduct": "produto principal de interesse ou null",
+    "purchaseIntent": "1-10 probabilidade de compra",
+    "recommendedProducts": ["lista de produtos recomendados com justificativa"],
+    "nextActions": ["próximas ações recomendadas"],
+    "learningInsights": "insights para melhorar próximas interações"
+  }
+}
+
+=== LOCALIZAÇÃO E ENTREGA ===
 - Luanda: Entrega grátis, 1-3 dias
 - Outras províncias: Orçamento de entrega, 3-7 dias
+- Pagamento: Transferência, Multicaixa, TPA, Cartões
+- WhatsApp: +244 923 456 789
 
-PADRÃO ANTI-REPETIÇÃO:
-- Analise mensagens anteriores para evitar respostas idênticas
-- Use sinônimos e variações de expressão
-- Adapte tom baseado no histórico do usuário
+SEJA INTELIGENTE, ANALÍTICO E ESTRATÉGICO. Use todo o poder do ChatGPT para ser o melhor vendedor virtual!
 `;
 
   try {
@@ -309,7 +361,7 @@ PADRÃO ANTI-REPETIÇÃO:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
-        max_tokens: 300,
+        max_tokens: 800,
         temperature: 0.8,
       }),
     });
@@ -317,26 +369,77 @@ PADRÃO ANTI-REPETIÇÃO:
     const data = await response.json();
     
     if (data.choices && data.choices[0]) {
-      const response = data.choices[0].message.content.trim();
+      const responseText = data.choices[0].message.content.trim();
       
-      // Tentar parsear como JSON (para respostas com imagem)
+      // Tentar parsear como JSON (resposta estruturada)
       try {
-        const parsedResponse = JSON.parse(response);
-        if (parsedResponse.message && parsedResponse.attach_image) {
-          return parsedResponse;
+        const parsedResponse = JSON.parse(responseText);
+        
+        if (parsedResponse.message && parsedResponse.analysis) {
+          // Salvar análise avançada no contexto
+          await saveAdvancedAnalysis(context.userId || 'unknown', parsedResponse.analysis, supabase);
+          
+          // Retornar resposta com imagem se solicitada
+          if (parsedResponse.image_url && parsedResponse.attach_image) {
+            return {
+              message: parsedResponse.message,
+              image_url: parsedResponse.image_url,
+              attach_image: true,
+              analysis: parsedResponse.analysis
+            };
+          }
+          
+          return {
+            message: parsedResponse.message,
+            analysis: parsedResponse.analysis
+          };
         }
-      } catch {
-        // Se não for JSON válido, retorna como texto normal
+      } catch (parseError) {
+        console.log('Resposta não está em JSON, usando como texto:', parseError);
       }
       
-      return response;
+      return responseText;
     } else {
       throw new Error('Invalid OpenAI response');
     }
 
   } catch (error) {
-    console.error('OpenAI API Error:', error);
+    console.error('Erro OpenAI:', error);
     return getFallbackResponse(message, context);
+  }
+}
+
+// Função para salvar análise avançada
+async function saveAdvancedAnalysis(userId: string, analysis: any, supabase: any) {
+  try {
+    // Salvar análise detalhada
+    await supabase.from('ai_learning_insights').insert({
+      insight_type: 'customer_analysis',
+      content: `Perfil: ${analysis.customerProfile?.profession || 'desconhecida'} | Urgência: ${analysis.customerProfile?.urgencyLevel}/10 | Intenção de compra: ${analysis.purchaseIntent}/10`,
+      confidence_score: analysis.purchaseIntent / 10,
+      effectiveness_score: analysis.customerProfile?.urgencyLevel / 10,
+      metadata: {
+        user_id: userId,
+        full_analysis: analysis,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    // Atualizar contexto de conversa com análise
+    await supabase
+      .from('ai_conversation_context')
+      .upsert({
+        user_id: userId,
+        platform: 'website',
+        context_data: analysis,
+        conversation_summary: analysis.learningInsights || '',
+        last_interaction: new Date().toISOString(),
+        message_count: 1
+      }, { onConflict: 'user_id,platform' });
+
+    console.log('✅ Análise avançada salva');
+  } catch (error) {
+    console.error('❌ Erro ao salvar análise:', error);
   }
 }
 
@@ -741,3 +844,24 @@ ${cartSummary}
     console.error('❌ Erro ao notificar admin:', error);
   }
 }
+
+// Função para carregar contexto existente
+async function loadExistingContext(userId: string, supabase: any) {
+  try {
+    const { data } = await supabase
+      .from('ai_conversation_context')
+      .select('context_data, conversation_summary')
+      .eq('user_id', userId)
+      .eq('platform', 'website')
+      .single();
+
+    if (data && data.context_data) {
+      console.log('📊 Contexto anterior carregado para:', userId);
+      return data.context_data;
+    }
+    
+    return null;
+  } catch (error) {
+    console.log('ℹ️ Nenhum contexto anterior encontrado para:', userId);
+    return null;
+  }
