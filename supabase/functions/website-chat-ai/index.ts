@@ -865,3 +865,4 @@ async function loadExistingContext(userId: string, supabase: any) {
     console.log('ℹ️ Nenhum contexto anterior encontrado para:', userId);
     return null;
   }
+}
