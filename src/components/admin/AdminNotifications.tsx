@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Bell, 
   User, 
@@ -13,10 +14,12 @@ import {
   AlertTriangle,
   Eye,
   RefreshCw,
-  Filter
+  Filter,
+  Reply
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import AdminChatInterface from './AdminChatInterface';
 
 interface AdminNotification {
   id: string;
@@ -33,6 +36,8 @@ const AdminNotifications = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'resolved'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'urgent'>('all');
+  const [chatOpen, setChatOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   // Carregar notificações
   const loadNotifications = async () => {
@@ -80,6 +85,19 @@ const AdminNotifications = () => {
       console.error('Erro ao atualizar notificação:', error);
       toast.error('Erro ao atualizar notificação');
     }
+  };
+
+  // Abrir chat com cliente
+  const openChat = (notification: AdminNotification) => {
+    setSelectedCustomer({
+      customer_id: notification.metadata?.customer_id || notification.admin_user_id,
+      customer_name: notification.metadata?.customer_name,
+      customer_phone: notification.metadata?.customer_phone,
+      customer_location: notification.metadata?.customer_location,
+      platform: notification.metadata?.platform || 'website',
+      notification_id: notification.id
+    });
+    setChatOpen(true);
   };
 
   // Obter cor da prioridade
@@ -254,8 +272,8 @@ const AdminNotifications = () => {
                        </div>
 
                        {/* Ações */}
-                       {!notification.is_sent && (
-                         <div className="flex gap-2 pt-2 border-t">
+                       <div className="flex gap-2 pt-2 border-t">
+                         {!notification.is_sent && (
                            <Button
                              size="sm"
                              onClick={() => markAsRead(notification.id)}
@@ -263,8 +281,18 @@ const AdminNotifications = () => {
                              <CheckCircle className="h-3 w-3 mr-1" />
                              Marcar como Lida
                            </Button>
-                         </div>
-                       )}
+                         )}
+                         {notification.metadata?.customer_id && (
+                           <Button
+                             size="sm"
+                             variant="outline"
+                             onClick={() => openChat(notification)}
+                           >
+                             <Reply className="h-3 w-3 mr-1" />
+                             Responder Cliente
+                           </Button>
+                         )}
+                       </div>
                     </div>
                   </Card>
                 ))
@@ -273,6 +301,21 @@ const AdminNotifications = () => {
           </ScrollArea>
         </div>
       </CardContent>
+
+      {/* Dialog do Chat */}
+      <Dialog open={chatOpen} onOpenChange={setChatOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Chat com Cliente</DialogTitle>
+          </DialogHeader>
+          {selectedCustomer && (
+            <AdminChatInterface 
+              customerData={selectedCustomer}
+              onClose={() => setChatOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

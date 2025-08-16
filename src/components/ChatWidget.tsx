@@ -45,7 +45,43 @@ export default function ChatWidget({
     }]);
   }, []);
 
-  // Auto-scroll para última mensagem
+  // Carregar mensagens do admin (se houver)
+  const loadAdminMessages = async () => {
+    try {
+      const { data } = await supabase
+        .from('ai_conversations')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('type', 'admin')
+        .order('timestamp', { ascending: true });
+
+      if (data && data.length > 0) {
+        const adminMessages = data.map(msg => ({
+          id: msg.id,
+          text: `📢 Resposta do Admin:\n\n${msg.message}`,
+          type: 'received' as const,
+          timestamp: new Date(msg.timestamp)
+        }));
+        
+        setMessages(prev => {
+          const existingIds = prev.map(m => m.id);
+          const newMessages = adminMessages.filter(m => !existingIds.includes(m.id));
+          return [...prev, ...newMessages];
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar mensagens admin:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && userId) {
+      loadAdminMessages();
+      const interval = setInterval(loadAdminMessages, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [isOpen, userId]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);

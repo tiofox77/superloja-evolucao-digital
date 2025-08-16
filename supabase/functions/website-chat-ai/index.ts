@@ -148,20 +148,23 @@ async function processWebsiteChat(
     }
   }
   
-  // 7.1. Verificar solicitação de entrega com carrinho existente
-  if (isDeliveryRequest(message) && cartItems && cartItems.length > 0) {
-    const cartSummary = cartItems.map(item => 
-      `${item.product.name} (${item.quantity}x) - ${item.product.price} AOA`
-    ).join('\n');
+  // 6.2. Inteligência para finalização - coletar dados completos
+  if (isFinalizationRequest(message, conversationHistory)) {
+    const missingData = await checkMissingCustomerData(userId, message, supabase);
     
-    const totalValue = cartItems.reduce((sum, item) => 
-      sum + (item.product.price * item.quantity), 0
-    );
-
-    const deliveryResponse = `Perfeito, meu estimado! Vejo que já tem produtos no carrinho:\n\n${cartSummary}\n\nTotal: ${totalValue} AOA\n\n${userLocation === 'luanda' ? 'Entrega grátis em Luanda (1-3 dias)!' : 'Vou verificar o valor da entrega para sua região (3-7 dias).'}\n\nPara finalizar, preciso apenas do seu contacto e endereço de entrega. Pode fornecer?`;
-    
-    await saveConversation(userId, deliveryResponse, 'assistant', supabase);
-    return deliveryResponse;
+    if (missingData.length > 0) {
+      const dataResponse = await generateDataCollectionResponse(missingData, cartItems);
+      await saveConversation(userId, dataResponse, 'assistant', supabase);
+      return dataResponse;
+    } else {
+      // Dados completos - finalizar e notificar admin
+      const customerData = await getCustomerData(userId, message, conversationHistory);
+      await notifyAdminFinalization(userId, customerData, cartItems, supabase);
+      
+      const confirmationResponse = `Perfeito, ${customerData.name}! 🎉\n\nSeus dados foram registrados:\n📍 ${customerData.location}\n📞 ${customerData.phone}\n\n📦 Pedido confirmado! Nossa equipa entrará em contacto em breve para finalizar a entrega.\n\nObrigado pela confiança na SuperLoja! 🛍️`;
+      await saveConversation(userId, confirmationResponse, 'assistant', supabase);
+      return confirmationResponse;
+    }
   }
   
   // 7. Processar com IA
@@ -602,5 +605,139 @@ function getFilenameFromUrl(url: string): string {
     return pathname.split('/').pop() || 'image.jpg';
   } catch {
     return 'image.jpg';
+  }
+}
+
+// Função para detectar solicitação de finalização
+function isFinalizationRequest(message: string, history: any[]): boolean {
+  const lowerText = message.toLowerCase();
+  const finalizationKeywords = [
+    'finalizar', 'finalizo', 'fechar', 'comprar agora',
+    'quero comprar', 'vou comprar', 'confirmar pedido',
+    'meu nome é', 'meu contacto', 'nome:', 'contacto:',
+    'telefone:', 'endereço:', 'morada:', 'dados pessoais'
+  ];
+  
+  // Verificar contexto recente sobre entrega/compra
+  const recentContext = history.slice(-3).map(h => h.message).join(' ').toLowerCase();
+  const hasRecentDeliveryContext = recentContext.includes('entrega') || 
+                                   recentContext.includes('finalizar') ||
+                                   recentContext.includes('dados');
+  
+  return finalizationKeywords.some(keyword => lowerText.includes(keyword)) || 
+         (hasRecentDeliveryContext && (lowerText.length > 10)); // Resposta substancial após contexto de entrega
+}
+
+// Função para verificar dados em falta do cliente
+async function checkMissingCustomerData(userId: string, message: string, supabase: any): Promise<string[]> {
+  const missingData = [];
+  
+  // Extrair informações da mensagem atual
+  const hasName = /nome.*:.*\w+|meu nome é.*\w+|chamo-me.*\w+/i.test(message);
+  const hasPhone = /telefone.*:.*\d+|contacto.*:.*\d+|\d{9,}/i.test(message);
+  const hasLocation = /endereço.*:.*\w+|morada.*:.*\w+|vivo em.*\w+|fico em.*\w+/i.test(message) ||
+                     /(luanda|benguela|huambo|lubango|malanje|namibe|cabinda|cuando|cunene|huíla|lunda|moxico|uíge|zaire)/i.test(message);
+  
+  if (!hasName) missingData.push('nome');
+  if (!hasPhone) missingData.push('telefone');
+  if (!hasLocation) missingData.push('localização');
+  
+  return missingData;
+}
+
+// Função para gerar resposta de coleta de dados
+async function generateDataCollectionResponse(missingData: string[], cartItems: any[]): Promise<string> {
+  const cartSummary = cartItems && cartItems.length > 0 ? 
+    `\n\n📦 Resumo do seu pedido:\n${cartItems.map(item => 
+      `• ${item.product.name} (${item.quantity}x) - ${item.product.price} AOA`
+    ).join('\n')}\n\nTotal: ${cartItems.reduce((sum, item) => 
+      sum + (item.product.price * item.quantity), 0)} AOA` : '';
+
+  let response = `Perfeito! Para finalizar seu pedido, preciso apenas de alguns dados:${cartSummary}\n\n`;
+  
+  if (missingData.includes('nome')) {
+    response += '👤 **Seu nome completo**\n';
+  }
+  if (missingData.includes('telefone')) {
+    response += '📞 **Número de telefone/WhatsApp**\n';
+  }
+  if (missingData.includes('localização')) {
+    response += '📍 **Localização para entrega** (província e endereço)\n';
+  }
+  
+  response += '\nPode fornecer esses dados? Exemplo:\n';
+  response += '"Meu nome é João Silva, telefone 923456789, vivo em Luanda, Talatona"';
+  
+  return response;
+}
+
+// Função para extrair dados do cliente
+async function getCustomerData(userId: string, message: string, history: any[]): Promise<any> {
+  const allText = [message, ...history.slice(-5).map(h => h.message)].join(' ');
+  
+  // Extrair nome
+  const nameMatch = allText.match(/(?:nome.*?:.*?|meu nome é|chamo-me)\s*([A-Za-zÀ-ÿ\s]+)/i);
+  const name = nameMatch ? nameMatch[1].trim() : 'Cliente';
+  
+  // Extrair telefone
+  const phoneMatch = allText.match(/(?:telefone.*?:.*?|contacto.*?:.*?|)\s*(\d{9,})/i);
+  const phone = phoneMatch ? phoneMatch[1] : '';
+  
+  // Extrair localização
+  const locationMatch = allText.match(/(?:endereço.*?:.*?|morada.*?:.*?|vivo em|fico em)\s*([A-Za-zÀ-ÿ\s,]+)/i) ||
+                       allText.match(/(luanda|benguela|huambo|lubango|malanje|namibe|cabinda|cuando|cunene|huíla|lunda|moxico|uíge|zaire)[^.]*?([A-Za-zÀ-ÿ\s,]*)/i);
+  const location = locationMatch ? locationMatch[0].trim() : 'Não especificada';
+  
+  return { name, phone, location };
+}
+
+// Função para notificar admin sobre finalização
+async function notifyAdminFinalization(userId: string, customerData: any, cartItems: any[], supabase: any) {
+  try {
+    const cartSummary = cartItems.map(item => 
+      `• ${item.product.name} (${item.quantity}x) - ${item.product.price} AOA`
+    ).join('\n');
+    
+    const totalValue = cartItems.reduce((sum, item) => 
+      sum + (item.product.price * item.quantity), 0
+    );
+
+    const message = `🎉 PEDIDO FINALIZADO! 🎉
+
+👤 Cliente: ${customerData.name}
+📞 Telefone: ${customerData.phone}
+📍 Localização: ${customerData.location}
+🆔 ID Sessão: ${userId}
+
+📦 Produtos:
+${cartSummary}
+
+💰 Total: ${totalValue} AOA
+
+⏰ ${new Date().toLocaleString('pt-AO')}
+
+🚚 AÇÃO NECESSÁRIA: Contactar cliente para confirmar entrega!`;
+
+    // Salvar notificação
+    await supabase.from('admin_notifications').insert({
+      admin_user_id: '24320548907583618',
+      notification_type: 'pedido_finalizado',
+      message: message,
+      metadata: {
+        customer_id: userId,
+        customer_name: customerData.name,
+        customer_phone: customerData.phone,
+        customer_location: customerData.location,
+        cart_items: cartItems,
+        total_value: totalValue,
+        platform: 'website',
+        requires_contact: true,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    console.log('✅ Admin notificado sobre finalização');
+  } catch (error) {
+    console.error('❌ Erro ao notificar admin:', error);
   }
 }
