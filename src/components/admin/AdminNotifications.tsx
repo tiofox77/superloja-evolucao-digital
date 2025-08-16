@@ -194,8 +194,14 @@ const AdminNotifications = () => {
                        <div className="flex items-center gap-2">
                            <User className="h-4 w-4 text-muted-foreground" />
                            <span className="font-medium text-sm">
-                             Admin: {notification.admin_user_id}
+                             {notification.metadata?.customer_name || 
+                              `Cliente ID: ${notification.metadata?.customer_id || 'N/A'}`}
                            </span>
+                           {notification.metadata?.platform && (
+                             <Badge variant="outline" className="text-xs">
+                               📱 {notification.metadata.platform}
+                             </Badge>
+                           )}
                            <Badge variant="outline" className="text-xs">
                              {notification.notification_type}
                            </Badge>
@@ -217,9 +223,25 @@ const AdminNotifications = () => {
                        </div>
 
                        {/* Metadata adicional */}
-                       {notification.metadata && Object.keys(notification.metadata).length > 0 && (
-                         <div className="text-xs text-muted-foreground">
-                           <strong>Dados:</strong> {JSON.stringify(notification.metadata, null, 2)}
+                       {notification.metadata && (
+                         <div className="bg-slate-50 p-3 rounded-lg text-xs space-y-1">
+                           {notification.metadata.customer_id && (
+                             <div><strong>ID Cliente:</strong> {notification.metadata.customer_id}</div>
+                           )}
+                           {notification.metadata.customer_message && (
+                             <div><strong>Mensagem:</strong> "{notification.metadata.customer_message}"</div>
+                           )}
+                           {notification.metadata.platform && (
+                             <div><strong>Plataforma:</strong> {notification.metadata.platform}</div>
+                           )}
+                           {notification.metadata.context && (
+                             <details className="mt-2">
+                               <summary className="cursor-pointer font-medium">Ver contexto completo</summary>
+                               <pre className="mt-1 text-xs bg-white p-2 rounded border overflow-auto">
+                                 {JSON.stringify(notification.metadata.context, null, 2)}
+                               </pre>
+                             </details>
+                           )}
                          </div>
                        )}
 

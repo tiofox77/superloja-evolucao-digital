@@ -1966,17 +1966,36 @@ async function notifyAdmin(customerId: string, customerMessage: string, supabase
       return;
     }
 
+    // Buscar informações detalhadas do cliente
+    let customerName = customerId;
+    let customerProfile = null;
+    let platform = 'Facebook'; // Default
+
+    try {
+      // Tentar buscar no Facebook Graph API o nome do usuário
+      const graphResponse = await fetch(`https://graph.facebook.com/v18.0/${customerId}?fields=first_name,last_name&access_token=${pageAccessToken}`);
+      if (graphResponse.ok) {
+        const userData = await graphResponse.json();
+        customerName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || customerId;
+        console.log('👤 Nome do cliente obtido:', customerName);
+      }
+    } catch (error) {
+      console.log('⚠️ Não foi possível obter nome do Facebook:', error);
+    }
+
     // Construir mensagem personalizada
     let notificationMessage = '';
     const productInfo = context?.selectedProduct || 'Produto não identificado';
     const customerNeeds = context?.identifiedNeeds || '';
-    const relationshipLevel = context?.relationshipLevel || 'desconhecido';
+    const relationshipLevel = context?.relationshipLevel || 'novo';
 
     switch (intentType) {
       case 'confirmed_purchase':
         notificationMessage = `🎉 VENDA CONFIRMADA! 🎉
 
-👤 Cliente: ${customerId}
+👤 Cliente: ${customerName}
+📱 Plataforma: ${platform}
+🆔 ID: ${customerId}
 🔄 Relacionamento: ${relationshipLevel}
 💬 Mensagem: "${customerMessage}"
 🛍️ Produto: ${productInfo}
@@ -1993,7 +2012,9 @@ ${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
       case 'finalization':
         notificationMessage = `🚨 CLIENTE FINALIZANDO COMPRA! 🚨
 
-👤 Cliente: ${customerId}
+👤 Cliente: ${customerName}
+📱 Plataforma: ${platform}
+🆔 ID: ${customerId}
 🔄 Relacionamento: ${relationshipLevel}
 💬 Mensagem: "${customerMessage}"
 🛍️ Produto interesse: ${productInfo}
@@ -2009,7 +2030,9 @@ ${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
       case 'strong_interest':
         notificationMessage = `⚡ OPORTUNIDADE DE VENDA! ⚡
 
-👤 Cliente: ${customerId}
+👤 Cliente: ${customerName}
+📱 Plataforma: ${platform}
+🆔 ID: ${customerId}
 🔄 Relacionamento: ${relationshipLevel}
 💬 Mensagem: "${customerMessage}"
 🛍️ Produto interesse: ${productInfo}
@@ -2050,7 +2073,9 @@ ${customerNeeds ? `🎯 Necessidade: ${customerNeeds}` : ''}
       message: notificationMessage,
       metadata: {
         customer_id: customerId,
+        customer_name: customerName,
         customer_message: customerMessage,
+        platform: platform,
         context: context,
         timestamp: new Date().toISOString()
       }
