@@ -24,9 +24,11 @@ import {
   Eye,
   User,
   Key,
-  Target
+  Target,
+  Bell
 } from 'lucide-react';
 import { toast } from 'sonner';
+import AdminNotifications from '@/components/admin/AdminNotifications';
 import TrainingChat from '@/components/admin/TrainingChat';
 import LearningSystem from '@/components/admin/LearningSystem';
 
@@ -651,7 +653,7 @@ para verificar se os serviços estão rodando`);
 
       {/* Tabs principais */}
       <Tabs defaultValue="realtime" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="realtime" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Tempo Real
@@ -681,8 +683,8 @@ para verificar se os serviços estão rodando`);
             Centro de Testes
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Admin Notifications
+            <Bell className="h-4 w-4" />
+            Notificações
           </TabsTrigger>
         </TabsList>
 
@@ -1536,6 +1538,11 @@ para verificar se os serviços estão rodando`);
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Notificações Admin */}
+        <TabsContent value="notifications">
+          <AdminNotifications />
         </TabsContent>
       </Tabs>
     </div>
