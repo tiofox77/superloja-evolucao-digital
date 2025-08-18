@@ -58,11 +58,23 @@ export const AutomatedPlansStatus: React.FC = () => {
         .from('weekly_posting_plans')
         .select('*')
         .eq('auto_generate', true)
-        .eq('status', 'active')
+        .in('status', ['active', 'completed'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPlans(data || []);
+      
+      // Verificar se planos devem ser marcados como concluídos
+      const plansWithStatus = (data || []).map(plan => {
+        const endDate = new Date(plan.end_date);
+        const now = new Date();
+        if (plan.status === 'active' && endDate < now) {
+          // Marcar como concluído se a data final já passou
+          return { ...plan, status: 'completed' };
+        }
+        return plan;
+      });
+      
+      setPlans(plansWithStatus);
     } catch (error) {
       console.error('Erro ao carregar planos automáticos:', error);
     }
@@ -186,45 +198,69 @@ export const AutomatedPlansStatus: React.FC = () => {
         </Button>
       </div>
 
-      {/* Planos Ativos */}
+      {/* Planos */}
       {plans.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {plans.map((plan) => (
-            <Card key={plan.id} className="border-l-4 border-l-green-500">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{plan.name}</CardTitle>
-                  <Badge variant="default" className="bg-green-100 text-green-800">
-                    Ativo
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">{plan.description}</p>
-                
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    <span>{new Date(plan.start_date).toLocaleDateString()} - {new Date(plan.end_date).toLocaleDateString()}</span>
+          {plans.map((plan) => {
+            const isCompleted = plan.status === 'completed';
+            const isPaused = plan.status === 'paused';
+            
+            return (
+              <Card key={plan.id} className={`border-l-4 ${
+                isCompleted ? 'border-l-blue-500' : 
+                isPaused ? 'border-l-yellow-500' : 
+                'border-l-green-500'
+              }`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">{plan.name}</CardTitle>
+                    <Badge variant="default" className={
+                      isCompleted ? 'bg-blue-100 text-blue-800' :
+                      isPaused ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }>
+                      {isCompleted ? 'Concluído' : isPaused ? 'Pausado' : 'Ativo'}
+                    </Badge>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Bot className="h-3 w-3" />
-                    <span>{plan.target_posts_per_day}/dia</span>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground">{plan.description}</p>
+                  
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>{new Date(plan.start_date).toLocaleDateString()} - {new Date(plan.end_date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Bot className="h-3 w-3" />
+                      <span>{plan.target_posts_per_day}/dia</span>
+                    </div>
                   </div>
-                </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8"
-                  onClick={() => togglePlanStatus(plan.id, plan.status)}
-                >
-                  <Pause className="mr-1 h-3 w-3" />
-                  Pausar
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                  {!isCompleted && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-8"
+                      onClick={() => togglePlanStatus(plan.id, plan.status)}
+                    >
+                      {isPaused ? (
+                        <>
+                          <Play className="mr-1 h-3 w-3" />
+                          Reativar
+                        </>
+                      ) : (
+                        <>
+                          <Pause className="mr-1 h-3 w-3" />
+                          Pausar
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <Card>
