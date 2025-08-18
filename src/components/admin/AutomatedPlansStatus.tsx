@@ -58,17 +58,31 @@ export const AutomatedPlansStatus: React.FC = () => {
         .from('weekly_posting_plans')
         .select('*')
         .eq('auto_generate', true)
-        .in('status', ['active', 'completed'])
+        .in('status', ['active', 'completed', 'paused'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
-      // Verificar se planos devem ser marcados como concluídos
+      // Verificar se planos ativos devem ser marcados como concluídos
+      const now = new Date();
+      const plansToUpdate = (data || []).filter(plan => {
+        const endDate = new Date(plan.end_date);
+        return plan.status === 'active' && endDate < now;
+      });
+
+      // Atualizar planos concluídos no banco
+      if (plansToUpdate.length > 0) {
+        const planIds = plansToUpdate.map(plan => plan.id);
+        await supabase
+          .from('weekly_posting_plans')
+          .update({ status: 'completed' })
+          .in('id', planIds);
+      }
+
+      // Aplicar status correto localmente
       const plansWithStatus = (data || []).map(plan => {
         const endDate = new Date(plan.end_date);
-        const now = new Date();
         if (plan.status === 'active' && endDate < now) {
-          // Marcar como concluído se a data final já passou
           return { ...plan, status: 'completed' };
         }
         return plan;
