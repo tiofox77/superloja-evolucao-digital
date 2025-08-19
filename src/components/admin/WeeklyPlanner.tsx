@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,7 +55,7 @@ interface WeeklyPlanPost {
   };
 }
 
-export const WeeklyPlanner: React.FC = () => {
+export const WeeklyPlanner = () => {
   const { toast } = useToast();
   const [plans, setPlans] = useState<WeeklyPlan[]>([]);
   const [planPosts, setPlanPosts] = useState<WeeklyPlanPost[]>([]);
