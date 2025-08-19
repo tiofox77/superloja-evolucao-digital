@@ -228,13 +228,14 @@ Ultra high resolution, professional marketing banner`;
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: prompt,
-        n: 1,
-        size: '1024x1024',
-        quality: 'high'
-      }),
+        body: JSON.stringify({
+          model: 'gpt-image-1',
+          prompt: prompt,
+          n: 1,
+          size: '1024x1024',
+          quality: 'high',
+          response_format: 'b64_json'
+        }),
     });
 
     let data = await response.json();
@@ -263,8 +264,17 @@ Ultra high resolution, professional marketing banner`;
     
     if (data.data && data.data[0]) {
       console.log('✅ [BANNER] Imagem gerada com sucesso');
-      // Para gpt-image-1, a resposta sempre vem em base64
-      return data.data[0].b64_json || data.data[0]; 
+      
+      // Para gpt-image-1 e dall-e-3, obter o base64
+      const imageBase64 = data.data[0].b64_json;
+      
+      if (imageBase64) {
+        console.log('✅ [BANNER] Base64 obtido, tamanho:', imageBase64.length);
+        return imageBase64;
+      } else {
+        console.error('❌ [BANNER] Base64 não encontrado na resposta');
+        return null;
+      }
     } else {
       console.error('❌ [BANNER] Erro na resposta da OpenAI:', data);
       return null;

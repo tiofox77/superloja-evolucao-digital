@@ -298,7 +298,8 @@ async function postToSocialMedia(post: any, content: any, supabase: any) {
         platform: post.platform,
         product_id: post.product_id,
         custom_prompt: content.content,
-        post_type: post.post_type
+        post_type: post.post_type,
+        banner_url: content.banner_url // Passar a URL do banner gerado
       }
     });
 
