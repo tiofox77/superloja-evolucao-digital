@@ -59,6 +59,8 @@ export const WeeklyPlanner: React.FC = () => {
   const { toast } = useToast();
   const [plans, setPlans] = useState<WeeklyPlan[]>([]);
   const [planPosts, setPlanPosts] = useState<WeeklyPlanPost[]>([]);
+  const [filteredPosts, setFilteredPosts] = useState<WeeklyPlanPost[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingPost, setEditingPost] = useState<WeeklyPlanPost | null>(null);
@@ -90,7 +92,36 @@ export const WeeklyPlanner: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPlans(data || []);
+      
+      // Verificar e atualizar status de planos completos
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // Final do dia
+      
+      const plansToUpdate = data?.filter(plan => {
+        const endDate = new Date(plan.end_date);
+        return plan.status === 'active' && endDate < today;
+      }) || [];
+
+      // Atualizar planos completos
+      for (const plan of plansToUpdate) {
+        await supabase
+          .from('weekly_posting_plans')
+          .update({ status: 'completed' })
+          .eq('id', plan.id);
+      }
+
+      // Recarregar dados se houve atualizações
+      if (plansToUpdate.length > 0) {
+        const { data: updatedData, error: updatedError } = await supabase
+          .from('weekly_posting_plans')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (updatedError) throw updatedError;
+        setPlans(updatedData || []);
+      } else {
+        setPlans(data || []);
+      }
     } catch (error) {
       console.error('Erro ao carregar planos:', error);
     }
@@ -124,10 +155,12 @@ export const WeeklyPlanner: React.FC = () => {
       }
       
       setPlanPosts(data || []);
+      setFilteredPosts(data || []);
     } catch (error) {
       console.error('Erro ao carregar posts do plano:', error);
       // Em caso de erro, mostrar um array vazio para não quebrar a UI
       setPlanPosts([]);
+      setFilteredPosts([]);
     }
   };
 
@@ -404,6 +437,25 @@ export const WeeklyPlanner: React.FC = () => {
     }
   };
 
+  const filterPostsByPlan = (planId: string | null) => {
+    setSelectedPlanId(planId);
+    if (planId) {
+      const filtered = planPosts.filter(post => post.plan_id === planId);
+      setFilteredPosts(filtered);
+    } else {
+      setFilteredPosts(planPosts);
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'active': return 'Ativo';
+      case 'paused': return 'Pausado';
+      case 'completed': return 'Concluído';
+      default: return status;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -539,7 +591,7 @@ export const WeeklyPlanner: React.FC = () => {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{plan.name}</CardTitle>
                 <Badge className={`${getStatusColor(plan.status)} text-white`}>
-                  {plan.status}
+                  {getStatusLabel(plan.status)}
                 </Badge>
               </div>
             </CardHeader>
@@ -561,39 +613,64 @@ export const WeeklyPlanner: React.FC = () => {
                 </div>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => togglePlanStatus(plan.id, plan.status)}
-              >
-                {plan.status === 'active' ? (
-                  <>
-                    <Pause className="mr-2 h-3 w-3" />
-                    Pausar
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-3 w-3" />
-                    Ativar
-                  </>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => filterPostsByPlan(plan.id)}
+                >
+                  <Eye className="mr-2 h-3 w-3" />
+                  Ver Posts
+                </Button>
+                {plan.status !== 'completed' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => togglePlanStatus(plan.id, plan.status)}
+                  >
+                    {plan.status === 'active' ? (
+                      <>
+                        <Pause className="mr-2 h-3 w-3" />
+                        Pausar
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-3 w-3" />
+                        Ativar
+                      </>
+                    )}
+                  </Button>
                 )}
-              </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Próximos Posts */}
-      {planPosts.length > 0 && (
+      {filteredPosts.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Próximos Posts Agendados
+                {selectedPlanId 
+                  ? `Posts do Plano: ${plans.find(p => p.id === selectedPlanId)?.name || 'Selecionado'}`
+                  : 'Próximos Posts Agendados'
+                }
               </CardTitle>
               <div className="flex gap-2">
+                {selectedPlanId && (
+                  <Button 
+                    onClick={() => filterPostsByPlan(null)} 
+                    variant="ghost" 
+                    size="sm"
+                  >
+                    Mostrar Todos
+                  </Button>
+                )}
                 <Button onClick={generateContent} variant="outline" size="sm">
                   <Settings className="mr-2 h-4 w-4" />
                   Gerar Conteúdo
@@ -607,7 +684,7 @@ export const WeeklyPlanner: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {planPosts.map((post) => (
+              {filteredPosts.map((post) => (
                 <div key={post.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
                     {getPostStatusIcon(post.status)}
