@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,17 +57,17 @@ interface WeeklyPlanPost {
 
 export const WeeklyPlanner = () => {
   const { toast } = useToast();
-  const [plans, setPlans] = useState<WeeklyPlan[]>([]);
-  const [planPosts, setPlanPosts] = useState<WeeklyPlanPost[]>([]);
-  const [filteredPosts, setFilteredPosts] = useState<WeeklyPlanPost[]>([]);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingPost, setEditingPost] = useState<WeeklyPlanPost | null>(null);
-  const [viewingPost, setViewingPost] = useState<WeeklyPlanPost | null>(null);
+  const [plans, setPlans] = React.useState<WeeklyPlan[]>([]);
+  const [planPosts, setPlanPosts] = React.useState<WeeklyPlanPost[]>([]);
+  const [filteredPosts, setFilteredPosts] = React.useState<WeeklyPlanPost[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [showCreateForm, setShowCreateForm] = React.useState(false);
+  const [editingPost, setEditingPost] = React.useState<WeeklyPlanPost | null>(null);
+  const [viewingPost, setViewingPost] = React.useState<WeeklyPlanPost | null>(null);
   
   // Form states
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = React.useState({
     name: '',
     description: '',
     start_date: '',
@@ -79,7 +79,7 @@ export const WeeklyPlanner = () => {
     auto_generate: true
   });
 
-  useEffect(() => {
+  React.useEffect(() => {
     loadPlans();
     loadPlanPosts();
   }, []);
