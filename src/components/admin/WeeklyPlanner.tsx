@@ -151,6 +151,7 @@ export const WeeklyPlanner = () => {
         
         if (fallbackError) throw fallbackError;
         setPlanPosts(fallbackData || []);
+        setFilteredPosts(fallbackData || []);
         return;
       }
       
@@ -566,14 +567,15 @@ export const WeeklyPlanner = () => {
                 <p className="text-xs text-muted-foreground">
                   {formData.auto_generate 
                     ? "✅ A IA irá gerar o conteúdo automaticamente nos horários agendados" 
-                    : "⚠️ Você precisará gerar o conteúdo manualmente para cada post"}
+                    : "❌ Você precisará gerar o conteúdo manualmente"
+                  }
                 </p>
               </div>
             </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button onClick={createPlan} disabled={loading}>
-                {loading ? 'Criando...' : 'Criar Plano'}
+            <div className="flex gap-3 pt-4">
+              <Button onClick={createPlan} disabled={loading} className="flex-1">
+                {loading ? "Criando..." : "Criar Plano"}
               </Button>
               <Button variant="outline" onClick={() => setShowCreateForm(false)}>
                 Cancelar
@@ -584,70 +586,80 @@ export const WeeklyPlanner = () => {
       )}
 
       {/* Lista de Planos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {plans.map((plan) => (
-          <Card key={plan.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{plan.name}</CardTitle>
-                <Badge className={`${getStatusColor(plan.status)} text-white`}>
-                  {getStatusLabel(plan.status)}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">{plan.description}</p>
-              
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-3 w-3" />
-                  <span>{new Date(plan.start_date).toLocaleDateString()} - {new Date(plan.end_date).toLocaleDateString()}</span>
+      {plans.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {plans.map((plan) => (
+            <Card key={plan.id} className="border-l-4" style={{borderLeftColor: getStatusColor(plan.status).replace('bg-', '#')}}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{plan.name}</CardTitle>
+                  <Badge className={`${getStatusColor(plan.status)} text-white`}>
+                    {getStatusLabel(plan.status)}
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Target className="h-3 w-3" />
-                  <span>{plan.target_posts_per_day} posts/dia</span>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">{plan.description}</p>
+                
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>{new Date(plan.start_date).toLocaleDateString()} - {new Date(plan.end_date).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Target className="h-4 w-4" />
+                    <span>{plan.target_posts_per_day}/dia</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-3 w-3" />
-                  <span>{plan.preferred_times.join(', ')}</span>
-                </div>
-              </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => filterPostsByPlan(plan.id)}
-                >
-                  <Eye className="mr-2 h-3 w-3" />
-                  Ver Posts
-                </Button>
-                {plan.status !== 'completed' && (
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => togglePlanStatus(plan.id, plan.status)}
+                    onClick={() => filterPostsByPlan(plan.id)}
                   >
-                    {plan.status === 'active' ? (
-                      <>
-                        <Pause className="mr-2 h-3 w-3" />
-                        Pausar
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-3 w-3" />
-                        Ativar
-                      </>
-                    )}
+                    <Eye className="mr-2 h-3 w-3" />
+                    Ver Posts
                   </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  {plan.status !== 'completed' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => togglePlanStatus(plan.id, plan.status)}
+                    >
+                      {plan.status === 'active' ? (
+                        <>
+                          <Pause className="mr-2 h-3 w-3" />
+                          Pausar
+                        </>
+                      ) : (
+                        <>
+                          <Play className="mr-2 h-3 w-3" />
+                          Ativar
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="text-center py-8">
+            <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">
+              Nenhum plano semanal encontrado
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Crie seu primeiro plano para começar a automatizar suas postagens
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Próximos Posts */}
       {filteredPosts.length > 0 && (
@@ -688,136 +700,86 @@ export const WeeklyPlanner = () => {
                 <div key={post.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
                     {getPostStatusIcon(post.status)}
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">
+                    <div>
+                      <p className="font-medium">
                         {post.product?.name || 'Post genérico'}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {new Date(post.scheduled_for).toLocaleString()} • {post.platform} • {post.post_type}
                       </p>
-                      {post.generated_content && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                          {post.generated_content.substring(0, 100)}...
-                        </p>
-                      )}
                     </div>
                   </div>
+                  
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline">
                       {post.status}
                     </Badge>
                     
-                    {/* Botão Ver */}
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" onClick={() => setViewingPost(post)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Visualizar Post</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <Label className="font-semibold">Produto:</Label>
-                            <p>{post.product?.name || 'Post genérico'}</p>
-                          </div>
-                          <div>
-                            <Label className="font-semibold">Agendado para:</Label>
-                            <p>{new Date(post.scheduled_for).toLocaleString()}</p>
-                          </div>
-                          <div>
-                            <Label className="font-semibold">Plataforma:</Label>
-                            <p>{post.platform}</p>
-                          </div>
-                          <div>
-                            <Label className="font-semibold">Tipo:</Label>
-                            <p>{post.post_type}</p>
-                          </div>
-                          {post.generated_content && (
-                            <div>
-                              <Label className="font-semibold">Conteúdo:</Label>
-                              <div className="p-3 bg-muted rounded-lg whitespace-pre-wrap">
-                                {post.generated_content}
+                    <div className="flex gap-1">
+                      {post.generated_content && (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="sm" onClick={() => setViewingPost(post)}>
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Visualizar Post</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-3">
+                              <div>
+                                <Label>Produto</Label>
+                                <p className="text-sm">{post.product?.name}</p>
+                              </div>
+                              <div>
+                                <Label>Conteúdo</Label>
+                                <p className="text-sm whitespace-pre-wrap">{post.generated_content}</p>
+                              </div>
+                              <div>
+                                <Label>Agendado para</Label>
+                                <p className="text-sm">{new Date(post.scheduled_for).toLocaleString()}</p>
                               </div>
                             </div>
-                          )}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-
-                    {/* Botão Editar */}
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" onClick={() => setEditingPost(post)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Editar Post</DialogTitle>
-                        </DialogHeader>
-                        {editingPost && (
-                          <div className="space-y-4">
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                      
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="sm" onClick={() => setEditingPost(post)}>
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Editar Post</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-3">
                             <div>
-                              <Label>Data e Hora</Label>
-                              <Input
-                                type="datetime-local"
-                                value={new Date(editingPost.scheduled_for).toISOString().slice(0, 16)}
-                                onChange={(e) => setEditingPost({
-                                  ...editingPost,
-                                  scheduled_for: new Date(e.target.value).toISOString()
-                                })}
+                              <Label>Conteúdo</Label>
+                              <Textarea
+                                value={editingPost?.content || editingPost?.generated_content || ''}
+                                onChange={(e) => setEditingPost(prev => prev ? {...prev, content: e.target.value} : null)}
+                                rows={4}
                               />
                             </div>
                             <div>
-                              <Label>Plataforma</Label>
-                              <Select 
-                                value={editingPost.platform} 
-                                onValueChange={(value) => setEditingPost({...editingPost, platform: value})}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="facebook">Facebook</SelectItem>
-                                  <SelectItem value="instagram">Instagram</SelectItem>
-                                  <SelectItem value="both">Ambos</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <Label>Data/Hora</Label>
+                              <Input
+                                type="datetime-local"
+                                value={editingPost ? new Date(editingPost.scheduled_for).toISOString().slice(0, 16) : ''}
+                                onChange={(e) => setEditingPost(prev => prev ? {...prev, scheduled_for: new Date(e.target.value).toISOString()} : null)}
+                              />
                             </div>
-                            <div>
-                              <Label>Tipo de Post</Label>
-                              <Select 
-                                value={editingPost.post_type} 
-                                onValueChange={(value) => setEditingPost({...editingPost, post_type: value})}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="product">Produto</SelectItem>
-                                  <SelectItem value="promotional">Promocional</SelectItem>
-                                  <SelectItem value="engagement">Engajamento</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            {editingPost.generated_content && (
-                              <div>
-                                <Label>Conteúdo</Label>
-                                <Textarea
-                                  value={editingPost.generated_content}
-                                  onChange={(e) => setEditingPost({
-                                    ...editingPost,
-                                    generated_content: e.target.value
-                                  })}
-                                  rows={6}
-                                />
-                              </div>
-                            )}
                             <div className="flex gap-2">
-                              <Button onClick={() => updatePost(editingPost.id, editingPost)}>
+                              <Button
+                                onClick={() => editingPost && updatePost(editingPost.id, {
+                                  content: editingPost.content,
+                                  scheduled_for: editingPost.scheduled_for
+                                })}
+                                className="flex-1"
+                              >
                                 Salvar
                               </Button>
                               <Button variant="outline" onClick={() => setEditingPost(null)}>
@@ -825,23 +787,15 @@ export const WeeklyPlanner = () => {
                               </Button>
                             </div>
                           </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-
-                    {/* Botão Postar Agora - para posts gerados */}
-                    {post.status === 'generated' && (
-                      <Button variant="default" size="sm" onClick={() => postNow(post.id)}>
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    )}
-                    
-                    {/* Botão Gerar - para posts pendentes */}
-                    {post.status === 'pending' && (
-                      <Button variant="outline" size="sm" onClick={() => postNow(post.id)}>
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                    )}
+                        </DialogContent>
+                      </Dialog>
+                      
+                      {post.status === 'generated' && (
+                        <Button variant="ghost" size="sm" onClick={() => postNow(post.id)}>
+                          <Send className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
