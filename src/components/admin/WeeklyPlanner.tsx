@@ -102,16 +102,32 @@ export const WeeklyPlanner: React.FC = () => {
         .from('weekly_plan_posts')
         .select(`
           *,
-          products(name, image_url)
+          products!inner(name, image_url)
         `)
         .in('status', ['pending', 'generated', 'posted', 'failed'])
         .order('scheduled_for', { ascending: true })
-        .limit(20);
+        .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro na query de posts:', error);
+        // Fallback: carregar posts sem join se der erro
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('weekly_plan_posts')
+          .select('*')
+          .in('status', ['pending', 'generated', 'posted', 'failed'])
+          .order('scheduled_for', { ascending: true })
+          .limit(50);
+        
+        if (fallbackError) throw fallbackError;
+        setPlanPosts(fallbackData || []);
+        return;
+      }
+      
       setPlanPosts(data || []);
     } catch (error) {
       console.error('Erro ao carregar posts do plano:', error);
+      // Em caso de erro, mostrar um array vazio para não quebrar a UI
+      setPlanPosts([]);
     }
   };
 
