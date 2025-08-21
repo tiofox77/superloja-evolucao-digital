@@ -44,8 +44,10 @@ const SettingsContext = createContext<SettingsContextType>({
 export const useSettings = () => useContext(SettingsContext);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  console.log('SettingsProvider: Starting component initialization');
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [loading, setLoading] = useState(true);
+  console.log('SettingsProvider: State initialized');
 
   const refreshSettings = async () => {
     try {

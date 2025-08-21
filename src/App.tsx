@@ -60,6 +60,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { SEOHead } from "@/components/SEOHead";
 
 function App() {
+  console.log('App.tsx: App component starting to render');
   return (
     <HelmetProvider>
       <SettingsProvider>
