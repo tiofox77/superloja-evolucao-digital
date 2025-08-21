@@ -5,6 +5,7 @@ import { Hero } from '@/components/Hero';
 import { FeaturedProducts } from '@/components/FeaturedProducts';
 import { SEOHead } from '@/components/SEOHead';
 import ChatWidget from '@/components/ChatWidget';
+import { FoxLoader } from '@/components/ui/FoxLoader';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useSettings } from '@/contexts/SettingsContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +31,7 @@ import {
 const Index = () => {
   const { trackEvent } = useAnalytics();
   const { settings } = useSettings();
+  const [isLoading, setIsLoading] = useState(true);
   const [healthProducts, setHealthProducts] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [recentProducts, setRecentProducts] = useState([]);
@@ -44,6 +46,7 @@ const Index = () => {
   }, []);
 
   const loadPageData = async () => {
+    setIsLoading(true);
     try {
       // Carregar produtos de saúde e bem estar
       const { data: healthCategory } = await supabase
@@ -122,8 +125,34 @@ const Index = () => {
 
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <SEOHead 
+          pageType="global"
+          title={`${settings.store_name} - ${settings.store_description}`}
+          description={`Descubra os melhores produtos tecnológicos com ofertas imperdíveis. Smartphones, computadores, acessórios e muito mais na ${settings.store_name}!`}
+          keywords="eletrônicos Angola, tecnologia Luanda, smartphones, computadores, loja online Angola"
+          ogImage={settings.logo_url}
+        />
+        <Header />
+        
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <FoxLoader 
+            size="lg" 
+            text="Preparando sua experiência de compras..." 
+          />
+        </div>
+        
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
