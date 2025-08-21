@@ -21,7 +21,7 @@ const LayoutContext = createContext<LayoutContextType>({
 
 export const useLayout = () => useContext(LayoutContext);
 
-export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const LayoutProvider = ({ children }: { children: React.ReactNode }) => {
   const [layoutSettings, setLayoutSettings] = useState<LayoutSettings>({});
   const [loading, setLoading] = useState(true);
 
