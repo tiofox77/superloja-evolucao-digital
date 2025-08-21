@@ -5,7 +5,7 @@ import { Hero } from '@/components/Hero';
 import { FeaturedProducts } from '@/components/FeaturedProducts';
 import { SEOHead } from '@/components/SEOHead';
 import ChatWidget from '@/components/ChatWidget';
-import { FoxLoader } from '@/components/ui/FoxLoader';
+import { ImmersiveLoader } from '@/components/ui/ImmersiveLoader';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useSettings } from '@/contexts/SettingsContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -142,9 +142,8 @@ const Index = () => {
         />
         <Header />
         
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <FoxLoader 
-            size="lg" 
+        <div className="fixed inset-0 z-50">
+          <ImmersiveLoader 
             text="Preparando sua experiência de compras..." 
           />
         </div>

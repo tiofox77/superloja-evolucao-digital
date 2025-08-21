@@ -208,5 +208,10 @@
   }
   95% { 
     transform: scaleY(0.1); 
-  }
+}
+
+/* Gradiente radial personalizado */
+.bg-gradient-radial {
+  background: radial-gradient(circle, var(--tw-gradient-stops));
+}
 }
