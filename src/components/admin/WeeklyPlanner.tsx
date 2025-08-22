@@ -133,7 +133,7 @@ export const WeeklyPlanner = () => {
         .from('weekly_plan_posts')
         .select(`
           *,
-          products!inner(name, image_url)
+          products(name, image_url)
         `)
         .in('status', ['pending', 'generated', 'posted', 'failed'])
         .order('scheduled_for', { ascending: true })
@@ -150,13 +150,26 @@ export const WeeklyPlanner = () => {
           .limit(50);
         
         if (fallbackError) throw fallbackError;
-        setPlanPosts(fallbackData || []);
-        setFilteredPosts(fallbackData || []);
+        
+        // Mapear dados sem product info
+        const mappedData = fallbackData?.map(post => ({
+          ...post,
+          product: null
+        })) || [];
+        
+        setPlanPosts(mappedData);
+        setFilteredPosts(mappedData);
         return;
       }
+
+      // Mapear dados com product info
+      const mappedData = data?.map(post => ({
+        ...post,
+        product: post.products || null
+      })) || [];
       
-      setPlanPosts(data || []);
-      setFilteredPosts(data || []);
+      setPlanPosts(mappedData);
+      setFilteredPosts(mappedData);
     } catch (error) {
       console.error('Erro ao carregar posts do plano:', error);
       // Em caso de erro, mostrar um array vazio para não quebrar a UI
