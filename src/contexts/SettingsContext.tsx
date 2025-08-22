@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Settings {
@@ -35,19 +35,19 @@ const defaultSettings: Settings = {
   whatsapp: ''
 };
 
-const SettingsContext = createContext<SettingsContextType>({
+const SettingsContext = React.createContext<SettingsContextType>({
   settings: defaultSettings,
   loading: true,
   refreshSettings: async () => {}
 });
 
-export const useSettings = () => useContext(SettingsContext);
+export const useSettings = () => React.useContext(SettingsContext);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = React.useState<Settings>(defaultSettings);
+  const [loading, setLoading] = React.useState(true);
 
-  const refreshSettings = async () => {
+  const refreshSettings = React.useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('settings')
@@ -81,14 +81,20 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    refreshSettings();
   }, []);
 
+  React.useEffect(() => {
+    refreshSettings();
+  }, [refreshSettings]);
+
+  const contextValue = React.useMemo(() => ({
+    settings,
+    loading,
+    refreshSettings
+  }), [settings, loading, refreshSettings]);
+
   return (
-    <SettingsContext.Provider value={{ settings, loading, refreshSettings }}>
+    <SettingsContext.Provider value={contextValue}>
       {children}
     </SettingsContext.Provider>
   );
