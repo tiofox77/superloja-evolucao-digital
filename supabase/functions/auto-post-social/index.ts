@@ -570,34 +570,82 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
       throw new Error('Erro no Facebook: ' + JSON.stringify(result));
     }
   } else {
-    // Post de texto apenas ou com link de imagem do produto
+    // Post de texto com imagem do produto (se disponível)
     console.log('📝 [FACEBOOK DEBUG] Postando texto...');
     
-    let postData: any = {
-      message: content,
-      access_token: pageInfo.access_token
-    };
-
-    // Não anexar link de imagem do produto para evitar exibir URL do Supabase
-    // Mantemos somente a mensagem. Caso necessário, futuramente anexar link do site (www.superloja.ao)
-
-    
-    const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams(postData).toString()
-    });
-
-    const result = await response.json();
-    
-    if (response.ok) {
-      return { success: true, post_id: result.id };
-    } else {
-      throw new Error('Erro no Facebook: ' + JSON.stringify(result));
+    // Verificar se há produto com imagem
+    let productImage = null;
+    if (product_id) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('image_url')
+        .eq('id', product_id)
+        .single();
+      
+      if (product?.image_url) {
+        productImage = product.image_url;
+        console.log('🖼️ [FACEBOOK DEBUG] Imagem do produto encontrada:', productImage);
+      }
     }
-  }
+
+    // Se há imagem do produto, postar como foto
+    if (productImage) {
+      console.log('📷 [FACEBOOK DEBUG] Postando com imagem do produto...');
+      
+      let postData: any = {
+        url: productImage,
+        caption: content,
+        access_token: pageInfo.access_token
+      };
+      
+      const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/photos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(postData).toString()
+      });
+
+      const result = await response.json();
+      
+      console.log('🔍 [FACEBOOK DEBUG] Resposta da API (com imagem):', {
+        status: response.status,
+        ok: response.ok,
+        result: result
+      });
+      
+      if (response.ok) {
+        console.log('✅ [FACEBOOK DEBUG] Post com imagem publicado:', result.id);
+        return { success: true, post_id: result.id, used_product_image: true };
+      } else {
+        console.error('❌ [FACEBOOK DEBUG] Erro ao postar com imagem:', result);
+        throw new Error('Erro no Facebook: ' + JSON.stringify(result));
+      }
+    } else {
+      // Post só de texto
+      console.log('📝 [FACEBOOK DEBUG] Postando só texto...');
+      
+      let postData: any = {
+        message: content,
+        access_token: pageInfo.access_token
+      };
+      
+      const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(postData).toString()
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        return { success: true, post_id: result.id };
+      } else {
+        throw new Error('Erro no Facebook: ' + JSON.stringify(result));
+      }
+    }
 }
 
 async function postToInstagram(content: string, product_id?: string, supabase?: any, banner_url?: string) {
