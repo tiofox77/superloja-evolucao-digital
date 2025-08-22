@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Settings {
@@ -43,11 +43,9 @@ const SettingsContext = createContext<SettingsContextType>({
 
 export const useSettings = () => useContext(SettingsContext);
 
-export const SettingsProvider = ({ children }: { children: ReactNode }) => {
-  console.log('SettingsProvider: Starting component initialization');
+export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [loading, setLoading] = useState(true);
-  console.log('SettingsProvider: State initialized');
 
   const refreshSettings = async () => {
     try {

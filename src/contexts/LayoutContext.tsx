@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LayoutSettings {
@@ -21,7 +21,7 @@ const LayoutContext = createContext<LayoutContextType>({
 
 export const useLayout = () => useContext(LayoutContext);
 
-export const LayoutProvider = ({ children }: { children: ReactNode }) => {
+export const LayoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [layoutSettings, setLayoutSettings] = useState<LayoutSettings>({});
   const [loading, setLoading] = useState(true);
 

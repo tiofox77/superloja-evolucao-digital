@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-// componentTagger disabled to avoid React interop issues
+// componentTagger disabled to avoid dev runtime conflicts
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -25,15 +25,14 @@ export default defineConfig(({ mode }) => ({
     }
   },
   plugins: [
-    react(),
+    react()
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "react": path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
-      "react/jsx-runtime": path.resolve(__dirname, "./node_modules/react/jsx-runtime"),
     },
-    dedupe: ['react', 'react-dom', 'react/jsx-runtime'],
+    dedupe: ['react', 'react-dom'],
   },
 }));
