@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface AutoPostRequest {
-  action: 'generate_content' | 'schedule_post' | 'post_now' | 'get_scheduled';
+  action?: 'generate_content' | 'schedule_post' | 'post_now' | 'get_scheduled';
   platform?: 'facebook' | 'instagram' | 'both';
   product_id?: string;
   custom_prompt?: string;
@@ -15,6 +15,10 @@ interface AutoPostRequest {
   post_type?: 'product' | 'promotional' | 'engagement' | 'custom';
   banner_base64?: string;
   banner_url?: string;
+  // Novos campos para posts diretos
+  content?: string;
+  post_id?: string;
+  table_name?: 'scheduled_posts' | 'weekly_plan_posts';
 }
 
 serve(async (req) => {
@@ -29,8 +33,32 @@ serve(async (req) => {
   );
 
   try {
-    const { action, platform, product_id, custom_prompt, schedule_time, post_type, banner_base64, banner_url }: AutoPostRequest = await req.json();
+    const requestBody: AutoPostRequest = await req.json();
+    const { action, platform, product_id, custom_prompt, schedule_time, post_type, banner_base64, banner_url, content, post_id, table_name } = requestBody;
 
+    // Se recebemos conteúdo direto e post_id, é uma chamada direta para postar um post específico
+    if (content && post_id && table_name) {
+      console.log('📤 Postagem direta solicitada:', { post_id, table_name, platform });
+      
+      const result = await postNow(platform, product_id, content, post_type, supabase, banner_base64, banner_url);
+      
+      // Atualizar status do post na tabela específica
+      const { error: updateError } = await supabase
+        .from(table_name)
+        .update({ 
+          status: 'posted',
+          scheduled_for: new Date().toISOString()
+        })
+        .eq('id', post_id);
+
+      if (updateError) {
+        console.error('Erro ao atualizar status do post:', updateError);
+      }
+
+      return result;
+    }
+
+    // Fluxo normal baseado em actions
     switch (action) {
       case 'generate_content':
         return await generateContent(product_id, post_type, custom_prompt, supabase);

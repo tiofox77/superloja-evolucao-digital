@@ -423,31 +423,64 @@ export const WeeklyPlanner = () => {
 
   const postNow = async (postId: string) => {
     try {
-      // Primeiro atualizar o post para status 'generated' se ainda estiver 'pending'
+      setLoading(true);
+      
+      // Buscar dados do post
+      const { data: post, error: fetchError } = await supabase
+        .from('weekly_plan_posts')
+        .select(`
+          *,
+          products(name, image_url, description, price)
+        `)
+        .eq('id', postId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (!post) {
+        throw new Error('Post não encontrado');
+      }
+
+      // Postar diretamente usando a edge function auto-post-social
+      const { data, error } = await supabase.functions.invoke('auto-post-social', {
+        body: {
+          content: post.generated_content || post.content || `Confira nosso produto: ${post.products?.name}`,
+          platform: post.platform,
+          post_type: post.post_type,
+          product_id: post.product_id,
+          post_id: postId,
+          table_name: 'weekly_plan_posts'
+        }
+      });
+
+      if (error) throw error;
+
+      // Atualizar status do post
       const { error: updateError } = await supabase
         .from('weekly_plan_posts')
         .update({ 
-          status: 'generated',
+          status: 'posted',
           scheduled_for: new Date().toISOString()
         })
         .eq('id', postId);
 
       if (updateError) throw updateError;
 
-      // Então processar imediatamente
-      await processPost();
-
       toast({
         title: "Post enviado!",
         description: "Post foi enviado imediatamente para as redes sociais",
       });
+
+      loadPlanPosts();
     } catch (error) {
       console.error('Erro ao postar agora:', error);
       toast({
         title: "Erro",
-        description: "Falha ao enviar post",
+        description: `Falha ao enviar post: ${error.message}`,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
