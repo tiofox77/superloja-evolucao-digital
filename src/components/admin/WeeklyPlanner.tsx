@@ -716,38 +716,52 @@ export const WeeklyPlanner = () => {
                     </Badge>
                     
                     <div className="flex gap-1">
-                      {post.generated_content && (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={() => setViewingPost(post)}>
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Visualizar Post</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-3">
-                              <div>
-                                <Label>Produto</Label>
-                                <p className="text-sm">{post.product?.name}</p>
-                              </div>
-                              <div>
-                                <Label>Conteúdo</Label>
-                                <p className="text-sm whitespace-pre-wrap">{post.generated_content}</p>
-                              </div>
-                              <div>
-                                <Label>Agendado para</Label>
-                                <p className="text-sm">{new Date(post.scheduled_for).toLocaleString()}</p>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      )}
-                      
+                      {/* Botão Ver Conteúdo - sempre visível */}
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" onClick={() => setEditingPost(post)}>
+                          <Button variant="ghost" size="sm" title="Ver conteúdo">
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Visualizar Post</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-3">
+                            <div>
+                              <Label>Produto</Label>
+                              <p className="text-sm">{post.product?.name || 'Post genérico'}</p>
+                            </div>
+                            <div>
+                              <Label>Plataforma</Label>
+                              <p className="text-sm">{post.platform}</p>
+                            </div>
+                            <div>
+                              <Label>Tipo de Post</Label>
+                              <p className="text-sm">{post.post_type}</p>
+                            </div>
+                            <div>
+                              <Label>Conteúdo</Label>
+                              <p className="text-sm whitespace-pre-wrap">
+                                {post.generated_content || post.content || 'Conteúdo não gerado ainda'}
+                              </p>
+                            </div>
+                            <div>
+                              <Label>Agendado para</Label>
+                              <p className="text-sm">{new Date(post.scheduled_for).toLocaleString()}</p>
+                            </div>
+                            <div>
+                              <Label>Status</Label>
+                              <Badge variant="outline">{post.status}</Badge>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      
+                      {/* Botão Editar - sempre visível */}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="sm" title="Editar post">
                             <Edit className="h-3 w-3" />
                           </Button>
                         </DialogTrigger>
@@ -790,8 +804,14 @@ export const WeeklyPlanner = () => {
                         </DialogContent>
                       </Dialog>
                       
-                      {post.status === 'generated' && (
-                        <Button variant="ghost" size="sm" onClick={() => postNow(post.id)}>
+                      {/* Botão Postar Agora - disponível para posts pendentes e gerados */}
+                      {(post.status === 'generated' || post.status === 'pending') && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => postNow(post.id)}
+                          title="Postar agora"
+                        >
                           <Send className="h-3 w-3" />
                         </Button>
                       )}
