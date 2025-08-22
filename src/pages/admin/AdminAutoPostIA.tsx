@@ -150,10 +150,22 @@ interface SocialMediaSettings {
   is_active: boolean;
 }
 
+interface PostHistory {
+  id: string;
+  platform: string;
+  content: string;
+  posted_at: string;
+  post_type: string;
+  status: 'success' | 'failed';
+  error_message?: string;
+  products?: Product;
+}
+
 const AdminAutoPostIA: React.FC = () => {
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
+  const [postHistory, setPostHistory] = useState<PostHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState('');
   const [generatedBanner, setGeneratedBanner] = useState<string | null>(null);
@@ -183,6 +195,7 @@ const AdminAutoPostIA: React.FC = () => {
     loadProducts();
     loadScheduledPosts();
     loadSocialSettings();
+    loadPostHistory();
   }, []);
 
   const loadProducts = async () => {
@@ -253,6 +266,52 @@ const AdminAutoPostIA: React.FC = () => {
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
+    }
+  };
+
+  const loadPostHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('social_posts_history')
+        .select(`
+          id,
+          platform,
+          content,
+          posted_at,
+          post_type,
+          product_id,
+          products:product_id (
+            id,
+            name,
+            price,
+            image_url
+          )
+        `)
+        .order('posted_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.log('Erro ao carregar histórico:', error);
+        // Set empty array if table doesn't exist or has no data
+        setPostHistory([]);
+        return;
+      }
+      
+      // Transform data to match PostHistory interface
+      const transformedData: PostHistory[] = (data || []).map(item => ({
+        id: item.id,
+        platform: item.platform,
+        content: item.content,
+        posted_at: item.posted_at,
+        post_type: item.post_type,
+        status: 'success' as const, // Assuming posts in history were successful
+        products: item.products as Product | undefined
+      }));
+      
+      setPostHistory(transformedData);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+      setPostHistory([]);
     }
   };
 
@@ -598,26 +657,36 @@ const AdminAutoPostIA: React.FC = () => {
       </div>
 
       <Tabs defaultValue="create" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="create" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
-            Criar Post
+            <span className="hidden sm:inline">Criar Post</span>
+            <span className="sm:hidden">Criar</span>
           </TabsTrigger>
           <TabsTrigger value="weekly" className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
-            Planos Semanais
+            <span className="hidden sm:inline">Planos Semanais</span>
+            <span className="sm:hidden">Planos</span>
           </TabsTrigger>
           <TabsTrigger value="automated" className="flex items-center gap-2">
             <Bot className="h-4 w-4" />
-            Automático IA
+            <span className="hidden sm:inline">Status IA</span>
+            <span className="sm:hidden">IA</span>
           </TabsTrigger>
           <TabsTrigger value="scheduled" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Agendados
+            <Clock className="h-4 w-4" />
+            <span className="hidden sm:inline">Agendados</span>
+            <span className="sm:hidden">Agenda</span>
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            <span className="hidden sm:inline">Histórico</span>
+            <span className="sm:hidden">Log</span>
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Configurações
+            <span className="hidden sm:inline">Config</span>
+            <span className="sm:hidden">⚙️</span>
           </TabsTrigger>
         </TabsList>
 
@@ -899,6 +968,122 @@ const AdminAutoPostIA: React.FC = () => {
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Nenhum post agendado encontrado</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                Histórico de Posts Publicados
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Últimos 50 posts publicados • Filtrados por data de publicação
+              </p>
+            </CardHeader>
+            <CardContent>
+              {postHistory.length > 0 ? (
+                <div className="space-y-4">
+                  {postHistory.map((post) => (
+                    <div key={post.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {getPlatformIcon(post.platform)}
+                          <Badge className={getPlatformColor(post.platform)}>
+                            {post.platform}
+                          </Badge>
+                          <Badge variant="outline">{post.post_type}</Badge>
+                          <Badge variant={post.status === 'success' ? 'default' : 'destructive'}>
+                            {post.status === 'success' ? '✅ Sucesso' : '❌ Falhou'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-muted-foreground">
+                            {new Date(post.posted_at).toLocaleString()}
+                          </div>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4 mr-1" />
+                                Ver
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                  <History className="h-5 w-5" />
+                                  Post Publicado
+                                </DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <strong>Plataforma:</strong> {post.platform}
+                                  </div>
+                                  <div>
+                                    <strong>Tipo:</strong> {post.post_type}
+                                  </div>
+                                  <div>
+                                    <strong>Status:</strong> {post.status}
+                                  </div>
+                                  <div>
+                                    <strong>Publicado em:</strong> {new Date(post.posted_at).toLocaleString()}
+                                  </div>
+                                </div>
+                                <Separator />
+                                <PostPreview 
+                                  content={post.content}
+                                  platform={post.platform}
+                                  postType={post.post_type}
+                                  productData={post.products ? {
+                                    name: post.products.name,
+                                    price: post.products.price,
+                                    image_url: post.products.image_url
+                                  } : undefined}
+                                  hasBanner={!!post.products}
+                                />
+                                {post.products && (
+                                  <div className="bg-muted p-3 rounded-lg">
+                                    <p className="text-sm font-medium mb-1">Produto Associado:</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {post.products.name} - {post.products.price.toLocaleString()} AOA
+                                    </p>
+                                  </div>
+                                )}
+                                {post.error_message && (
+                                  <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-lg">
+                                    <p className="text-sm font-medium mb-1 text-destructive">Erro:</p>
+                                    <p className="text-sm text-destructive">{post.error_message}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
+                      <p className="text-sm bg-muted p-3 rounded line-clamp-3">{post.content}</p>
+                      {post.products && (
+                        <div className="text-xs text-muted-foreground">
+                          Produto: {post.products.name}
+                        </div>
+                      )}
+                      {post.error_message && (
+                        <div className="text-xs text-destructive bg-destructive/10 p-2 rounded">
+                          Erro: {post.error_message}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhum histórico de posts encontrado</p>
+                  <p className="text-xs mt-2">Os posts publicados aparecerão aqui</p>
                 </div>
               )}
             </CardContent>
