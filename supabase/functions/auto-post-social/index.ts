@@ -788,3 +788,12 @@ async function getScheduledPosts(supabase: any) {
     { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
   );
 }
+
+  } catch (error) {
+    console.error('Erro no auto-post:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+    );
+  }
+});
