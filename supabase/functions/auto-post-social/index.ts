@@ -313,35 +313,6 @@ Ultra high resolution, professional marketing banner`;
   }
 }
 
-// Função para criar HTML do banner
-function createBannerHtml(product: any, config: any, postType: string, logoUrl: string) {
-  const promoTag = postType === 'promotional' ? 
-    `<div style="background: #FF6B35; color: white; padding: 10px 20px; border-radius: 20px; font-size: 24px; font-weight: bold; position: absolute; top: 80px; right: 40px; transform: rotate(15deg); box-shadow: 0 4px 15px rgba(0,0,0,0.3);">OFERTA ESPECIAL!</div>` : '';
-
-  return `
-    <div style="width: ${config.width}px; height: ${config.height}px; background: ${config.background}; color: ${config.textColor}; position: relative; font-family: Arial, sans-serif; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; box-sizing: border-box;">
-      ${promoTag}
-      
-      ${logoUrl ? `<div style="width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 20px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.2); margin-bottom: 30px;">
-        <img src="${logoUrl}" style="max-width: 80px; max-height: 80px; object-fit: contain;" />
-      </div>` : ''}
-      
-      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
-        ${product.image_url ? `<img src="${product.image_url}" style="max-width: 300px; max-height: 300px; object-fit: contain; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.3); margin-bottom: 30px;" />` : ''}
-        
-        <h2 style="font-size: 48px; font-weight: bold; margin: 0 0 20px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); line-height: 1.2;">${product.name}</h2>
-        
-        <div style="font-size: 42px; font-weight: bold; background: rgba(255,255,255,0.2); padding: 15px 30px; border-radius: 25px; margin: 20px 0; border: 3px solid ${config.textColor};">${product.price.toLocaleString()} AOA</div>
-      </div>
-      
-      <div style="font-size: 24px; opacity: 0.9; text-align: center;">
-        <div style="font-weight: bold; margin-bottom: 5px;">SuperLoja</div>
-        <div>Entrega grátis em Luanda • www.superloja.ao</div>
-      </div>
-    </div>
-  `;
-}
-
 async function schedulePost(platform?: string, product_id?: string, custom_prompt?: string, schedule_time?: string, post_type?: string, supabase?: any) {
   // Gerar conteúdo primeiro
   const contentResponse = await generateContent(product_id, post_type, custom_prompt, supabase);
@@ -467,266 +438,110 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
         success: true,
         content: content,
         results: results,
-        has_banner: !!bannerBase64
+        message: 'Post enviado com sucesso!'
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
+
   } catch (error) {
-    console.error('❌ Erro geral em postNow:', error);
+    console.error('❌ Erro no postNow:', error);
     return new Response(
       JSON.stringify({ 
         success: false,
         error: error.message 
       }),
-      { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders } 
-      }
+      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
 }
 
-async function postToFacebook(content: string, product_id?: string, supabase?: any, bannerBase64?: string) {
-  console.log('🔍 [FACEBOOK DEBUG] Iniciando postagem...');
-  console.log('🔍 [FACEBOOK DEBUG] Parâmetros recebidos:', { 
-    content: content ? 'presente' : 'ausente',
-    product_id: product_id || 'não informado',
-    bannerBase64: bannerBase64 ? 'presente' : 'ausente',
-    bannerLength: bannerBase64 ? bannerBase64.length : 0
-  });
+async function postToFacebook(content: string, product_id?: string, supabase?: any, banner_base64?: string) {
+  const FACEBOOK_PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
   
-  // Buscar configurações do banco de dados
-  const { data: settings, error: settingsError } = await supabase
-    .from('social_media_settings')
-    .select('settings')
-    .eq('platform', 'facebook')
-    .eq('is_active', true)
-    .single();
-  
-  console.log('🔍 [FACEBOOK DEBUG] Configurações encontradas:', {
-    hasSettings: !!settings,
-    settingsError,
-    hasAccessToken: !!settings?.settings?.access_token,
-    hasPageId: !!settings?.settings?.page_id,
-    tokenPrefix: settings?.settings?.access_token?.substring(0, 10) + '...',
-    pageId: settings?.settings?.page_id,
-    hasBanner: !!bannerBase64
-  });
-  
-  if (!settings?.settings?.access_token || !settings?.settings?.page_id) {
-    throw new Error('Token do Facebook não configurado');
+  if (!FACEBOOK_PAGE_ACCESS_TOKEN) {
+    throw new Error('Facebook Page Access Token não configurado');
   }
-  
-  const FACEBOOK_PAGE_ACCESS_TOKEN = settings.settings.access_token;
-  const FACEBOOK_PAGE_ID = settings.settings.page_id;
 
-  // Primeiro obter o Page Access Token
-  console.log('🔍 [FACEBOOK DEBUG] Obtendo Page Token...');
-  const pageTokenResponse = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${FACEBOOK_PAGE_ACCESS_TOKEN}`);
-  const pageTokenData = await pageTokenResponse.json();
-  
-  console.log('🔍 [FACEBOOK DEBUG] Resposta das páginas:', {
-    success: pageTokenResponse.ok,
-    hasData: !!pageTokenData.data,
-    pagesCount: pageTokenData.data?.length || 0,
-    targetPageId: FACEBOOK_PAGE_ID
-  });
-  
-  const pageInfo = pageTokenData.data?.find((page: any) => page.id === FACEBOOK_PAGE_ID);
-  if (!pageInfo) {
-    throw new Error('Página não encontrada ou sem acesso');
-  }
-  
-  console.log('✅ [FACEBOOK DEBUG] Página encontrada:', {
-    name: pageInfo.name,
-    hasToken: !!pageInfo.access_token
-  });
+  const FACEBOOK_PAGE_ID = '476690778850970';
 
-  // Se temos banner gerado, postar como foto com legenda
-  if (bannerBase64) {
-    console.log('📷 [FACEBOOK DEBUG] Postando imagem gerada...');
+  try {
+    console.log('📘 [FACEBOOK] Iniciando postagem...');
     
-    // Converter base64 para blob
-    console.log('🔍 [FACEBOOK DEBUG] Convertendo base64 para blob...');
-    
-    let imageBlob;
-    try {
-      const binaryString = atob(bannerBase64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+    // Se há uma imagem em base64, fazer upload primeiro
+    let photoId = null;
+    if (banner_base64) {
+      console.log('📷 [FACEBOOK] Fazendo upload da imagem...');
+      
+      // Converter base64 para blob
+      const imageData = Uint8Array.from(atob(banner_base64), c => c.charCodeAt(0));
+      
+      // Criar form data
+      const formData = new FormData();
+      formData.append('source', new Blob([imageData], { type: 'image/png' }));
+      formData.append('access_token', FACEBOOK_PAGE_ACCESS_TOKEN);
+      formData.append('published', 'false'); // Upload não publicado para depois anexar ao post
+
+      const uploadResponse = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/photos`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const uploadResult = await uploadResponse.json();
+      console.log('📷 [FACEBOOK] Resultado upload:', uploadResult);
+
+      if (uploadResponse.ok && uploadResult.id) {
+        photoId = uploadResult.id;
+        console.log('✅ [FACEBOOK] Imagem carregada com ID:', photoId);
+      } else {
+        console.error('❌ [FACEBOOK] Erro no upload da imagem:', uploadResult);
       }
-      imageBlob = new Blob([bytes], { type: 'image/png' });
-      console.log('✅ [FACEBOOK DEBUG] Base64 convertido, tamanho:', bytes.length, 'blob size:', imageBlob.size);
-    } catch (error) {
-      console.error('❌ [FACEBOOK DEBUG] Erro ao converter base64:', error);
-      throw new Error('Erro ao processar imagem gerada: ' + error.message);
     }
-    
-    // Criar FormData para upload da imagem
-    console.log('🔍 [FACEBOOK DEBUG] Criando FormData para upload...');
-    const formData = new FormData();
-    formData.append('source', imageBlob);
-    formData.append('message', content);
-    formData.append('access_token', pageInfo.access_token);
-    
-    console.log('🔍 [FACEBOOK DEBUG] FormData criado:', {
-      blobSize: imageBlob.size,
-      messageLength: content.length,
-      hasAccessToken: !!pageInfo.access_token
+
+    // Criar o post
+    console.log('📝 [FACEBOOK] Criando post...');
+    const postData = new URLSearchParams({
+      message: content,
+      access_token: FACEBOOK_PAGE_ACCESS_TOKEN
     });
-    
-    console.log('🔍 [FACEBOOK DEBUG] Enviando para Facebook API...');
-    const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/photos`, {
+
+    // Se temos uma foto, adicionar ao post
+    if (photoId) {
+      postData.append('attached_media[0]', JSON.stringify({ media_fbid: photoId }));
+    }
+
+    const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
       method: 'POST',
-      body: formData
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: postData.toString()
     });
 
     const result = await response.json();
-    
-    console.log('🔍 [FACEBOOK DEBUG] Resposta da API:', {
-      status: response.status,
-      ok: response.ok,
-      result: result
-    });
+    console.log('📘 [FACEBOOK] Resultado final:', result);
     
     if (response.ok) {
-      console.log('✅ [FACEBOOK DEBUG] Imagem postada com sucesso:', result.id);
-      return { success: true, post_id: result.id, used_banner: true };
+      return { success: true, post_id: result.id };
     } else {
-      console.error('❌ [FACEBOOK DEBUG] Erro ao postar imagem:', result);
-      throw new Error('Erro no Facebook: ' + JSON.stringify(result));
+      throw new Error('Erro ao postar no Facebook: ' + JSON.stringify(result));
     }
-  } else {
-    // Post de texto com imagem do produto (se disponível)
-    console.log('📝 [FACEBOOK DEBUG] Postando texto...');
-    
-    // Verificar se há produto com imagem
-    let productImage = null;
-    if (product_id) {
-      const { data: product } = await supabase
-        .from('products')
-        .select('image_url')
-        .eq('id', product_id)
-        .single();
-      
-      if (product?.image_url) {
-        productImage = product.image_url;
-        console.log('🖼️ [FACEBOOK DEBUG] Imagem do produto encontrada:', productImage);
-      }
-    }
-
-    // Se há imagem do produto, postar como foto
-    if (productImage) {
-      console.log('📷 [FACEBOOK DEBUG] Postando com imagem do produto...');
-      
-      let postData: any = {
-        url: productImage,
-        caption: content,
-        access_token: pageInfo.access_token
-      };
-      
-      const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/photos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams(postData).toString()
-      });
-
-      const result = await response.json();
-      
-      console.log('🔍 [FACEBOOK DEBUG] Resposta da API (com imagem):', {
-        status: response.status,
-        ok: response.ok,
-        result: result
-      });
-      
-      if (response.ok) {
-        console.log('✅ [FACEBOOK DEBUG] Post com imagem publicado:', result.id);
-        return { success: true, post_id: result.id, used_product_image: true };
-      } else {
-        console.error('❌ [FACEBOOK DEBUG] Erro ao postar com imagem:', result);
-        throw new Error('Erro no Facebook: ' + JSON.stringify(result));
-      }
-    } else {
-      // Post só de texto
-      console.log('📝 [FACEBOOK DEBUG] Postando só texto...');
-      
-      let postData: any = {
-        message: content,
-        access_token: pageInfo.access_token
-      };
-      
-      const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams(postData).toString()
-      });
-
-      const result = await response.json();
-      
-      if (response.ok) {
-        return { success: true, post_id: result.id };
-      } else {
-        throw new Error('Erro no Facebook: ' + JSON.stringify(result));
-      }
-    }
+  } catch (error) {
+    console.error('❌ [FACEBOOK] Erro:', error);
+    throw error;
+  }
 }
 
 async function postToInstagram(content: string, product_id?: string, supabase?: any, banner_url?: string) {
-  console.log('🔍 [INSTAGRAM DEBUG] Iniciando postagem...');
+  const INSTAGRAM_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+  const INSTAGRAM_BUSINESS_ID = '17841470006070925';
   
-  // Buscar configurações do banco de dados
-  const { data: settings, error: settingsError } = await supabase
-    .from('social_media_settings')
-    .select('settings')
-    .eq('platform', 'instagram')
-    .eq('is_active', true)
-    .single();
-  
-  console.log('🔍 [INSTAGRAM DEBUG] Configurações encontradas:', {
-    hasSettings: !!settings,
-    settingsError,
-    hasAccessToken: !!settings?.settings?.access_token,
-    hasBusinessId: !!settings?.settings?.business_id,
-    tokenPrefix: settings?.settings?.access_token?.substring(0, 10) + '...',
-    businessId: settings?.settings?.business_id
-  });
-  
-  if (!settings?.settings?.access_token || !settings?.settings?.business_id) {
-    throw new Error('Credenciais do Instagram não configuradas');
-  }
-  
-  const INSTAGRAM_ACCESS_TOKEN = settings.settings.access_token;
-  const INSTAGRAM_BUSINESS_ID = settings.settings.business_id;
-
-  // Instagram requer imagem para posts
-  let imageUrl: string | null = null;
-
-  // Priorizar banner_url (banners gerados pelo sistema)
-  if (banner_url) {
-    imageUrl = banner_url;
-  }
-  
-  // Se não houver banner_url, tentar imagem do produto
-  if (!imageUrl && product_id) {
-    const { data: product } = await supabase
-      .from('products')
-      .select('image_url')
-      .eq('id', product_id)
-      .single();
-    
-    if (product?.image_url) {
-      imageUrl = product.image_url;
-    }
+  if (!INSTAGRAM_ACCESS_TOKEN) {
+    throw new Error('Instagram Access Token não configurado');
   }
 
-  // Fallback (manter anterior se ainda não houver)
-  if (!imageUrl) {
-    imageUrl = 'https://fijbvihinhuedkvkxwir.supabase.co/storage/v1/object/public/product-images/default-post.jpg';
+  // Se não há imagem, não podemos postar no Instagram
+  if (!banner_url) {
+    throw new Error('Instagram requer uma imagem. Banner URL não fornecida.');
   }
 
   // Criar container de mídia
@@ -736,7 +551,7 @@ async function postToInstagram(content: string, product_id?: string, supabase?: 
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
-      image_url: imageUrl,
+      image_url: banner_url,
       caption: content,
       access_token: INSTAGRAM_ACCESS_TOKEN
     }).toString()
@@ -745,7 +560,7 @@ async function postToInstagram(content: string, product_id?: string, supabase?: 
   const containerResult = await containerResponse.json();
   
   if (!containerResponse.ok) {
-    throw new Error('Erro ao criar container Instagram: ' + JSON.stringify(containerResult));
+    throw new Error('Erro ao criar container do Instagram: ' + JSON.stringify(containerResult));
   }
 
   // Publicar o container
