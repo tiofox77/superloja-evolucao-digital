@@ -891,6 +891,11 @@ const AdminAutoPostIA: React.FC = () => {
                             {post.platform}
                           </Badge>
                           <Badge variant="outline">{post.post_type}</Badge>
+                          {(post.post_type === 'promotional' || post.post_type === 'informational' || post.post_type === 'engagement') && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200">
+                              🤖 IA
+                            </Badge>
+                          )}
                           <Badge variant={post.status === 'pending' ? 'default' : 'secondary'}>
                             {post.status === 'pending' ? '⏳ Pendente' : 
                              post.status === 'posted' ? '✅ Publicado' : 
@@ -997,6 +1002,11 @@ const AdminAutoPostIA: React.FC = () => {
                             {post.platform}
                           </Badge>
                           <Badge variant="outline">{post.post_type}</Badge>
+                          {(post.post_type === 'promotional' || post.post_type === 'informational' || post.post_type === 'engagement') && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200">
+                              🤖 IA
+                            </Badge>
+                          )}
                           <Badge variant={post.status === 'success' ? 'default' : 'destructive'}>
                             {post.status === 'success' ? '✅ Sucesso' : '❌ Falhou'}
                           </Badge>
