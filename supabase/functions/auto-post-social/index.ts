@@ -575,7 +575,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
       formData.append('access_token', FACEBOOK_PAGE_ACCESS_TOKEN);
       formData.append('published', 'false'); // Upload não publicado para depois anexar ao post
 
-      const uploadResponse = await fetch(`https://graph.facebook.com/v19.0/${FACEBOOK_PAGE_ID}/photos`, {
+      const uploadResponse = await fetch(`https://graph.facebook.com/v23.0/${FACEBOOK_PAGE_ID}/photos`, {
         method: 'POST',
         body: formData
       });
@@ -593,7 +593,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
     }
 
     // Criar o post
-    const postUrl = `https://graph.facebook.com/v19.0/${FACEBOOK_PAGE_ID}/feed`;
+    const postUrl = `https://graph.facebook.com/v23.0/${FACEBOOK_PAGE_ID}/feed`;
     const postData: any = {
       message: content,
       access_token: FACEBOOK_PAGE_ACCESS_TOKEN
@@ -604,49 +604,43 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
       postData.object_attachment = photoId;
     }
 
-    console.log('📘 [FACEBOOK] Criando post...');
+    console.log('📘 [FACEBOOK] Criando post com dados:', { 
+      hasMessage: !!postData.message, 
+      hasPhoto: !!photoId,
+      pageId: FACEBOOK_PAGE_ID 
+    });
+    
     const postResponse = await fetch(postUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(postData)
     });
-        console.log('✅ [FACEBOOK] Imagem carregada com ID:', photoId);
-      } else {
-        console.error('❌ [FACEBOOK] Erro no upload da imagem:', uploadResult);
-      }
-    }
 
-    // Criar o post
-    console.log('📝 [FACEBOOK] Criando post...');
-    const postData = new URLSearchParams({
-      message: content,
-      access_token: FACEBOOK_PAGE_ACCESS_TOKEN
-    });
+    const postResult = await postResponse.json();
+    console.log('📘 [FACEBOOK] Resultado do post:', postResult);
 
-    // Se temos uma foto, adicionar ao post
-    if (photoId) {
-      postData.append('attached_media[0]', JSON.stringify({ media_fbid: photoId }));
-    }
-
-    const response = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/feed`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: postData.toString()
-    });
-
-    const result = await response.json();
-    console.log('📘 [FACEBOOK] Resultado final:', result);
-    
-    if (response.ok) {
-      return { success: true, post_id: result.id };
+    if (postResponse.ok && postResult.id) {
+      console.log('✅ [FACEBOOK] Post criado com sucesso:', postResult.id);
+      return { success: true, post_id: postResult.id };
     } else {
-      throw new Error('Erro ao postar no Facebook: ' + JSON.stringify(result));
+      console.error('❌ [FACEBOOK] Erro ao criar post:', postResult);
+      
+      // Verificar se é erro de permissões
+      if (postResult.error?.code === 200) {
+        return { 
+          success: false, 
+          error: `Erro de permissões: ${postResult.error.message}. Verifique se o token tem as permissões 'pages_manage_posts' e 'pages_read_engagement'.`
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: postResult.error?.message || 'Erro desconhecido ao postar no Facebook' 
+      };
     }
-  } catch (error) {
-    console.error('❌ [FACEBOOK] Erro:', error);
-    throw error;
+  } catch (error: any) {
+    console.error('❌ [FACEBOOK] Erro geral:', error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -665,48 +659,73 @@ async function postToInstagram(content: string, product_id?: string, supabase?: 
   const INSTAGRAM_ACCESS_TOKEN = tokens.instagram.access_token;
   const INSTAGRAM_BUSINESS_ID = tokens.instagram.business_id;
 
-  // Se não há imagem, não podemos postar no Instagram
-  if (!banner_url) {
-    throw new Error('Instagram requer uma imagem. Banner URL não fornecida.');
-  }
+  try {
+    console.log('📷 [INSTAGRAM] Iniciando postagem...');
+    
+    if (banner_url) {
+      // Post com imagem
+      console.log('📷 [INSTAGRAM] Postando com imagem...');
+      
+      // Primeiro, criar container de mídia
+      const containerResponse = await fetch(`https://graph.facebook.com/v23.0/${INSTAGRAM_BUSINESS_ID}/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_url: banner_url,
+          caption: content,
+          access_token: INSTAGRAM_ACCESS_TOKEN
+        })
+      });
 
-  // Criar container de mídia
-  const containerResponse = await fetch(`https://graph.facebook.com/v18.0/${INSTAGRAM_BUSINESS_ID}/media`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      image_url: banner_url,
-      caption: content,
-      access_token: INSTAGRAM_ACCESS_TOKEN
-    }).toString()
-  });
+      const containerResult = await containerResponse.json();
+      console.log('📷 [INSTAGRAM] Container criado:', containerResult);
 
-  const containerResult = await containerResponse.json();
-  
-  if (!containerResponse.ok) {
-    throw new Error('Erro ao criar container do Instagram: ' + JSON.stringify(containerResult));
-  }
+      if (!containerResponse.ok || !containerResult.id) {
+        console.error('❌ [INSTAGRAM] Erro ao criar container:', containerResult);
+        return { success: false, error: containerResult.error?.message || 'Erro ao criar container de mídia' };
+      }
 
-  // Publicar o container
-  const publishResponse = await fetch(`https://graph.facebook.com/v18.0/${INSTAGRAM_BUSINESS_ID}/media_publish`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      creation_id: containerResult.id,
-      access_token: INSTAGRAM_ACCESS_TOKEN
-    }).toString()
-  });
+      // Aguardar processamento e publicar
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Aguardar 2 segundos
+        
+        const publishResponse = await fetch(`https://graph.facebook.com/v23.0/${INSTAGRAM_BUSINESS_ID}/media_publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            creation_id: containerResult.id,
+            access_token: INSTAGRAM_ACCESS_TOKEN
+          })
+        });
 
-  const publishResult = await publishResponse.json();
-  
-  if (publishResponse.ok) {
-    return { success: true, post_id: publishResult.id };
-  } else {
-    throw new Error('Erro ao publicar no Instagram: ' + JSON.stringify(publishResult));
+        const publishResult = await publishResponse.json();
+        console.log(`📷 [INSTAGRAM] Tentativa ${attempts + 1} de publicação:`, publishResult);
+
+        if (publishResponse.ok && publishResult.id) {
+          console.log('✅ [INSTAGRAM] Post publicado com sucesso:', publishResult.id);
+          return { success: true, post_id: publishResult.id };
+        } else if (publishResult.error?.message?.includes('try again')) {
+          attempts++;
+          continue;
+        } else {
+          console.error('❌ [INSTAGRAM] Erro na publicação:', publishResult);
+          return { success: false, error: publishResult.error?.message || 'Erro ao publicar no Instagram' };
+        }
+      }
+      
+      return { success: false, error: 'Timeout ao publicar no Instagram' };
+    } else {
+      // Post apenas com texto (não suportado no Instagram)
+      console.log('⚠️ [INSTAGRAM] Instagram requer imagem - pulando post somente texto');
+      return { success: false, error: 'Instagram requer uma imagem para posts' };
+    }
+    
+  } catch (error: any) {
+    console.error('❌ [INSTAGRAM] Erro geral:', error);
+    return { success: false, error: error.message };
   }
 }
 
