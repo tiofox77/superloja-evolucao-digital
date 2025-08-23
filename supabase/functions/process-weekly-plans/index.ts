@@ -50,7 +50,7 @@ serve(async (req) => {
 
     // Buscar posts para processar baseado na ação
     const now = new Date();
-    const { data: pendingPosts, error: postsError } = await supabase
+    let query = supabase
       .from('weekly_plan_posts')
       .select(`
         *,
@@ -58,8 +58,15 @@ serve(async (req) => {
         products(id, name, price, image_url)
       `)
       .in('status', statusFilter)
-      .eq('weekly_posting_plans.status', 'active')
-      .lte('scheduled_for', now.toISOString())
+      .eq('weekly_posting_plans.status', 'active');
+
+    // Para processamento automático geral, respeitamos o horário agendado.
+    // Para ações manuais (ex.: post_generated), não limitamos pelo horário.
+    if (action !== 'post_generated') {
+      query = query.lte('scheduled_for', now.toISOString());
+    }
+
+    const { data: pendingPosts, error: postsError } = await query
       .order('scheduled_for', { ascending: true })
       .limit(10);
 
