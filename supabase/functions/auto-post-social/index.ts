@@ -575,7 +575,7 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
       formData.append('access_token', FACEBOOK_PAGE_ACCESS_TOKEN);
       formData.append('published', 'false'); // Upload não publicado para depois anexar ao post
 
-      const uploadResponse = await fetch(`https://graph.facebook.com/v18.0/${FACEBOOK_PAGE_ID}/photos`, {
+      const uploadResponse = await fetch(`https://graph.facebook.com/v19.0/${FACEBOOK_PAGE_ID}/photos`, {
         method: 'POST',
         body: formData
       });
@@ -585,6 +585,31 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
 
       if (uploadResponse.ok && uploadResult.id) {
         photoId = uploadResult.id;
+        console.log('✅ [FACEBOOK] Upload da imagem bem-sucedido, ID:', photoId);
+      } else {
+        console.error('❌ [FACEBOOK] Falha no upload da imagem:', uploadResult);
+        // Continue sem imagem se o upload falhar
+      }
+    }
+
+    // Criar o post
+    const postUrl = `https://graph.facebook.com/v19.0/${FACEBOOK_PAGE_ID}/feed`;
+    const postData: any = {
+      message: content,
+      access_token: FACEBOOK_PAGE_ACCESS_TOKEN
+    };
+
+    // Adicionar imagem se disponível
+    if (photoId) {
+      postData.object_attachment = photoId;
+    }
+
+    console.log('📘 [FACEBOOK] Criando post...');
+    const postResponse = await fetch(postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(postData)
+    });
         console.log('✅ [FACEBOOK] Imagem carregada com ID:', photoId);
       } else {
         console.error('❌ [FACEBOOK] Erro no upload da imagem:', uploadResult);
