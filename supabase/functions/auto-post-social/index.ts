@@ -40,13 +40,15 @@ serve(async (req) => {
     if (content && post_id && table_name) {
       console.log('📤 Postagem direta solicitada:', { post_id, table_name, platform });
       
-      const result = await postNow(platform, product_id, content, post_type, supabase, banner_base64, banner_url);
+      const result: any = await postNow(platform, product_id, content, post_type, supabase, banner_base64, banner_url);
+      
+      const overallSuccess = !!result?.success;
       
       // Atualizar status do post na tabela específica
       const { error: updateError } = await supabase
         .from(table_name)
         .update({ 
-          status: 'posted',
+          status: overallSuccess ? 'posted' : 'failed',
           scheduled_for: new Date().toISOString()
         })
         .eq('id', post_id);
@@ -55,7 +57,9 @@ serve(async (req) => {
         console.error('Erro ao atualizar status do post:', updateError);
       }
 
-      return result;
+      return new Response(JSON.stringify(result), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // Fluxo normal baseado em actions
@@ -66,8 +70,12 @@ serve(async (req) => {
       case 'schedule_post':
         return await schedulePost(platform, product_id, custom_prompt, schedule_time, post_type, supabase);
       
-      case 'post_now':
-        return await postNow(platform, product_id, custom_prompt, post_type, supabase, banner_base64, banner_url);
+      case 'post_now': {
+        const result: any = await postNow(platform, product_id, custom_prompt, post_type, supabase, banner_base64, banner_url);
+        return new Response(JSON.stringify(result), {
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
       
       case 'get_scheduled':
         return await getScheduledPosts(supabase);
@@ -433,25 +441,24 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
       console.log('✅ Histórico salvo com sucesso');
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        content: content,
-        results: results,
-        message: 'Post enviado com sucesso!'
-      }),
-      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-    );
+    const overallSuccess = results.some((r: any) => r?.success === true);
 
-  } catch (error) {
+    return {
+      success: overallSuccess,
+      content,
+      results,
+      message: overallSuccess ? 'Post enviado com sucesso!' : 'Falha ao postar — ver detalhes',
+    } as any;
+
+  } catch (error: any) {
     console.error('❌ Erro no postNow:', error);
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message 
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-    );
+    return {
+      success: false,
+      content: content ?? '',
+      results: [],
+      message: 'Erro ao enviar post',
+      error: error.message,
+    } as any;
   }
 }
 
