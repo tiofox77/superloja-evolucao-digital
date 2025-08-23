@@ -6,6 +6,87 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Função para buscar configurações dos tokens das tabelas do banco
+async function getSocialMediaTokens(supabase: any) {
+  console.log('🔑 Buscando tokens das configurações...');
+  
+  try {
+    // Buscar configurações do Facebook/Instagram
+    const { data: socialSettings, error: socialError } = await supabase
+      .from('social_media_settings')
+      .select('platform, settings, is_active')
+      .in('platform', ['facebook', 'instagram'])
+      .eq('is_active', true);
+
+    if (socialError) {
+      console.error('❌ Erro ao buscar social_media_settings:', socialError);
+    }
+
+    // Buscar configurações da Meta (nova tabela)
+    const { data: metaSettings, error: metaError } = await supabase
+      .from('meta_settings')
+      .select('access_token, page_id, instagram_id, app_id, app_secret')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (metaError) {
+      console.error('❌ Erro ao buscar meta_settings:', metaError);
+    }
+
+    const tokens = {
+      facebook: {
+        access_token: '',
+        page_id: ''
+      },
+      instagram: {
+        access_token: '',
+        business_id: ''
+      }
+    };
+
+    // Priorizar meta_settings se disponível
+    if (metaSettings?.access_token) {
+      console.log('✅ Usando tokens da meta_settings');
+      tokens.facebook.access_token = metaSettings.access_token;
+      tokens.facebook.page_id = metaSettings.page_id || '';
+      tokens.instagram.access_token = metaSettings.access_token;
+      tokens.instagram.business_id = metaSettings.instagram_id || '';
+    } else if (socialSettings?.length > 0) {
+      console.log('✅ Usando tokens da social_media_settings');
+      // Fallback para social_media_settings
+      socialSettings.forEach(setting => {
+        if (setting.platform === 'facebook' && setting.settings) {
+          tokens.facebook.access_token = setting.settings.access_token || '';
+          tokens.facebook.page_id = setting.settings.page_id || '';
+        } else if (setting.platform === 'instagram' && setting.settings) {
+          tokens.instagram.access_token = setting.settings.access_token || '';
+          tokens.instagram.business_id = setting.settings.business_id || '';
+        }
+      });
+    }
+
+    console.log('🔑 Tokens carregados:', {
+      facebook: { 
+        hasToken: !!tokens.facebook.access_token,
+        hasPageId: !!tokens.facebook.page_id 
+      },
+      instagram: { 
+        hasToken: !!tokens.instagram.access_token,
+        hasBusinessId: !!tokens.instagram.business_id 
+      }
+    });
+
+    return tokens;
+  } catch (error) {
+    console.error('❌ Erro ao buscar tokens:', error);
+    return {
+      facebook: { access_token: '', page_id: '' },
+      instagram: { access_token: '', business_id: '' }
+    };
+  }
+}
+
 interface AutoPostRequest {
   action?: 'generate_content' | 'schedule_post' | 'post_now' | 'get_scheduled';
   platform?: 'facebook' | 'instagram' | 'both';
@@ -463,13 +544,19 @@ async function postNow(platform?: string, product_id?: string, custom_prompt?: s
 }
 
 async function postToFacebook(content: string, product_id?: string, supabase?: any, banner_base64?: string) {
-  const FACEBOOK_PAGE_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
+  // Buscar tokens das configurações do banco
+  const tokens = await getSocialMediaTokens(supabase);
   
-  if (!FACEBOOK_PAGE_ACCESS_TOKEN) {
-    throw new Error('Facebook Page Access Token não configurado');
+  if (!tokens.facebook.access_token) {
+    throw new Error('Facebook Access Token não configurado nas configurações');
   }
 
-  const FACEBOOK_PAGE_ID = '476690778850970';
+  if (!tokens.facebook.page_id) {
+    throw new Error('Facebook Page ID não configurado nas configurações');
+  }
+
+  const FACEBOOK_PAGE_ACCESS_TOKEN = tokens.facebook.access_token;
+  const FACEBOOK_PAGE_ID = tokens.facebook.page_id;
 
   try {
     console.log('📘 [FACEBOOK] Iniciando postagem...');
@@ -539,12 +626,19 @@ async function postToFacebook(content: string, product_id?: string, supabase?: a
 }
 
 async function postToInstagram(content: string, product_id?: string, supabase?: any, banner_url?: string) {
-  const INSTAGRAM_ACCESS_TOKEN = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
-  const INSTAGRAM_BUSINESS_ID = '17841470006070925';
+  // Buscar tokens das configurações do banco
+  const tokens = await getSocialMediaTokens(supabase);
   
-  if (!INSTAGRAM_ACCESS_TOKEN) {
-    throw new Error('Instagram Access Token não configurado');
+  if (!tokens.instagram.access_token) {
+    throw new Error('Instagram Access Token não configurado nas configurações');
   }
+
+  if (!tokens.instagram.business_id) {
+    throw new Error('Instagram Business ID não configurado nas configurações');
+  }
+
+  const INSTAGRAM_ACCESS_TOKEN = tokens.instagram.access_token;
+  const INSTAGRAM_BUSINESS_ID = tokens.instagram.business_id;
 
   // Se não há imagem, não podemos postar no Instagram
   if (!banner_url) {
