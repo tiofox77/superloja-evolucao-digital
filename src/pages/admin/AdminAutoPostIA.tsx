@@ -30,7 +30,8 @@ import {
   Zap,
   CalendarDays,
   HelpCircle,
-  Eye
+  Eye,
+  RefreshCw
 } from 'lucide-react';
 import { TokenHelpDialog } from '@/components/admin/TokenHelpDialog';
 
@@ -1104,7 +1105,7 @@ const AdminAutoPostIA: React.FC = () => {
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-              <div className="text-sm">
+              <div className="text-sm flex-1">
                 <p className="font-medium text-amber-800 mb-1">Status dos Tokens</p>
                 <p className="text-amber-700 mb-2">
                   <strong>Facebook:</strong> Token expirou em 03/08/2025 - Precisa renovar
@@ -1112,15 +1113,27 @@ const AdminAutoPostIA: React.FC = () => {
                 <p className="text-amber-700 mb-3">
                   <strong>Instagram:</strong> Não configurado - Configure access token e business ID
                 </p>
-                <Button 
-                  onClick={() => setShowTokenHelp(true)}
-                  variant="outline"
-                  size="sm"
-                  className="bg-white"
-                >
-                  <HelpCircle className="h-4 w-4 mr-1" />
-                  Ver Guia de Configuração
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => setShowTokenHelp(true)}
+                    variant="outline"
+                    size="sm"
+                    className="bg-white"
+                  >
+                    <HelpCircle className="h-4 w-4 mr-1" />
+                    Ver Guia de Configuração
+                  </Button>
+                  <Button 
+                    onClick={testSocialConfig}
+                    variant="outline"
+                    size="sm"
+                    className="bg-white"
+                    disabled={settingsLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1 ${settingsLoading ? 'animate-spin' : ''}`} />
+                    Atualizar Status
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
