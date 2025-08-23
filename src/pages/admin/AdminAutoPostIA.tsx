@@ -191,12 +191,17 @@ const AdminAutoPostIA: React.FC = () => {
   });
   const [showKeySetup, setShowKeySetup] = useState(false);
   const [showTokenHelp, setShowTokenHelp] = useState(false);
+  const [tokenStatus, setTokenStatus] = useState({
+    facebook: { valid: false, error: '', loading: true },
+    instagram: { valid: false, error: '', loading: true }
+  });
 
   useEffect(() => {
     loadProducts();
     loadScheduledPosts();
     loadSocialSettings();
     loadPostHistory();
+    testSocialConfig(); // Carregar status inicial dos tokens
   }, []);
 
   const loadProducts = async () => {
@@ -563,14 +568,32 @@ const AdminAutoPostIA: React.FC = () => {
         
         console.log('🔍 Teste de configurações:', results);
         
+        // Atualizar o estado do token status com dados reais
+        setTokenStatus({
+          facebook: {
+            valid: results.facebook?.tokenValid || false,
+            error: results.facebook?.tokenValid ? '' : 'Token inválido ou expirado',
+            loading: false
+          },
+          instagram: {
+            valid: results.instagram?.hasToken && results.instagram?.hasBusinessId || false,
+            error: results.instagram?.hasToken ? '' : 'Token ou Business ID não configurado',
+            loading: false
+          }
+        });
+        
         toast({
-          title: "Teste de Configurações",
+          title: "Status Atualizado",
           description: `Facebook: ${summary.facebookReady ? '✅ OK' : '❌ Problema'} | Instagram: ${summary.instagramReady ? '✅ OK' : '❌ Problema'}`,
           variant: summary.facebookReady || summary.instagramReady ? "default" : "destructive",
         });
       }
     } catch (error) {
       console.error('Erro no teste:', error);
+      setTokenStatus({
+        facebook: { valid: false, error: 'Erro ao verificar', loading: false },
+        instagram: { valid: false, error: 'Erro ao verificar', loading: false }
+      });
       toast({
         title: "Erro no teste",
         description: "Falha ao testar configurações",
@@ -1108,10 +1131,14 @@ const AdminAutoPostIA: React.FC = () => {
               <div className="text-sm flex-1">
                 <p className="font-medium text-amber-800 mb-1">Status dos Tokens</p>
                 <p className="text-amber-700 mb-2">
-                  <strong>Facebook:</strong> Token expirou em 03/08/2025 - Precisa renovar
+                  <strong>Facebook:</strong> {tokenStatus.facebook.loading ? '⏳ Verificando...' : 
+                    tokenStatus.facebook.valid ? '✅ Token válido e funcionando' : 
+                    `❌ ${tokenStatus.facebook.error}`}
                 </p>
                 <p className="text-amber-700 mb-3">
-                  <strong>Instagram:</strong> Não configurado - Configure access token e business ID
+                  <strong>Instagram:</strong> {tokenStatus.instagram.loading ? '⏳ Verificando...' : 
+                    tokenStatus.instagram.valid ? '✅ Token válido e funcionando' : 
+                    `❌ ${tokenStatus.instagram.error}`}
                 </p>
                 <div className="flex gap-2">
                   <Button 
