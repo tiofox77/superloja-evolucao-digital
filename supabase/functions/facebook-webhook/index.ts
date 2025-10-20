@@ -348,12 +348,24 @@ async function handleMessage(messaging: any, supabase: any, platform: 'facebook'
     // Verificar se o bot está habilitado
     const { data: botSettings } = await supabase
       .from('ai_settings')
-      .select('value')
-      .eq('key', 'bot_enabled')
-      .single();
+      .select('key, value')
+      .in('key', ['bot_enabled', 'auto_response_enabled']);
     
-    if (botSettings?.value !== 'true') {
-      console.log('🚫 Bot desabilitado');
+    const botEnabled = botSettings?.find((s: any) => s.key === 'bot_enabled')?.value === 'true';
+    const autoResponseEnabled = botSettings?.find((s: any) => s.key === 'auto_response_enabled')?.value === 'true';
+    
+    console.log('🤖 Status do Bot:', { botEnabled, autoResponseEnabled });
+    
+    if (!botEnabled || !autoResponseEnabled) {
+      console.log('🚫 Bot desabilitado - salvando mensagem mas NÃO respondendo automaticamente');
+      // Salvar mensagem mesmo com bot desabilitado
+      await supabase.from('ai_conversations').insert({
+        platform: platform,
+        user_id: senderId,
+        message: messageText,
+        type: 'received',
+        timestamp: new Date().toISOString()
+      });
       return;
     }
     
