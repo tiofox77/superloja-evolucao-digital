@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Edit, Trash2, Eye, Star, Grid2X2, List, Filter, Power, PowerOff, FileDown, Facebook } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Star, Grid2X2, List, Filter, Power, PowerOff, FileDown, Facebook, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -173,6 +173,46 @@ const AdminProdutos = () => {
     setSearchTerm('');
   };
 
+  const exportToXML = async () => {
+    try {
+      toast({
+        title: "Gerando XML...",
+        description: "Aguarde enquanto o arquivo é gerado."
+      });
+
+      const response = await supabase.functions.invoke('export-products-xml');
+      
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao gerar XML');
+      }
+
+      // Criar blob com o XML
+      const blob = new Blob([response.data], { type: 'application/xml' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Criar link temporário para download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `produtos-export-${new Date().toISOString().split('T')[0]}.xml`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "XML exportado!",
+        description: "Arquivo XML foi baixado com sucesso."
+      });
+    } catch (error: any) {
+      console.error('Erro ao exportar XML:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível exportar o XML.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const exportToFacebookCatalog = () => {
     try {
       // Preparar dados no formato do Facebook Catalog
@@ -281,6 +321,14 @@ const AdminProdutos = () => {
           >
             <FileDown className="w-4 h-4 mr-2" />
             Gerar Catálogo PDF
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={exportToXML}
+            className="hover:scale-105 transition-transform border-green-200 text-green-600 hover:bg-green-50"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exportar XML
           </Button>
           <Button 
             variant="outline"
